@@ -18,3 +18,4 @@
 ## 文档
 
 - 设计方案：[`docs/specs/2026-10-18-md-reader-design.md`](docs/specs/2026-10-18-md-reader-design.md)
+- 实施计划：[`docs/plans/2026-10-18-md-reader-implementation.md`](docs/plans/2026-10-18-md-reader-implementation.md)
