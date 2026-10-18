@@ -1,5 +1,21 @@
-import { APP_TITLE } from './constants';
+import { createHashRouter, RouterProvider } from 'react-router-dom';
+import Shell from './app/Shell';
+import HomePage from './pages/HomePage';
+import DocPage from './pages/DocPage';
+import SearchPage from './pages/SearchPage';
+import SettingsPage from './pages/SettingsPage';
+import SetupPage from './pages/SetupPage';
+
+const router = createHashRouter([
+  { path: '/', element: <Shell />, children: [
+    { index: true, element: <HomePage /> },
+    { path: 'doc/*', element: <DocPage /> },
+    { path: 'search', element: <SearchPage /> },
+    { path: 'settings', element: <SettingsPage /> },
+    { path: 'setup', element: <SetupPage /> },
+  ]},
+]);
 
 export default function App() {
-  return <h1>{APP_TITLE} · 占位页</h1>;
+  return <RouterProvider router={router} />;
 }
