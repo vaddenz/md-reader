@@ -4,10 +4,12 @@ export interface TextPos { node: Text | null; offset: number }
 export interface Haystack { text: string; map: TextPos[] }
 
 const SKIP_SELECTOR = 'script, style, pre, code, button, svg, .code-copy, .mermaid, .md-img-error';
+/** 复制口径的跳过清单：与锚定口径相同，但保留 pre/code（代码是正文内容，只剔除界面元素）。 */
+const COPY_SKIP_SELECTOR = 'script, style, button, svg, .code-copy, .mermaid, .md-img-error';
 const BLOCK_SELECTOR = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, dt, dd';
 const CONTEXT = 32;
 
-export function buildHaystack(container: HTMLElement): Haystack {
+export function buildHaystack(container: HTMLElement, skipSelector: string = SKIP_SELECTOR): Haystack {
   const text: string[] = [];
   const map: TextPos[] = [];
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -15,7 +17,7 @@ export function buildHaystack(container: HTMLElement): Haystack {
   let node = walker.nextNode() as Text | null;
   while (node) {
     const parent = node.parentElement;
-    if (parent && !parent.closest(SKIP_SELECTOR)) {
+    if (parent && !parent.closest(skipSelector)) {
       const block = parent.closest(BLOCK_SELECTOR) ?? container;
       if (prevBlock !== null && block !== prevBlock) {
         text.push('\n');
@@ -50,9 +52,9 @@ export function contentRange(container: HTMLElement): Range | null {
   return range;
 }
 
-/** 可见文本（非排除区，块间以换行分隔）：全选复制时用于剔除代码块/复制按钮等界面文本。 */
+/** 可见文本（复制口径：保留代码、剔除界面元素，块间以换行分隔）。 */
 export function visibleText(container: HTMLElement): string {
-  return buildHaystack(container).text;
+  return buildHaystack(container, COPY_SKIP_SELECTOR).text;
 }
 
 /** 归一化：空白串折叠为单空格，并记录每个归一化字符 → 原文下标。 */

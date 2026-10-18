@@ -185,6 +185,7 @@ test('全选：选区覆盖正文；复制内容不含代码复制按钮等界�
     return dt.getData('text/plain');
   });
   expect(copied).toContain('文档 B');
+  expect(copied).toContain('const answer = 42;');
   expect(copied).not.toContain('复制');
 });
 
@@ -208,5 +209,6 @@ test('全选后经菜单复制：内容不含界面文本', async ({ page }) => 
   await page.locator('.selection-menu').getByRole('menuitem', { name: '复制' }).click();
   const copied = await page.evaluate(() => (window as any).__copied as string);
   expect(copied).toContain('文档 B');
+  expect(copied).toContain('const answer = 42;');
   expect(copied).not.toContain('复制');
 });

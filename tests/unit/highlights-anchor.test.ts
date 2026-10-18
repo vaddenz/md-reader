@@ -136,9 +136,9 @@ describe('contentRange / visibleText', () => {
     const el = mount('<pre><code>只有代码</code></pre>');
     expect(contentRange(el)).toBeNull();
   });
-  it('visibleText 跳过排除区（代码块与复制按钮），块间换行分隔', () => {
-    const el = mount('<p>正文</p><pre><code>代码</code><button class="code-copy">复制</button></pre><p>结尾</p>');
-    expect(visibleText(el)).toBe('正文\n结尾');
+  it('visibleText 保留代码文本、剔除界面元素，块间换行分隔', () => {
+    const el = mount('<p>正文</p><pre><code>const x = 1;</code><button class="code-copy">复制</button></pre><p>结尾</p>');
+    expect(visibleText(el)).toBe('正文\nconst x = 1;\n结尾');
   });
 });
 
