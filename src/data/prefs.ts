@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from './db';
+import { serialize } from './serialize';
 
 /**
  * 用户偏好（T19）：收藏与阅读进度。
@@ -20,17 +21,6 @@ export interface RecentDoc { path: string; updatedAt: number }
 
 const FAVORITES_KEY = 'favorites';
 const PROGRESS_KEY = 'progress';
-
-/**
- * 读-改-写串行化：滚动节流写、visibilitychange 补写与卸载补写可能并发，
- * 串行避免两次读改写互相覆盖丢更新（后一次总能读到前一次的结果）。
- */
-let queue: Promise<unknown> = Promise.resolve();
-function serialize<T>(task: () => Promise<T>): Promise<T> {
-  const run = queue.then(task, task);
-  queue = run.catch(() => {});
-  return run;
-}
 
 /** kv 数据可能被旧版本/外部写入损坏：非字符串项直接丢弃。 */
 function sanitizeFavorites(raw: unknown): string[] {
