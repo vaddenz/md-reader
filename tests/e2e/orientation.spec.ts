@@ -47,6 +47,17 @@ test('不支持时：用户操作给出安装提示', async ({ page }) => {
   await expect(page.getByText(/不支持方向锁定/)).toBeVisible();
 });
 
+test('退出全屏后重新应用锁定（静默）', async ({ page }) => {
+  await stubOrientation(page);
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).__lockCalls.length)).toBeGreaterThan(0); // 启动锁定已完成
+  const before = await page.evaluate(() => (window as any).__lockCalls.length as number);
+  await page.evaluate(() => document.dispatchEvent(new Event('fullscreenchange')));
+  await expect.poll(() => page.evaluate(() => (window as any).__lockCalls.length)).toBe(before + 1);
+});
+
 test('设置页三态单选与头部同步', async ({ page }) => {
   await stubOrientation(page);
   await configureAndSync(page);

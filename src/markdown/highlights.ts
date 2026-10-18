@@ -5,10 +5,10 @@ export interface Haystack { text: string; map: TextPos[] }
 /** 归一化结果：空白串折叠为单空格，并记录每个归一化字符 → 原文下标。 */
 export interface NormalizedText { norm: string; toRaw: number[] }
 
-const SKIP_SELECTOR = 'script, style, pre, code, button, svg, .code-copy, .mermaid, .md-img-error';
+const SKIP_SELECTOR = 'script, style, pre, code, button, svg, .code-copy, .md-mermaid, .md-mermaid-error, .md-img-error';
 /** 复制口径的跳过清单：与锚定口径相同，但保留 pre/code（代码是正文内容，只剔除界面元素）。 */
-const COPY_SKIP_SELECTOR = 'script, style, button, svg, .code-copy, .mermaid, .md-img-error';
-const BLOCK_SELECTOR = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, dt, dd';
+const COPY_SKIP_SELECTOR = 'script, style, button, svg, .code-copy, .md-mermaid, .md-mermaid-error, .md-img-error';
+const BLOCK_SELECTOR = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, dt, dd, pre';
 const CONTEXT = 32;
 
 export function buildHaystack(container: HTMLElement, skipSelector: string = SKIP_SELECTOR): Haystack {

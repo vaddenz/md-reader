@@ -33,6 +33,19 @@ export function OrientationProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
+  // spec §7.4：系统 / 用户退出全屏后重新应用锁定；回到前台时补一次（静默，不提示）。
+  useEffect(() => {
+    if (!loaded) return;
+    const reapply = () => { void applyOrientation(state); };
+    const onVisibility = () => { if (document.visibilityState === 'visible') void applyOrientation(state); };
+    document.addEventListener('fullscreenchange', reapply);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('fullscreenchange', reapply);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [loaded, state]);
+
   useEffect(() => {
     if (state !== 'portrait') lastLandscape.current = state;
   }, [state]);

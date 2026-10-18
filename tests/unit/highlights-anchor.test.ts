@@ -30,6 +30,11 @@ describe('buildHaystack', () => {
     const el = mount('<p>前<strong>中</strong>后</p>');
     expect(buildHaystack(el).text).toBe('前中后');
   });
+  it('跳过 mermaid 占位与错误文案（md-mermaid / md-mermaid-error）', () => {
+    const el = mount('<div class="md-mermaid md-mermaid-done">graph TD</div><p class="md-mermaid-error">图表渲染失败，已显示源码</p><p>正文</p>');
+    expect(buildHaystack(el).text).toBe('正文');
+    expect(visibleText(el)).toBe('正文'); // 复制口径同样剔除（此前 `.mermaid` 死选择器漏过）
+  });
 });
 
 describe('locateAnchor', () => {
@@ -159,6 +164,10 @@ describe('contentRange / visibleText', () => {
   it('visibleText 保留代码文本、剔除界面元素，块间换行分隔', () => {
     const el = mount('<p>正文</p><pre><code>const x = 1;</code><button class="code-copy">复制</button></pre><p>结尾</p>');
     expect(visibleText(el)).toBe('正文\nconst x = 1;\n结尾');
+  });
+  it('相邻代码块在 visibleText 中以换行分隔', () => {
+    const el = mount('<pre><code>a;</code></pre><pre><code>b;</code></pre>');
+    expect(visibleText(el)).toBe('a;\nb;');
   });
 });
 
