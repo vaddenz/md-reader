@@ -28,6 +28,17 @@ describe('sanitizeHighlights', () => {
       ],
     });
   });
+  it('未知 kind 的 decoration 原样保留（向前兼容）；仅非法项丢弃', () => {
+    expect(sanitizeHighlights({ 'a.md': [
+      { id: 'h4', exact: '未知 kind', decorations: [{ kind: 'underline', style: 'wavy', color: 'red' }] },
+      { id: 'h5', exact: '非法项', decorations: [null, 42, 'bg', { color: 'red' }] },
+    ] })).toEqual({
+      'a.md': [
+        { id: 'h4', exact: '未知 kind', prefix: '', suffix: '', decorations: [{ kind: 'underline', style: 'wavy', color: 'red' }], createdAt: 0 },
+        { id: 'h5', exact: '非法项', prefix: '', suffix: '', decorations: [], createdAt: 0 },
+      ],
+    });
+  });
 });
 
 describe('add / remove / 读回', () => {

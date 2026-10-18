@@ -1,7 +1,11 @@
 import { kvGet, kvSet } from './db';
 import { serialize } from './serialize';
 
-export interface Decoration { kind: 'bg'; color: string }
+export interface Decoration {
+  kind: string;           // v1 仅渲染 'bg'；未知 kind 保留数据
+  color?: string;
+  [key: string]: unknown; // 未知字段原样保留（向前兼容）
+}
 export interface HighlightRecord {
   id: string; exact: string; prefix: string; suffix: string;
   decorations: Decoration[]; createdAt: number;
@@ -23,10 +27,9 @@ function sanitizeRecord(raw: unknown): HighlightRecord | null {
   if (typeof rec.id !== 'string' || !rec.id) return null;
   if (typeof rec.exact !== 'string' || !rec.exact) return null;
   const decorations: Decoration[] = Array.isArray(rec.decorations)
-    ? rec.decorations
-        .filter((d): d is Decoration =>
-          !!d && typeof d === 'object' && (d as Decoration).kind === 'bg' && typeof (d as Decoration).color === 'string')
-        .map((d) => ({ kind: 'bg', color: d.color }))
+    ? rec.decorations.filter(
+        (d): d is Decoration => !!d && typeof d === 'object' && typeof (d as Decoration).kind === 'string',
+      )
     : [];
   return {
     id: rec.id, exact: rec.exact,
