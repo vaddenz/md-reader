@@ -1,0 +1,219 @@
+/* 设置页（T21）：Token / 仓库 / 同步 / 存储 / 危险区 / 关于。 */
+
+.settings {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--c-primary);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.settings-title {
+  margin: 4px 0 12px;
+  font-size: 22px;
+}
+
+.settings-section {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.settings-section h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.settings-note {
+  margin: 6px 0 0;
+  color: #57606a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.settings-error { margin: 6px 0 0; color: #b42318; font-size: 13px; }
+.settings-ok { margin: 6px 0 0; color: #1a7f37; font-size: 13px; }
+
+/* Token：掩码展示 + 更换 / 清除 + 内联输入 */
+.settings-token-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.settings-token {
+  min-width: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f6f8fa;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.settings-token-row button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--c-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings-token-row button:disabled { color: #8b949e; cursor: default; }
+
+.settings-token-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-token-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  color: var(--c-text);
+  font: inherit;
+  font-size: 16px; /* ≥16px：iOS 聚焦时不放大页面 */
+}
+
+.settings-token-form button {
+  flex: none;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--c-primary);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.settings-token-form button:disabled { background: #8b949e; cursor: default; }
+
+/* 仓库配置表单 */
+.settings-repo-form {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-repo-form label {
+  display: grid;
+  gap: 4px;
+  color: #57606a;
+  font-size: 13px;
+}
+
+.settings-repo-form input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  color: var(--c-text);
+  font: inherit;
+  font-size: 16px; /* ≥16px：iOS 聚焦时不放大页面 */
+}
+
+.settings-repo-form button {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--c-primary);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* 同步 */
+.settings-sync-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.settings-sync-row button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--c-primary);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.settings-sync-row button:disabled { color: #8b949e; cursor: default; }
+.settings-sync-row .settings-note { margin: 0; }
+
+/* 危险区 */
+.settings-danger {
+  border-color: #ffc1bc;
+  background: #fff5f4;
+}
+.settings-danger h2 { color: #b42318; }
+
+.settings-danger-btn {
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 0 14px;
+  border: 1px solid #b42318;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #b42318;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.settings-danger-btn:disabled { border-color: #d0d7de; color: #8b949e; cursor: default; }
+
+/* 关于 */
+.settings-version {
+  margin: 0 0 8px;
+  color: #57606a;
+  font-size: 13px;
+}
+.settings-version code { font-family: var(--font-mono); }
+
+.settings-about-statement {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.settings-about-list {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: #57606a;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@media (hover: hover) {
+  .settings-back:hover { text-decoration: underline; }
+  .settings-token-row button:not(:disabled):hover,
+  .settings-sync-row button:not(:disabled):hover { background: #eaf2fd; }
+  .settings-token-form button:not(:disabled):hover,
+  .settings-repo-form button:not(:disabled):hover { background: #0b4ea2; }
+  .settings-danger-btn:not(:disabled):hover { background: #fff0ee; }
+}
