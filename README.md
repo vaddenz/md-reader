@@ -62,6 +62,7 @@ npm run preview  # 预览生产构建
   站点若被删除 / 重置，需手动重建一次（如 `gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow`）。
 - 自建 / fork：需把 `vite.config.ts` 的 `base` 改为与自己的仓库名一致（如仓库 `foo` → `base: '/foo/'`），
   否则静态资源 404；本项目为个人自用，其他部署环境的兼容性由使用者自行承担。
+  注意：内置字体的 URL 在 `src/styles/fonts.css` 中硬编码了 `/md-reader/` 前缀，改 `base` 时需一并修改，否则字体静默回退系统字体。
 
 ### 字体
 
