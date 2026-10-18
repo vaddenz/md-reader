@@ -5,7 +5,9 @@ import { kvGet } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
 import { sweepExpired, syncRepo, type SyncProgress } from '../data/sync';
 import { useOnline } from '../hooks/useOnline';
+import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError, ratelimitToastText } from '../lib/errors';
 import { timeAgo } from '../lib/format';
+import { showToast } from '../lib/toast';
 import { useToken } from './TokenContext';
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
@@ -60,15 +62,25 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       setLastSyncAt(Date.now());
       setStatus(navigator.onLine ? 'idle' : 'offline'); // 取完成时刻的实时状态（同步期间可能掉线）
     } catch (err) {
+      // 存储超限（IndexedDB 写入）不是 GitHubError：单独映射，提示清理缓存后仍保留其余状态
+      if (isQuotaError(err)) {
+        setError(new GitHubError('unknown', QUOTA_TEXT));
+        setStatus('error');
+        showToast(QUOTA_TEXT, { kind: 'error' });
+        return;
+      }
       const gerr = err instanceof GitHubError
         ? err
         : new GitHubError('unknown', err instanceof Error ? err.message : String(err));
       setError(gerr);
       if (gerr.kind === 'auth') {
-        // 缓存保留，仅引导重新授权（T22 将替换为 toast + ?reauth=1）
-        window.alert('登录已过期，请重新授权（本地缓存已保留）');
+        // 缓存保留，仅引导重新授权（T22：toast 替代 window.alert + ?reauth=1 变体）
+        showToast(AUTH_EXPIRED_TEXT, { kind: 'error' });
         setStatus('error');
-        navigate(toRouterPath(SETUP));
+        navigate(toRouterPath(`${SETUP}?reauth=1`));
+      } else if (gerr.kind === 'ratelimit') {
+        showToast(ratelimitToastText(gerr.resetAt), { kind: 'error' });
+        setStatus('error');
       } else if (gerr.kind === 'network') {
         setStatus('offline');
       } else {

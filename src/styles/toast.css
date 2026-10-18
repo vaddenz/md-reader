@@ -1,0 +1,52 @@
+/* toast 容器与条目（T22）：固定底部居中、可叠放、点按关闭；不遮挡正文交互。 */
+
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(92vw, 480px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 44px; /* 触摸目标尺寸与全站一致 */
+  padding: 10px 14px;
+  border: 1px solid #24292f;
+  border-radius: 8px;
+  background: #24292f;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 12px rgba(27, 31, 36, 0.24);
+  cursor: pointer;
+  animation: toast-in 0.18s ease-out;
+}
+.toast:active { opacity: 0.85; }
+
+.toast-error {
+  border-color: #b42318;
+  background: #b42318;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}

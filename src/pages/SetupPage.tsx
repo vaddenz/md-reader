@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HOME, toRouterPath } from '../app/nav';
 import { DEFAULT_REPO } from '../constants';
 import { kvGet, kvSet } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
+import { AUTH_EXPIRED_TEXT } from '../lib/errors';
 import { useToken } from '../state/TokenContext';
 
 function errorText(err: GitHubError): string {
@@ -16,6 +17,8 @@ function errorText(err: GitHubError): string {
 
 export default function SetupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reauth = searchParams.get('reauth') === '1';
   const { setToken } = useToken();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -46,6 +49,21 @@ export default function SetupPage() {
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: 16 }}>
       <h1>配置访问 Token</h1>
+      {reauth && (
+        <p
+          role="status"
+          className="setup-reauth"
+          style={{
+            padding: '10px 12px',
+            border: '1px solid #d4a72c',
+            borderRadius: 8,
+            background: '#fff8c5',
+            color: '#7d4e00',
+          }}
+        >
+          {AUTH_EXPIRED_TEXT}
+        </p>
+      )}
       <p>
         本应用通过你本人的 GitHub <strong>Fine-grained PAT</strong>（细粒度个人访问令牌）读取私有仓库内容，
         Token 仅保存在本机浏览器中，不会上传到任何第三方。

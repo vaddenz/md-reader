@@ -7,7 +7,9 @@ import { GitHubClient } from '../data/github';
 import { searchDocs, type SearchHit } from '../data/search';
 import { loadCachedTexts } from '../data/searchCache';
 import { downloadDocText } from '../data/sync';
+import { QUOTA_TEXT, isQuotaError } from '../lib/errors';
 import { runPool } from '../lib/pool';
+import { showToast } from '../lib/toast';
 import { termRanges } from '../markdown/highlight';
 import { useSync, type RepoConfig } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
@@ -101,16 +103,19 @@ export default function SearchPage() {
     const cfg = (await kvGet<RepoConfig>('config').catch(() => undefined)) ?? DEFAULT_REPO;
     const client = new GitHubClient(token);
     let bad = 0;
+    let quota = false;
     await runPool(uncached, 4, async (m) => {
       try {
         await downloadDocText(client, cfg, m.path);
-      } catch {
+      } catch (err) {
         bad++;
+        if (isQuotaError(err)) quota = true; // 写入超限：下载失败会逐篇累积，提示只需一次
       }
       setBusy((b) => (b ? { ...b, done: b.done + 1 } : b));
     });
     setFailed(bad);
     setBusy(null);
+    if (quota) showToast(QUOTA_TEXT, { kind: 'error' });
     setReload((n) => n + 1); // 重新列元数据并重搜（缓存按命中数自愈）
   }, [busy, token, uncached]);
 

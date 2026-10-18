@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { toRouterPath } from './nav';
 import { keyFromLocation, rememberScroll } from './scroll';
+import OfflineBanner from '../components/OfflineBanner';
+import { ToastHost } from '../lib/toast';
 import { SyncProvider } from '../state/SyncContext';
 import { TokenProvider } from '../state/TokenContext';
 
@@ -41,6 +43,9 @@ export default function Shell() {
     <TokenProvider>
       <SyncProvider>
         <div className="shell">
+          {/* ToastHost 先挂载：页面/同步的早期 effect 触发的提示也能被接收 */}
+          <ToastHost />
+          <OfflineBanner />
           <Outlet />
         </div>
       </SyncProvider>

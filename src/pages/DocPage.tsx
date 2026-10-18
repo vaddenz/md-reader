@@ -14,6 +14,8 @@ import { GitHubClient } from '../data/github';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { downloadDocText } from '../data/sync';
 import { useReadingProgress } from '../hooks/useReadingProgress';
+import { QUOTA_TEXT, isQuotaError } from '../lib/errors';
+import { showToast } from '../lib/toast';
 import { highlightInContainer } from '../markdown/highlight';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
@@ -90,7 +92,9 @@ export default function DocPage() {
       try {
         const text = await downloadDocText(new GitHubClient(token), cfg, path);
         if (!cancelled) setState({ kind: 'ready', path, title: rec.title, text });
-      } catch {
+      } catch (err) {
+        // 存储超限（写入 IndexedDB 失败）单独提示，其余（离线/鉴权等）走「需联网下载」重试态
+        if (!cancelled && isQuotaError(err)) showToast(QUOTA_TEXT, { kind: 'error' });
         if (!cancelled) setState({ kind: 'download-failed', path });
       }
     })();
@@ -321,6 +325,7 @@ export default function DocPage() {
           {cur.kind === 'missing' ? (
             <div className="doc-state">
               <p>文档不存在或尚未同步</p>
+              <p className="doc-state-path">{path}</p>
               <button type="button" className="doc-state-btn" onClick={() => navigate(toRouterPath(HOME))}>
                 返回首页
               </button>
@@ -328,6 +333,7 @@ export default function DocPage() {
           ) : cur.kind === 'download-failed' ? (
             <div className="doc-state">
               <p>该文档未缓存，需联网下载后阅读</p>
+              <p className="doc-state-path">{path}</p>
               <button type="button" className="doc-state-btn" onClick={() => setRetry((n) => n + 1)}>
                 重试
               </button>

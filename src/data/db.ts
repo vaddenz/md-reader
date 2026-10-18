@@ -18,6 +18,16 @@ function open(): Promise<IDBPDatabase> {
   });
 }
 
+/** 缓存自愈完成信号（T22）：ToastHost 监听后提示「本地缓存已重建」。仅浏览器环境派发。 */
+function signalCacheRebuilt(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent('mdreader:cache-rebuilt'));
+  } catch {
+    // 事件派发失败不影响自愈结果
+  }
+}
+
 export function openDb(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = open().catch(async () => {
@@ -30,6 +40,8 @@ export function openDb(): Promise<IDBPDatabase> {
         throw err;
       });
       dbPromise = retry;
+      // 重建成功后才派发一次性信号（失败时提示「已重建」会误导）
+      void retry.then(signalCacheRebuilt, () => {});
       return retry;
     });
   }
