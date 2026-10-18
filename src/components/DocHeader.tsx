@@ -8,10 +8,14 @@ interface DocHeaderProps {
   onOpenToc?: () => void;
   /** 打开文件树抽屉；未提供时（本地没有文档）不渲染文件按钮。 */
   onOpenTree?: () => void;
+  /** 收藏状态：true 实心星；未提供 onToggleFavorite 时不渲染收藏按钮。 */
+  favorite?: boolean;
+  /** 切换收藏；未提供时（收藏状态尚未读取）不渲染收藏按钮。 */
+  onToggleFavorite?: () => void;
 }
 
-/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（文件树 / 目录；收藏留待后续任务）。 */
-export default function DocHeader({ title, onOpenToc, onOpenTree }: DocHeaderProps) {
+/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（文件树 / 目录 / 收藏）。 */
+export default function DocHeader({ title, onOpenToc, onOpenTree, favorite = false, onToggleFavorite }: DocHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -34,7 +38,6 @@ export default function DocHeader({ title, onOpenToc, onOpenTree }: DocHeaderPro
         </svg>
       </button>
       <span className="doc-title" title={title || undefined}>{title}</span>
-      {/* T19：收藏按钮将放入此操作区 */}
       <div className="doc-header-actions">
         {onOpenTree && (
           <button
@@ -66,6 +69,26 @@ export default function DocHeader({ title, onOpenToc, onOpenTree }: DocHeaderPro
           >
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
               <path fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" d="M4 7h16M4 12h16M4 17h10" />
+            </svg>
+          </button>
+        )}
+        {onToggleFavorite && (
+          <button
+            type="button"
+            className="doc-header-btn doc-fav"
+            aria-label={favorite ? '取消收藏' : '收藏'}
+            aria-pressed={favorite}
+            title={favorite ? '取消收藏' : '收藏'}
+            onClick={onToggleFavorite}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill={favorite ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                d="M12 3.6l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9z"
+              />
             </svg>
           </button>
         )}

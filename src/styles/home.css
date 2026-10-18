@@ -31,6 +31,46 @@
   text-align: center;
 }
 
+/* 首页区块（T19）：继续阅读 / 收藏 */
+.home-section {
+  margin: 16px 0;
+}
+
+.home-section-title {
+  margin: 0 0 4px;
+  color: #57606a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.home-section-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-doc-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.home-doc-star {
+  flex: none;
+  color: #bf8700;
+}
+
+.home-doc-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .file-tree {
   margin-top: 8px;
 }

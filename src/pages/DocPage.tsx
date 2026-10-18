@@ -8,9 +8,11 @@ import PrevNext from '../components/PrevNext';
 import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
 import { DEFAULT_REPO } from '../constants';
-import { getFile, kvGet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
+import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient } from '../data/github';
+import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { downloadDocText } from '../data/sync';
+import { useReadingProgress } from '../hooks/useReadingProgress';
 import { highlightInContainer } from '../markdown/highlight';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
@@ -55,6 +57,8 @@ export default function DocPage() {
   const [retry, setRetry] = useState(0);
   const [tocOpen, setTocOpen] = useState(false);
   const [treeOpen, setTreeOpen] = useState(false);
+  // null = 收藏状态尚未读取（不渲染星标按钮，避免先闪未收藏态）。
+  const [favorite, setFavorite] = useState<boolean | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
 
@@ -117,6 +121,23 @@ export default function DocPage() {
   // 换文档（如浏览器前进/后退）时关闭抽屉，避免展示上一篇的目录/高亮。
   useEffect(() => { setTocOpen(false); setTreeOpen(false); }, [path]);
 
+  // 收藏状态：随文档切换重新读取；读取失败按未收藏处理（按钮仍可用）。
+  useEffect(() => {
+    let cancelled = false;
+    void getFavorites().then(
+      (list) => { if (!cancelled) setFavorite(list.includes(path)); },
+      () => { if (!cancelled) setFavorite(false); },
+    );
+    return () => { cancelled = true; };
+  }, [path]);
+
+  const toggleFav = useCallback(() => {
+    void toggleFavorite(path).then(
+      (list) => setFavorite(list.includes(path)),
+      () => {},
+    );
+  }, [path]);
+
   // 图片管线：由仓库路径查 kv.tree 的 sha，再按当前配置鉴权取字节（blob 缓存由管线内部处理）。
   const fetchBlob = useCallback(async (repoPath: string): Promise<Blob> => {
     if (!token) throw new Error('未配置 Token');
@@ -134,6 +155,7 @@ export default function DocPage() {
     const stopImages = hydrateImages(container, { fetchBlob });
     const stopMermaid = hydrateMermaid(container);
     void touchFile(path).catch(() => {});
+    void kvSet('lastDoc', path).catch(() => {}); // 记住最近打开的文档（后续任务可用）
     return () => {
       stopImages();
       stopMermaid();
@@ -164,7 +186,7 @@ export default function DocPage() {
   }, [locationKey, ready]);
 
   // 历史滚动恢复：回到本条目（浏览器返回/「返回来源」）时优先还原记录的位置；
-  // 新打开时：?to= 锚点 > ?q= 第 i 处命中（越界回退第一处）> 页首。
+  // 新打开时优先级：scroll 记忆 > ?to= 锚点 > ?q= 第 i 处命中（越界回退第一处）> 进度比例 > 页首。
   // 高亮在正文注入 + 懒加载启动（上一个 effect）之后执行：先清理旧命中再重新高亮。
   useEffect(() => {
     if (!ready) return;
@@ -175,16 +197,38 @@ export default function DocPage() {
     const marks = container && q ? highlightInContainer(container, q) : [];
     const saved = takeScroll(locationKey);
     if (saved !== undefined) {
-      const frame = window.requestAnimationFrame(() => {
+      const restoreFrame = window.requestAnimationFrame(() => {
         window.scrollTo(0, saved);
         rememberScroll(locationKey, saved); // 恢复期间若被钳制值覆盖，用真实值写回
       });
-      return () => window.cancelAnimationFrame(frame);
+      return () => window.cancelAnimationFrame(restoreFrame);
     }
-    if (to) document.getElementById(to)?.scrollIntoView();
-    else if (marks.length) (marks[markIndex] ?? marks[0]).scrollIntoView();
-    else if (!q) window.scrollTo(0, 0);
-  }, [ready, to, q, markIndex, locationKey]);
+    if (to) {
+      document.getElementById(to)?.scrollIntoView();
+      return;
+    }
+    if (q) {
+      if (marks.length) (marks[markIndex] ?? marks[0]).scrollIntoView();
+      return;
+    }
+    // 无 scroll 记忆、无 ?to=/?q=（T19）：恢复上次阅读进度比例，无记录回页首。
+    // 等 IDB 读完再进 rAF（正文已渲染），与上面 scroll 记忆恢复同槽位。
+    let cancelled = false;
+    let frame = 0;
+    void getProgress(path).catch(() => undefined).then((rec) => {
+      if (cancelled) return;
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const y = rec ? Math.round(rec.ratio * max) : 0;
+      frame = window.requestAnimationFrame(() => window.scrollTo(0, y));
+    });
+    return () => {
+      cancelled = true;
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [ready, to, q, markIndex, locationKey, path]);
+
+  // 阅读进度记录：滚动比例节流写入（含 visibilitychange 与卸载补写）。
+  useReadingProgress(path, { enabled: ready, container: contentRef });
 
   // 卸载时清掉复制按钮的回退定时器。
   useEffect(() => () => {
@@ -259,6 +303,8 @@ export default function DocPage() {
         title={title}
         onOpenToc={tocHeadings.length > 0 ? openToc : undefined}
         onOpenTree={metas.length > 0 ? openTree : undefined}
+        favorite={favorite === true}
+        onToggleFavorite={favorite === null ? undefined : toggleFav}
       />
       {from && <BackToSource />}
       {ready ? (

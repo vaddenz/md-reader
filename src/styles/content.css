@@ -32,6 +32,9 @@
 .doc-back:active,
 .doc-header-btn:active { background: #f0f3f6; }
 
+/* 收藏星标（T19）：已收藏为实心金色 */
+.doc-header-btn.doc-fav[aria-pressed='true'] { color: #bf8700; }
+
 .doc-title {
   flex: 1 1 auto;
   min-width: 0;
