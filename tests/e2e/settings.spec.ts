@@ -135,3 +135,11 @@ test('设置页：立即同步与存储统计', async ({ page }) => {
   await expect.poll(() => mock.syncCalls()).toBe(before + 1);
   await expect(page.getByText('上次同步：刚刚')).toBeVisible();
 });
+
+test('首页「设置」入口：点击进入设置页', async ({ page }) => {
+  await configureAndSync(page);
+
+  await page.getByRole('link', { name: '设置' }).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+});
