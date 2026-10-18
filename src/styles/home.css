@@ -1,0 +1,123 @@
+/* 首页与全局文件树（阅读页抽屉复用 FileTree，样式随组件加载）。 */
+
+.home {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.home-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 12px 0;
+  padding: 0 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #f6f8fa;
+  color: #57606a;
+  text-decoration: none;
+}
+
+.home-search-icon {
+  flex: none;
+  color: #8b949e;
+}
+
+.home-empty {
+  padding: 24px 0;
+  color: #57606a;
+  text-align: center;
+}
+
+.file-tree {
+  margin-top: 8px;
+}
+
+.tree-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.tree-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tree-current {
+  background: #eaf2fd;
+  color: var(--c-primary);
+  font-weight: 600;
+}
+
+.tree-badge {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  background: #f6f8fa;
+  color: #8b949e;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.tree-dir-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-chevron {
+  flex: none;
+  color: #8b949e;
+  transition: transform 0.15s ease;
+}
+.tree-chevron-open {
+  transform: rotate(90deg);
+}
+
+.tree-dir-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tree-children {
+  padding-left: 14px;
+}
+
+@media (hover: hover) {
+  .tree-item:hover,
+  .tree-dir-toggle:hover {
+    background: #f6f8fa;
+  }
+  .tree-item.tree-current:hover {
+    background: #eaf2fd;
+  }
+}
