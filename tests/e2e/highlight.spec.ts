@@ -212,3 +212,28 @@ test('全选后经菜单复制：内容不含界面文本', async ({ page }) => 
   expect(copied).toContain('const answer = 42;');
   expect(copied).not.toContain('复制');
 });
+
+test('高亮导出 JSON 与导入合并', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'highlights', { 'a.md': [record('h1')] });
+  await page.goto('./#/settings');
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: '导出高亮' }).click(),
+  ]);
+  const path = await download.path();
+  const fs = await import('node:fs/promises');
+  const parsed = JSON.parse(await fs.readFile(path!, 'utf-8'));
+  expect(parsed.formatVersion).toBe(1);
+  expect(parsed.highlights['a.md']).toHaveLength(1);
+
+  // 清空后导入同一份 → 恢复
+  await writeKv(page, 'highlights', {});
+  await page.setInputFiles('input[type="file"]', { name: 'hl.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(parsed)) });
+  await expect(page.getByText(/导入 1 条/)).toBeVisible();
+  await expect.poll(async () => {
+    const kv = (await readKv(page, 'highlights')) as Record<string, unknown[]>;
+    return kv['a.md']?.length ?? 0;
+  }).toBe(1);
+});

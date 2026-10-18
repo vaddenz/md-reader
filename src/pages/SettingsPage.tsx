@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HOME, SETUP, toRouterPath } from '../app/nav';
 import AboutSection from '../components/AboutSection';
 import AppearanceSection from '../components/AppearanceSection';
+import HighlightsSection from '../components/HighlightsSection';
 import { DEFAULT_REPO } from '../constants';
 import { clearAllData, kvGet, kvSet, listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
@@ -236,6 +237,8 @@ export default function SettingsPage() {
       </section>
 
       <AppearanceSection />
+
+      <HighlightsSection />
 
       <section className="settings-section" aria-labelledby="settings-storage-title">
         <h2 id="settings-storage-title">存储</h2>
