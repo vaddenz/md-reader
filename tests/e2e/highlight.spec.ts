@@ -163,3 +163,50 @@ test('代码块内选区：只提供复制', async ({ page }) => {
   const menu = page.locator('.selection-menu');
   await expect(menu.getByRole('menuitem')).toHaveText(['复制']);
 });
+
+test('全选：选区覆盖正文；复制内容不含代码复制按钮等界面文本', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/doc/深挖/b.md');
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await page.evaluate(() => {
+    const container = document.querySelector('.doc-content')!;
+    container.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 100, clientY: 200 }));
+  });
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '全选' }).click();
+  const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+  expect(selected).toContain('文档 B');
+  // DOM Range 是连续区间，无法跳过中间的排除区（代码块内的按钮文本仍在选区文本里）；
+  // 复制（Cmd/Ctrl+C）改写为可见文本，不得带入「复制」等界面文本。
+  const copied = await page.evaluate(() => {
+    const dt = new DataTransfer();
+    document.querySelector('.doc-content')!.dispatchEvent(
+      new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: dt }),
+    );
+    return dt.getData('text/plain');
+  });
+  expect(copied).toContain('文档 B');
+  expect(copied).not.toContain('复制');
+});
+
+test('全选后经菜单复制：内容不含界面文本', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (t: string) => { (window as any).__copied = t; } },
+    });
+  });
+  await configureAndSync(page);
+  await page.goto('./#/doc/深挖/b.md');
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  const openMenu = () => page.evaluate(() => {
+    document.querySelector('.doc-content')!.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, clientX: 100, clientY: 200 }),
+    );
+  });
+  await openMenu();
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '全选' }).click();
+  await openMenu(); // 选区仍在 → 菜单含「复制」
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '复制' }).click();
+  const copied = await page.evaluate(() => (window as any).__copied as string);
+  expect(copied).toContain('文档 B');
+  expect(copied).not.toContain('复制');
+});

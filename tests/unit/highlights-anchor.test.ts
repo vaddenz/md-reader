@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import {
-  applyHighlights, buildHaystack, locateAnchor, markClassFor, rangeIntersectsExcluded,
-  removeMarks, selectionToAnchor, wrapRange,
+  applyHighlights, buildHaystack, contentRange, locateAnchor, markClassFor, rangeIntersectsExcluded,
+  removeMarks, selectionToAnchor, visibleText, wrapRange,
 } from '../../src/markdown/highlights';
 import type { HighlightRecord } from '../../src/data/highlights';
 
@@ -118,6 +118,27 @@ describe('selectionToAnchor / rangeIntersectsExcluded', () => {
     expect(rangeIntersectsExcluded(el, r1)).toBe(true);
     const r2 = document.createRange(); r2.selectNodeContents(el.querySelector('p')!.firstChild!);
     expect(rangeIntersectsExcluded(el, r2)).toBe(false);
+  });
+});
+
+describe('contentRange / visibleText', () => {
+  it('范围从首个到末个非排除区文本节点：首尾排除区不在选区内', () => {
+    const el = mount('<button class="code-copy">复制</button><p>正文</p><p>结尾</p><pre><code>代码</code></pre>');
+    expect(contentRange(el)?.toString()).toBe('正文结尾');
+  });
+  // DOM Range 是连续区间，无法「挖掉」中间的排除区（浏览器同此语义）：
+  // 中间排除区仍会被 toString() 包含，故复制路径改用 visibleText 过滤（见下）。
+  it('中间排除区仍被 Range 语义包含（复制路径依赖 visibleText）', () => {
+    const el = mount('<p>正文</p><pre><code>代码</code><button class="code-copy">复制</button></pre><p>结尾</p>');
+    expect(contentRange(el)?.toString()).toBe('正文代码复制结尾');
+  });
+  it('无可用文本返回 null', () => {
+    const el = mount('<pre><code>只有代码</code></pre>');
+    expect(contentRange(el)).toBeNull();
+  });
+  it('visibleText 跳过排除区（代码块与复制按钮），块间换行分隔', () => {
+    const el = mount('<p>正文</p><pre><code>代码</code><button class="code-copy">复制</button></pre><p>结尾</p>');
+    expect(visibleText(el)).toBe('正文\n结尾');
   });
 });
 

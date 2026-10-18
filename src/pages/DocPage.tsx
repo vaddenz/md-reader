@@ -21,7 +21,7 @@ import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError } from '../lib/errors';
 import { menuActionsFor, type MenuContext } from '../lib/selection-menu';
 import { showToast } from '../lib/toast';
 import { highlightInContainer } from '../markdown/highlight';
-import { applyHighlights, buildHaystack, rangeIntersectsExcluded, removeMarks, selectionToAnchor, wrapRange } from '../markdown/highlights';
+import { applyHighlights, buildHaystack, contentRange, rangeIntersectsExcluded, removeMarks, selectionToAnchor, visibleText, wrapRange } from '../markdown/highlights';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
@@ -50,6 +50,20 @@ const COPY_RESET_MS = 1500;
 /** 路由参数通常已被 react-router 解码；仍含 % 时兜底再解一次，非法编码原样使用。 */
 function safeDecode(raw: string): string {
   try { return decodeURIComponent(raw); } catch { return raw; }
+}
+
+/** 选区是否等价于当前正文容器内、由「全选」建立的选区（对象同一或边界一致）；跨根/已卸载视为不等。 */
+function sameSelectionRange(sel: Selection | null, range: Range | null, container: HTMLElement): boolean {
+  if (!range || !sel || sel.rangeCount !== 1) return false;
+  const cur = sel.getRangeAt(0);
+  if (!container.contains(cur.commonAncestorContainer)) return false; // 旧文档的残留选区
+  if (cur === range) return true;
+  try {
+    return cur.compareBoundaryPoints(Range.START_TO_START, range) === 0
+      && cur.compareBoundaryPoints(Range.END_TO_END, range) === 0;
+  } catch {
+    return false;
+  }
 }
 
 export default function DocPage() {
@@ -83,6 +97,9 @@ export default function DocPage() {
   const copyTimers = useRef(new Map<HTMLElement, number>());
   // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
   const appliedRef = useRef(new Map<string, { start: number; end: number }>());
+  // 「全选」建立的选区范围：DOM Range 无法跳过中间的排除区（连续区间），
+  // 复制时据此识别全选选区并改用 visibleText 过滤（见下方 copy 监听）。
+  const selectAllRangeRef = useRef<Range | null>(null);
 
   // 目录元数据（knownPaths 判定互链 + 上下篇排序）；就绪前不渲染正文，避免互链被误判为死链。
   // 同步完成（lastSyncAt 变化）后重读：抽屉内「更新目录」的结果即时反映到文件树（与首页同口径）。
@@ -382,7 +399,8 @@ export default function DocPage() {
     const sel = window.getSelection();
 
     if (id === 'copy') {
-      const text = sel?.toString() ?? '';
+      // 全选选区（Range 含中间排除区）改用可见文本，避免带入「复制」按钮等界面文本。
+      const text = sameSelectionRange(sel, selectAllRangeRef.current, container) ? visibleText(container) : (sel?.toString() ?? '');
       void navigator.clipboard.writeText(text).then(
         () => showToast('已复制'),
         () => showToast('复制失败', { kind: 'error' }),
@@ -390,10 +408,12 @@ export default function DocPage() {
       return;
     }
     if (id === 'select-all') {
-      const r = document.createRange();
-      r.selectNodeContents(container);
-      sel?.removeAllRanges();
-      sel?.addRange(r);
+      const r = contentRange(container);
+      if (r) {
+        selectAllRangeRef.current = r;
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+      }
       return;
     }
     if (id === 'clear') {
@@ -444,6 +464,19 @@ export default function DocPage() {
       return;
     }
   }, [menu, path]);
+
+  // 原生复制（Cmd/Ctrl+C）兜底：全选选区含中间排除区（Range 是连续区间），
+  // 复制时改写为可见文本，避免代码块内「复制」按钮等界面文本混入剪贴板。
+  useEffect(() => {
+    const onCopy = (e: ClipboardEvent) => {
+      const container = contentRef.current;
+      if (!container || !sameSelectionRange(window.getSelection(), selectAllRangeRef.current, container)) return;
+      e.clipboardData?.setData('text/plain', visibleText(container));
+      e.preventDefault();
+    };
+    document.addEventListener('copy', onCopy);
+    return () => document.removeEventListener('copy', onCopy);
+  }, []);
 
   // 文件树抽屉选中文档：收起抽屉、记住当前位置，再经 react-router 导航。
   const openDocFromTree = useCallback((href: string) => {

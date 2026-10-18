@@ -32,6 +32,29 @@ export function buildHaystack(container: HTMLElement): Haystack {
   return { text: text.join(''), map };
 }
 
+/** 全选范围：从首个到末个「非排除区」文本节点；无可用文本时返回 null。 */
+export function contentRange(container: HTMLElement): Range | null {
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode() as Text | null;
+  while (node) {
+    const parent = node.parentElement;
+    if (parent && !parent.closest(SKIP_SELECTOR)) nodes.push(node);
+    node = walker.nextNode() as Text | null;
+  }
+  if (nodes.length === 0) return null;
+  const range = document.createRange();
+  range.setStart(nodes[0], 0);
+  const last = nodes[nodes.length - 1];
+  range.setEnd(last, last.data.length);
+  return range;
+}
+
+/** 可见文本（非排除区，块间以换行分隔）：全选复制时用于剔除代码块/复制按钮等界面文本。 */
+export function visibleText(container: HTMLElement): string {
+  return buildHaystack(container).text;
+}
+
 /** 归一化：空白串折叠为单空格，并记录每个归一化字符 → 原文下标。 */
 function normalize(s: string): { norm: string; toRaw: number[] } {
   const norm: string[] = [];
