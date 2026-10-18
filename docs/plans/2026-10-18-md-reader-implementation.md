@@ -16,6 +16,7 @@
 - Node ≥ 20；使用 npm；不加锁文件以外的工具链（不加 ESLint/Prettier，质量线用 `tsc --noEmit` + 测试）。
 - **出站请求仅允许 `https://api.github.com`**；禁止任何 CDN、第三方字体、图标库、分析脚本；图标一律内联 SVG 或本地资源。
 - 渲染口径（不得更改）：`html:false`、`breaks:true`、`linkify:true`、`typographer:false`、`==高亮==`（markdown-it-mark）、标题 id 用 github-slugger **裸 slug**（不加 `user-content-` 前缀）。
+- **缓存过期（2026-10-18 新增，用户确认）**：正文缓存 7 天未使用自动清理（时钟 = `lastUsedAt`；收藏**不豁免**）；点击未缓存文档按需重下；目录（首页与文件树抽屉）提供「更新目录」手动刷新按钮；搜索**直接跳过**未缓存文档并支持「纳入全文搜索」。
 - 界面文案中文；站点启用 `noindex,nofollow`；README、应用「关于」页、引导页三处保留「**个人自用，非通用 Markdown 阅读器**」声明。
 - 仓库中**不得提交**：真实 token、个人内容、真实语料拷贝、截图；e2e 全部 mock `api.github.com`。
 - 依赖版本按本计划 package.json 的 caret 范围；个别版本号若已不存在，安装该 major 的最新兼容版并在 commit message 说明（不得引入计划外依赖，测试专用依赖除外——计划中已列明）。
@@ -39,7 +40,7 @@ md-reader/
 │  ├─ markdown/     # render.ts, images.ts, mermaid.ts, highlight.ts
 │  ├─ data/         # db.ts, github.ts, sync.ts, paths.ts, links.ts, search.ts, prefs.ts
 │  ├─ state/        # TokenContext, SyncContext, DocsContext
-│  ├─ lib/          # pool.ts, token.ts, mermaid-loader.ts, format.ts
+│  ├─ lib/          # pool.ts, token.ts, mermaid-loader.ts, format.ts, text.ts
 │  └─ styles/       # base.css, content.css, home.css
 ├─ tests/unit/      # Vitest（逻辑与 DOM 工具）
 ├─ tests/e2e/       # Playwright（mock api.github.com）
@@ -585,7 +586,7 @@ git add -A && git commit -m "ci: Pages 部署工作流"
 
 **Interfaces:**
 - Produces（后续全部依赖）:
-  - `db.ts`: `FileRecord{path,sha,size,text,updatedAt}`、`TreeEntry{path,sha,size,type}`、`openDb()`、`getFile(path)`、`putFiles(FileRecord[])`、`deleteFiles(paths:string[])`、`listFilesMeta(): Promise<{path,sha,size}[]>`、`getBlob(sha)`、`putBlob(sha, blob)`、`kvGet<T>(key)`、`kvSet(key, value)`、`storageEstimate()`、`clearAllData()`
+  - `db.ts`: `FileRecord{path,sha,size,text:string|null,title,lastUsedAt,updatedAt}`、`TreeEntry{path,sha,size,type}`、`openDb()`、`getFile(path)`、`putFiles(FileRecord[])`、`deleteFiles(paths:string[])`、`listFilesMeta(): Promise<{path,sha,size,cached,title,lastUsedAt}[]>`、`markExpired(paths:string[])`（`text → null`，保留其余字段）、`touchFile(path, at?)`（刷新 `lastUsedAt`）、`getBlob(sha)`、`putBlob(sha, blob)`、`kvGet<T>(key)`、`kvSet(key, value)`、`storageEstimate()`、`clearAllData()`
   - `kv` 键约定：`config` `{owner,repo,branch}`、`tree` `{syncedAt, entries: TreeEntry[]}`（**含 md 与图片**，供路径→sha 查询）、`links` `{[from:string]: string[]}`、`favorites` `string[]`、`progress` `{[path]:{ratio:number;headingId?:string;updatedAt:number}}`、`lastDoc` `string`、`lastSyncAt` `number`
   - `pool.ts`: `runPool<T>(items: T[], limit: number, worker: (item: T, index: number) => Promise<void>, opts?: { signal?: AbortSignal }): Promise<void>`
 
@@ -635,17 +636,25 @@ export async function runPool<T>(
 ```ts
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearAllData, getFile, kvGet, kvSet, listFilesMeta, putFiles, deleteFiles } from '../../src/data/db';
+import { clearAllData, getFile, kvGet, kvSet, listFilesMeta, markExpired, putFiles, deleteFiles, touchFile } from '../../src/data/db';
 
 beforeEach(async () => { await clearAllData(); });
 
 describe('db', () => {
-  it('文件写入/读取/删除/元数据', async () => {
-    await putFiles([{ path: 'a.md', sha: 's1', size: 2, text: 'hi', updatedAt: 1 }]);
+  it('文件写入/读取/删除/元数据（含过期字段）', async () => {
+    await putFiles([{ path: 'a.md', sha: 's1', size: 2, text: 'hi', title: 'A', lastUsedAt: 100, updatedAt: 1 }]);
     expect((await getFile('a.md'))?.text).toBe('hi');
-    expect(await listFilesMeta()).toEqual([{ path: 'a.md', sha: 's1', size: 2 }]);
+    expect(await listFilesMeta()).toEqual([{ path: 'a.md', sha: 's1', size: 2, cached: true, title: 'A', lastUsedAt: 100 }]);
     await deleteFiles(['a.md']);
     expect(await getFile('a.md')).toBeUndefined();
+  });
+  it('markExpired 清正文保元数据；touchFile 刷新时钟', async () => {
+    await putFiles([{ path: 'a.md', sha: 's1', size: 2, text: 'hi', title: 'A', lastUsedAt: 100, updatedAt: 1 }]);
+    await markExpired(['a.md']);
+    expect(await getFile('a.md')).toMatchObject({ text: null, sha: 's1', title: 'A', lastUsedAt: 100 });
+    expect((await listFilesMeta())[0].cached).toBe(false);
+    await touchFile('a.md', 999);
+    expect((await getFile('a.md'))?.lastUsedAt).toBe(999);
   });
   it('kv 读写与清理', async () => {
     await kvSet('lastSyncAt', 123);
@@ -661,7 +670,7 @@ describe('db', () => {
 ```ts
 import { openDB, type IDBPDatabase } from 'idb';
 
-export interface FileRecord { path: string; sha: string; size: number; text: string; updatedAt: number }
+export interface FileRecord { path: string; sha: string; size: number; text: string | null; title: string; lastUsedAt: number; updatedAt: number }
 export interface TreeEntry { path: string; sha: string; size: number; type: 'blob' }
 
 const DB_NAME = 'mdreader';
@@ -704,9 +713,28 @@ export async function deleteFiles(paths: string[]): Promise<void> {
   const tx = db.transaction('files', 'readwrite');
   await Promise.all([...paths.map((p) => tx.store.delete(p)), tx.done]);
 }
-export async function listFilesMeta(): Promise<{ path: string; sha: string; size: number }[]> {
+export interface FileMeta { path: string; sha: string; size: number; cached: boolean; title: string; lastUsedAt: number }
+export async function listFilesMeta(): Promise<FileMeta[]> {
   const all = await (await openDb()).getAll('files');
-  return all.map(({ path, sha, size }) => ({ path, sha, size }));
+  return all.map(({ path, sha, size, text, title, lastUsedAt }) => ({ path, sha, size, cached: text !== null, title, lastUsedAt }));
+}
+export async function markExpired(paths: string[]): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction('files', 'readwrite');
+  await Promise.all([
+    ...paths.map(async (p) => {
+      const rec = await tx.store.get(p);
+      if (rec) await tx.store.put({ ...rec, text: null, updatedAt: Date.now() }, p);
+    }),
+    tx.done,
+  ]);
+}
+export async function touchFile(path: string, at = Date.now()): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction('files', 'readwrite');
+  const rec = await tx.store.get(path);
+  if (rec) await tx.store.put({ ...rec, lastUsedAt: at }, path);
+  await tx.done;
 }
 export async function getBlob(sha: string) {
   return (await (await openDb()).get('blobs', sha)) as { sha: string; blob: Blob; updatedAt: number } | undefined;
@@ -953,14 +981,15 @@ git add -A && git commit -m "feat: Token 管理与引导页"
 ### Task 8: 同步引擎（增量、断点、互链索引）
 
 **Files:**
-- Create: `src/data/paths.ts`、`src/data/links.ts`、`src/data/sync.ts`
+- Create: `src/data/paths.ts`、`src/data/links.ts`、`src/data/sync.ts`、`src/lib/text.ts`
 - Test: `tests/unit/paths.test.ts`、`tests/unit/diff.test.ts`、`tests/unit/links.test.ts`、`tests/unit/sync.test.ts`
 
 **Interfaces:**
 - Produces:
   - `paths.ts`: `normalizeRepoPath(p:string):string`、`resolveMdLink(fromPath:string, href:string): {path:string; anchor?:string} | null`、`resolveAssetPath(fromPath:string, src:string): string | null`、`isDoc(p):boolean`、`isImage(p):boolean`
   - `links.ts`: `buildLinksIndex(docs:{path:string;text:string}[]): Record<string,string[]>`、`getRelated(path:string, index:Record<string,string[]>): { out: string[]; in: string[] }`
-  - `sync.ts`: `diffTree(localShaByPath:Record<string,string>, remote:TreeEntry[])`、`syncRepo(client, cfg, onProgress, opts?): Promise<SyncResult>`、类型 `SyncProgress{phase:'tree'|'download'|'cleanup'|'done';done:number;total:number}`、`SyncResult{added:number;updated:number;deleted:number;totalDocs:number;bytes:number}`
+  - `sync.ts`: `diffTree(localShaByPath:Record<string,string>, remote:TreeEntry[])`、`syncRepo(client, cfg, onProgress, opts?): Promise<SyncResult>`、`sweepExpired(ttlMs?): Promise<number>`（清理超期正文，返回清理数）、`downloadDocText(client, cfg, path): Promise<string>`（按需下载未缓存文档并刷新 `lastUsedAt`）、类型 `SyncProgress{phase:'tree'|'download'|'cleanup'|'done';done:number;total:number}`、`SyncResult{added:number;updated:number;deleted:number;totalDocs:number;bytes:number}`
+  - `lib/text.ts`: `extractTitle(md: string, fallback?: string): string`（取首个 `# ` 标题；缺省用文件名去 `.md`）
 
 - [ ] **Step 1: 写失败测试（paths / diff / links）**
 
@@ -1092,11 +1121,22 @@ export function getRelated(path: string, index: Record<string, string[]>) {
 ```
 
 ```ts
+// src/lib/text.ts
+/** 提取文档标题：首个一级标题；缺省用文件名（去 .md）。 */
+export function extractTitle(md: string, fallback = ''): string {
+  const m = /^#\s+(.+)$/m.exec(md);
+  if (m) return m[1].trim();
+  return fallback.replace(/\.md$/, '');
+}
+```
+
+```ts
 // src/data/sync.ts
 import type { GitHubClient } from './github';
-import { deleteFiles, getFile, kvSet, listFilesMeta, putFiles, type TreeEntry } from './db';
+import { deleteFiles, getFile, kvGet, kvSet, listFilesMeta, markExpired, putFiles, type TreeEntry } from './db';
 import { buildLinksIndex } from './links';
 import { isDoc } from './paths';
+import { extractTitle } from '../lib/text';
 import { runPool } from '../lib/pool';
 
 export interface SyncProgress { phase: 'tree' | 'download' | 'cleanup' | 'done'; done: number; total: number }
@@ -1114,6 +1154,32 @@ export function diffTree(localShaByPath: Record<string, string>, remote: TreeEnt
   return { added, updated, deleted };
 }
 
+export const EXPIRY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 清理超过 ttl 未使用的文档正文（text → null），返回清理数量。 */
+export async function sweepExpired(ttlMs = EXPIRY_TTL_MS, now = Date.now()): Promise<number> {
+  const metas = await listFilesMeta();
+  const expired = metas.filter((m) => m.cached && now - m.lastUsedAt > ttlMs).map((m) => m.path);
+  if (expired.length) await markExpired(expired);
+  await kvSet('lastSweepAt', now);
+  return expired.length;
+}
+
+/** 按需下载未缓存文档（从本地目录树取 sha），写入并刷新 lastUsedAt。 */
+export async function downloadDocText(
+  client: Pick<GitHubClient, 'getBlobText'>,
+  cfg: { owner: string; repo: string; branch: string },
+  path: string,
+): Promise<string> {
+  const tree = await kvGet<{ entries: TreeEntry[] }>('tree');
+  const entry = tree?.entries.find((e) => e.path === path);
+  if (!entry) throw new Error('文件不在本地目录树中，请先更新目录');
+  const text = await client.getBlobText(cfg.owner, cfg.repo, entry.sha);
+  const now = Date.now();
+  await putFiles([{ path, sha: entry.sha, size: entry.size, text, title: extractTitle(text, path), lastUsedAt: now, updatedAt: now }]);
+  return text;
+}
+
 export async function syncRepo(
   client: Pick<GitHubClient, 'getTree' | 'getBlobText'>,
   cfg: { owner: string; repo: string; branch: string },
@@ -1124,14 +1190,28 @@ export async function syncRepo(
   const tree = await client.getTree(cfg.owner, cfg.repo, cfg.branch);
   const docs = tree.filter((e) => isDoc(e.path));
 
-  const local = Object.fromEntries((await listFilesMeta()).map((m) => [m.path, m.sha]));
+  const metas = await listFilesMeta();
+  const metaByPath = Object.fromEntries(metas.map((m) => [m.path, m]));
+  const local = Object.fromEntries(metas.map((m) => [m.path, m.sha]));
   const { added, updated, deleted } = diffTree(local, docs);
-  const queue = [...added, ...updated];
+
+  // 已过期（未缓存）的文档：只更新记录的 sha，不下载（用户点击时按需下载）
+  const updatedExpired = updated.filter((e) => metaByPath[e.path]?.cached === false);
+  const queue = [...added, ...updated.filter((e) => metaByPath[e.path]?.cached !== false)];
   let done = 0, bytes = 0;
+
+  if (updatedExpired.length) {
+    const now = Date.now();
+    await putFiles(updatedExpired.map((e) => {
+      const m = metaByPath[e.path]!;
+      return { path: e.path, sha: e.sha, size: e.size, text: null, title: m.title, lastUsedAt: m.lastUsedAt, updatedAt: now };
+    }));
+  }
 
   await runPool(queue, 4, async (e) => {
     const text = await client.getBlobText(cfg.owner, cfg.repo, e.sha);
-    await putFiles([{ path: e.path, sha: e.sha, size: e.size, text, updatedAt: Date.now() }]);
+    const now = Date.now();
+    await putFiles([{ path: e.path, sha: e.sha, size: e.size, text, title: extractTitle(text, e.path), lastUsedAt: now, updatedAt: now }]);
     done++; bytes += text.length;
     onProgress({ phase: 'download', done, total: queue.length });
   }, opts);
@@ -1155,8 +1235,8 @@ export async function syncRepo(
 ```ts
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearAllData, listFilesMeta } from '../../src/data/db';
-import { syncRepo, type SyncProgress } from '../../src/data/sync';
+import { clearAllData, getFile, kvSet, listFilesMeta, markExpired, putFiles } from '../../src/data/db';
+import { downloadDocText, sweepExpired, syncRepo, type SyncProgress } from '../../src/data/sync';
 
 beforeEach(async () => { await clearAllData(); });
 
@@ -1185,6 +1265,32 @@ describe('syncRepo', () => {
     expect(res).toMatchObject({ added: 0, updated: 1, deleted: 1 });
     expect(spy).toHaveBeenCalledTimes(1);
   });
+  it('过期文档：sha 变化只更新记录、不下载', async () => {
+    await syncRepo(mkClient({ 'a.md': 'v1', 'b.md': 'x' }), { owner: 'o', repo: 'r', branch: 'main' }, () => {});
+    await markExpired(['a.md']);
+    const spy = vi.fn(async () => 'v2');
+    const c2 = {
+      getTree: async () => [
+        { path: 'a.md', sha: 'sha-a2', size: 2, type: 'blob' as const },
+        { path: 'b.md', sha: 'sha-b.md', size: 1, type: 'blob' as const },
+      ],
+      getBlobText: spy,
+    };
+    const res = await syncRepo(c2 as never, { owner: 'o', repo: 'r', branch: 'main' }, () => {});
+    expect(res).toMatchObject({ added: 0, updated: 1, deleted: 0 });
+    expect(spy).not.toHaveBeenCalled();
+    expect(await getFile('a.md')).toMatchObject({ sha: 'sha-a2', text: null });
+  });
+  it('sweepExpired 清理超期正文；downloadDocText 按需重下并刷新时钟', async () => {
+    await putFiles([{ path: 'a.md', sha: 's1', size: 2, text: 'hi', title: 'A', lastUsedAt: Date.now() - 8 * 24 * 3600 * 1000, updatedAt: 1 }]);
+    expect(await sweepExpired()).toBe(1);
+    expect((await getFile('a.md'))?.text).toBeNull();
+    await kvSet('tree', { syncedAt: 0, entries: [{ path: 'a.md', sha: 's1', size: 2, type: 'blob' }] });
+    const text = await downloadDocText({ getBlobText: async () => 'fresh' }, { owner: 'o', repo: 'r', branch: 'main' }, 'a.md');
+    expect(text).toBe('fresh');
+    expect((await getFile('a.md'))?.text).toBe('fresh');
+    expect((await getFile('a.md'))!.lastUsedAt).toBeGreaterThan(Date.now() - 1000);
+  });
 });
 ```
 
@@ -1212,8 +1318,8 @@ git add -A && git commit -m "feat: 同步引擎（增量 diff、并发下载、�
 - [ ] **Step 1: 实现 `useOnline` + `SyncContext`**
 
 行为规范：
-- Shell 挂载后：`token && config` 存在且在线 → `syncNow()`（后台静默，`status:'syncing'` 只显示小圆点）。
-- `syncNow()`：读 `config`；无 → 跳 `SETUP`；执行 `syncRepo`；首次成功同步后调用 `navigator.storage.persist()`；期间进度写入 state；`GitHubError.kind==='auth'` → 提示并跳 Setup（缓存不清）；`network` → `status:'offline'`。
+- Shell 挂载后：先执行 `sweepExpired()`（本地清理 7 天未使用的正文），再在 `token && config` 存在且在线时 → `syncNow()`（后台静默，`status:'syncing'` 只显示小圆点）。
+- `syncNow()`：读 `config`；无 → 跳 `SETUP`；执行 `syncRepo`；同步成功后再次执行 `sweepExpired()`；首次成功同步后调用 `navigator.storage.persist()`；期间进度写入 state；`GitHubError.kind==='auth'` → 提示并跳 Setup（缓存不清）；`network` → `status:'offline'`。
 - `useOnline`：`online/offline` 事件 + `navigator.onLine`。
 
 ```ts
@@ -1232,9 +1338,9 @@ export function useOnline() {
 
 `SyncContext` 实现要点（完整实现按此）：`createContext` + `useState`；`syncNow` 用 `useRef` 防重入；`timeAgo`（`刚刚 / n 分钟前 / n 小时前 / n 天前`）放在 `src/lib/format.ts` 并配单测（`tests/unit/format.test.ts`：now-30s→「刚刚」，now-5min→「5 分钟前」，now-3d→「3 天前」）。
 
-- [ ] **Step 2: 实现 `SyncBadge` 并挂到首页顶部**
+- [ ] **Step 2: 实现 `SyncBadge`（含「更新目录」手动刷新按钮）并挂到首页顶部**
 
-显示：状态点（灰=idle / 蓝转=同步中+n·共m / 红=错误 / 橙=离线）+「上次同步 X」+ 点按触发 `syncNow()`。
+显示：状态点（灰=idle / 蓝转=同步中+n·共m / 红=错误 / 橙=离线）+「上次同步 X」+ **「更新目录」按钮（触发 `syncNow()`，同步中旋转并禁用）**；点按徽标同样触发 `syncNow()`。
 
 - [ ] **Step 3: 验证（真实数据手动走查，作为 P1 验收前的本机检查）**
 
@@ -1588,7 +1694,11 @@ git add -A && git commit -m "feat: mermaid 懒渲染（代码分割、失败降�
 
 - [ ] **Step 1: 实现 DocPage 核心逻辑**
 
-流程：解析路由 `params['*']` → decode 得到 path → `getFile(path)`（无 → 显示「文档不存在/尚未同步」+ 返回首页按钮）→ `renderDoc(text, { path, knownPaths })`（knownPaths：`listFilesMeta()` 缓存于 DocsContext 或本页 `useEffect` 加载）→ `dangerouslySetInnerHTML` 注入 `div.doc-content` → `useEffect` 里 `hydrateImages` + `hydrateMermaid`，清理返回函数 → `?to=` 参数 → `document.getElementById(to)` `scrollIntoView()`；`?q=`/`?i=` → 走 Task 18 的高亮（本任务先忽略）→ 底部 `<PrevNext>`（由排序后的文档路径列表计算前后）。
+流程：解析路由 `params['*']` → decode 得到 path → `getFile(path)`，三分支：
+1. 无记录 → 显示「文档不存在/尚未同步」+ 返回首页按钮；
+2. `text === null`（已过期）→ 加载态中调 `downloadDocText(client, cfg, path)`（`useToken()` + `kvGet('config')`）；成功 → 继续渲染；离线/失败 → 显示「该文档未缓存，需联网下载后阅读」+ 重试按钮；
+3. 正常 → 继续渲染。
+渲染分支统一：`renderDoc(text, { path, knownPaths })`（knownPaths：`listFilesMeta()` 缓存于 DocsContext 或本页 `useEffect` 加载）→ `dangerouslySetInnerHTML` 注入 `div.doc-content` → `useEffect` 里 `hydrateImages` + `hydrateMermaid`，清理返回函数 → **`touchFile(path)` 刷新过期时钟** → `?to=` 参数 → `document.getElementById(to)` `scrollIntoView()`；`?q=`/`?i=` → 走 Task 18 的高亮（本任务先忽略）→ 底部 `<PrevNext>`（由排序后的文档路径列表计算前后）。
 
 样式要点（`content.css`）：`.doc-content { max-width: 46rem; margin: 0 auto; padding: 0 16px 96px; font-size: 17px; line-height: 1.8; }`；标题、表格（`display:block; overflow-x:auto`）、`pre`、引用块、`mark`（`background:#fff8c5`）、`s`、`img.md-img { max-width:100%; height:auto }`、`.md-mermaid { overflow-x:auto }`、`h1..h4 { scroll-margin-top: calc(var(--header-h) + 12px) }`；顶栏吸顶 `position: sticky`。
 
@@ -1658,9 +1768,9 @@ describe('tree', () => {
 });
 ```
 
-- [ ] **Step 2: 实现 `tree.ts`（`Intl.Collator('zh')` 排序、name 去 `.md`）与 `FileTree.tsx`（可折叠目录、当前项高亮）**
+- [ ] **Step 2: 实现 `tree.ts`（`Intl.Collator('zh')` 排序、name 去 `.md`）与 `FileTree.tsx`（可折叠目录、当前项高亮；**未缓存文档显示「未缓存」小标记**，数据来自 `listFilesMeta()` 的 `cached` 字段）**
 
-- [ ] **Step 3: 实现首页：搜索入口（跳 `searchHref('')` 不预填）+ 同步徽标 + 文件树；样式 home.css（列表触达区 ≥44px 高）**
+- [ ] **Step 3: 实现首页：搜索入口（跳 `searchHref('')` 不预填）+ 同步徽标（含「更新目录」按钮）+ 文件树（含未缓存标记）；样式 home.css（列表触达区 ≥44px 高）**
 
 - [ ] **Step 4: 验证并提交**
 
@@ -1737,7 +1847,7 @@ git add -A && git commit -m "feat: 历史栈与滚动恢复、返回来源、双
 - Test: `tests/unit/search.test.ts`
 
 **Interfaces:**
-- Produces: `searchDocs(docs: {path:string;text:string}[], query: string, limit?: number): SearchHit[]`；`SearchHit { path: string; title: string; count: number; score: number; snippets: { text: string; start: number }[] }`；`extractTitle(text: string): string`。
+- Produces: `searchDocs(docs: {path:string;text:string}[], query: string, limit?: number): SearchHit[]`；`SearchHit { path: string; title: string; count: number; score: number; snippets: { text: string; start: number }[] }`；`extractTitle` 复用 Task 8 的 `src/lib/text.ts`（不重复实现）。
 
 - [ ] **Step 1: 写失败测试**
 
@@ -1808,7 +1918,10 @@ describe('highlightInContainer', () => {
 
 - [ ] **Step 2: 实现 highlight.ts（TreeWalker + 大小写不敏感 + max 上限）与 SearchPage**
 
-SearchPage：读 `?q=`，无词时展示提示；有词：从 DocsContext 拿全量文本（`listFilesMeta` + `getFile`，首次加载后缓存在模块级 Map，同步完成时失效）→ `searchDocs` → 结果卡片（标题、路径、命中数、前 2 条片段，片段中命中词用 `<mark>`）→ 点击 → `navigate(docHref(path, { q, i: snippetIndex }))`。
+SearchPage：读 `?q=`，无词时展示提示；有词：
+1. `listFilesMeta()` → **未缓存文档（`cached === false`）直接跳过**；若存在未缓存文档，顶部显示「N 篇文档未缓存（已过期），未参与搜索」+「纳入全文搜索」按钮；
+2. 已缓存文档 `getFile` 取文本（模块级 Map 缓存，同步完成时失效）→ `searchDocs` → 结果卡片（标题、路径、命中数、前 2 条片段，命中词用 `<mark>`）→ 点击 → `navigate(docHref(path, { q, i: snippetIndex }))`；
+3. 「纳入全文搜索」：对未缓存文档并发 4 调 `downloadDocText`（带进度），完成后刷新缓存并重新搜索（下载即刷新其 `lastUsedAt`）。
 
 DocPage：`useEffect` 渲染后若有 `q`：`highlightInContainer(contentEl, q)` → 滚动到 `hits[i] ?? hits[0]`。
 
@@ -1906,7 +2019,7 @@ git add -A && git commit -m "feat: 关联文档面板（引用/被引用互跳�
 
 - [ ] **Step 1: 实现设置页**
 
-区块：① Token（掩码显示 + 更换 → 内联输入校验后保存 + 清除）；② 仓库（owner/repo/branch 三输入 + 保存；默认值来自 `DEFAULT_REPO`）；③ 同步（立即同步 + 上次同步时间 + 进度）；④ 存储（`storageEstimate` + bytesToText）；⑤ 危险区（清除全部数据，`window.confirm` 二次确认）；⑥ 关于：版本号（`import pkg from '../../package.json'`，resolveJsonModule 已开）、定位声明全文（**个人自用，非通用 Markdown 阅读器**）、隐私说明（token 仅存本机、仅访问 api.github.com）。
+区块：① Token（掩码显示 + 更换 → 内联输入校验后保存 + 清除）；② 仓库（owner/repo/branch 三输入 + 保存；默认值来自 `DEFAULT_REPO`）；③ 同步（立即同步 + 上次同步时间 + 进度）；④ 存储（`storageEstimate` + bytesToText + 缓存统计「已缓存 N 篇 / 未缓存 M 篇」，来自 `listFilesMeta()` 的 `cached`）；⑤ 危险区（清除全部数据，`window.confirm` 二次确认）；⑥ 关于：版本号（`import pkg from '../../package.json'`，resolveJsonModule 已开）、定位声明全文（**个人自用，非通用 Markdown 阅读器**）、隐私说明（token 仅存本机、仅访问 api.github.com）。
 
 - [ ] **Step 2: 验证并提交**
 
@@ -1925,7 +2038,7 @@ git add -A && git commit -m "feat: 设置页与关于（个人自用声明）"
 
 - [ ] **Step 2: 实现 toast 与错误映射**：401 → `navigate(SETUP + '?reauth=1')` + 顶部「登录已过期，请重新授权（本地缓存已保留）」；ratelimit → 「GitHub 请求超限，X 分钟后重试」；quota → 「存储空间不足，可在设置中清除缓存」；缓存损坏自愈 → 一次性提示「本地缓存已重建」。
 
-- [ ] **Step 3: 空态检查**：引导页、空仓库（0 文档）、搜索无结果、读取不存在的文档 4 类文案就位。
+- [ ] **Step 3: 空态检查**：引导页、空仓库（0 文档）、搜索无结果、读取不存在的文档、**未缓存文档离线打开（「需联网下载后阅读」+ 重试）** 5 类文案就位。
 
 - [ ] **Step 4: 验证并提交**
 
@@ -1941,13 +2054,15 @@ git add -A && git commit -m "feat: 离线横幅与错误态完善"
 ### Task 23: e2e 全场景补全
 
 **Files:**
-- Create: `tests/e2e/offline.spec.ts`、`tests/e2e/auth.spec.ts`、`tests/e2e/pwa.spec.ts`
+- Create: `tests/e2e/offline.spec.ts`、`tests/e2e/auth.spec.ts`、`tests/e2e/pwa.spec.ts`、`tests/e2e/expiry.spec.ts`
 - Modify: 既有 spec（如需）
 
 - [ ] **Step 1: `offline.spec.ts`**：完成首同步 → `context.setOffline(true)` → reload → 首页与文档可用、搜索可用；`setOffline(false)` → 恢复。
 - [ ] **Step 2: `auth.spec.ts`**：以 `failAuth` 安装 mock → 引导页显示「Token 无效」；预置有效缓存后在文档页触发 401（切换 mock）→ 跳 Setup 且 IndexedDB 数据仍在（`page.evaluate` 检查 `indexedDB.databases()`）。
 - [ ] **Step 3: `pwa.spec.ts`**：首访后 `navigator.serviceWorker.ready` 完成；`link[rel=manifest]` 存在且 fetch 200；`meta[name=robots][content*=noindex]` 存在。
-- [ ] **Step 4: 运行全部并提交**
+- [ ] **Step 4: `expiry.spec.ts`**：同步完成后用 `page.evaluate` 将某篇的 `lastUsedAt` 改为 8 天前 → reload → 断言该篇 `text === null`（IndexedDB）且目录出现「未缓存」标记 → 点击该文档 → mock 返回内容 → 正常渲染且 `text` 重新写入；`setOffline(true)` 后点击另一篇过期文档 → 显示「需联网下载后阅读」。
+
+- [ ] **Step 5: 运行全部并提交**
 
 ```bash
 npm run test:e2e && npm test && npm run typecheck
@@ -2004,7 +2119,7 @@ git add -A && git commit -m "chore: 语料体检与渲染对拍脚本"
 
 - [ ] **Step 1: README 追加小节**：运行方式（`npm i && npm run dev` / `npm run build`）、Token 创建步骤（仅指向 GitHub 官方设置页的文字步骤，不含链接外跳依赖）、部署说明（本人 fork/自建需将 `base` 与仓库名对齐并自行承担兼容性）、测试命令（`npm test` / `npm run test:e2e` / `npm run corpus`）。**顶部「仅供个人使用」声明保持原样**。
 
-- [ ] **Step 2: 执行真机验收清单（Spec §12.5 全部 12 条），逐条记录结果到 `docs/acceptance-2026-10-18.md`（通过/失败/备注）**
+- [ ] **Step 2: 执行真机验收清单（Spec §12.5 全部条目，含过期清理与目录手动更新），逐条记录结果到 `docs/acceptance-2026-10-18.md`（通过/失败/备注）**
 
 - [ ] **Step 3: 修复验收发现的问题（若涉及计划外变更，先与用户确认）**
 
@@ -2041,3 +2156,5 @@ git tag v1.0.0 && git push origin main --tags
 **3. 类型一致性**：`TreeEntry/FileRecord`（T5）↔ `GitHubClient`（T6）↔ `syncRepo`（T8）；`docHref`（T2）被 T13/T18/T20 复用；`hydrateImages`（T11）/`hydrateMermaid`（T12）签名与 T13 的调用一致；`SearchHit`（T17）与 T18 页面一致；`search-mark` 类名在 T18 测试与实现中一致。
 
 **4. 已知取舍**：e2e 全部 mock（不触网）；私有语料不进仓库（corpus 脚本按本地路径运行）；渲染对拍为可选工具。
+
+**5. 2026-10-18 设计更新（缓存过期 + 目录手动更新）**：已落入 Global Constraints 与 T5/T8/T9/T13/T15/T17/T18/T21/T22/T23/T25——过期清理（`sweepExpired`）、按需重下（`downloadDocText`）、搜索跳过未缓存并支持「纳入全文搜索」、SyncBadge 含「更新目录」按钮、文件树未缓存标记。
