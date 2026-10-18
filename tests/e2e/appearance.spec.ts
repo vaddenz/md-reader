@@ -67,4 +67,6 @@ test('字体样张页：三种字体并排样张', async ({ page }) => {
   await expect(page.locator('.font-sample').nth(0)).toContainText('系统默认');
   await expect(page.locator('.font-sample').nth(1)).toContainText('等线');
   await expect(page.locator('.font-sample').nth(2)).toContainText('宋体');
+  // 标题样张须在 .doc-content 内，随所选字体渲染
+  await expect(page.locator('.font-sample').nth(1).locator('.doc-content h2')).toHaveText('标题样张 Heading');
 });

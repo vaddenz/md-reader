@@ -25,6 +25,7 @@ export default function FontPreviewPage() {
         <section key={s.id} className="font-sample">
           <h2>{s.label}</h2>
           <div className="doc-content" style={appearanceStyle({ ...base, fontFamily: s.id })}>
+            <h2>标题样张 Heading</h2>
             <p>这是一段用于对比的正文字样：MVCC 与版本可见性、中文标点，与 <code>inline code</code> 混排。</p>
             <blockquote><p>引用块样张：紧凑排版下的阅读效果。</p></blockquote>
             <table><thead><tr><th>列 A</th><th>列 B</th></tr></thead><tbody><tr><td>表格文本</td><td>示例</td></tr></tbody></table>
