@@ -281,6 +281,44 @@
 }
 .doc-state-btn:active { background: #f0f3f6; }
 
+/* ========== 相关文档（T20） ========== */
+.related-docs {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+.related-group + .related-group { margin-top: 16px; }
+.related-group-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #57606a;
+}
+.related-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.related-chip {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  background: #f6f8fa;
+  color: var(--c-text);
+  font-size: 13px;
+  text-decoration: none;
+}
+.related-chip:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.related-chip:active { background: #eaf2fd; }
+
 /* ========== 上下篇 ========== */
 .prev-next {
   display: flex;

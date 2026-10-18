@@ -5,6 +5,7 @@ import { keyFromLocation, rememberScroll, takeScroll } from '../app/scroll';
 import BackToSource from '../components/BackToSource';
 import DocHeader from '../components/DocHeader';
 import PrevNext from '../components/PrevNext';
+import RelatedDocs from '../components/RelatedDocs';
 import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
 import { DEFAULT_REPO } from '../constants';
@@ -338,6 +339,7 @@ export default function DocPage() {
           )}
         </div>
       )}
+      {ready && <RelatedDocs path={path} />}
       {ready && <PrevNext path={path} metas={metas} />}
       {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}
       {treeOpen && (

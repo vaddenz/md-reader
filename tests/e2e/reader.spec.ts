@@ -28,8 +28,8 @@ test('P2 全链路：引导配置 → 自动同步 → mermaid/锚点/返回来�
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
   await expect(page.locator('.md-mermaid svg')).toBeVisible();
 
-  // b.md 中的互链回 a.md → 「返回来源」出现
-  await page.getByRole('link', { name: '文档 A', exact: true }).click();
+  // b.md 中的互链回 a.md → 「返回来源」出现（限定正文，避开底部关联面板的同名 chip）
+  await page.locator('.doc-content').getByRole('link', { name: '文档 A', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
   await expect(page.getByRole('button', { name: '返回来源' })).toBeVisible();
 
@@ -85,6 +85,30 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: '全部文档' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '返回来源' })).toHaveCount(0);
+});
+
+test('相关文档面板：双向引用分组 chips，点击互跳；无引用不渲染', async ({ page }) => {
+  await configureAndSync(page);
+
+  // 长文档.md 没有任何互链 → 面板整块不渲染
+  await page.getByRole('link', { name: '长文档', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
+  await expect(page.locator('.related-docs')).toHaveCount(0);
+
+  // a.md ↔ 深挖/b.md 双向引用：两个分组都出现，chip 显示标题
+  await page.getByRole('button', { name: '返回首页' }).click();
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  const panel = page.locator('.related-docs');
+  await expect(panel.getByRole('region', { name: '引用本文的' })).toBeVisible();
+  await expect(panel.getByRole('region', { name: '本文引用的' })).toBeVisible();
+  await expect(panel.getByRole('link', { name: '文档 B' })).toHaveCount(2);
+
+  // 点 chip 直达 b.md（普通 <a> 经 Shell 拦截走路由，不整页刷新）
+  await panel.getByRole('link', { name: '文档 B' }).first().click();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await expect(page).toHaveURL(/#\/doc\//);
+  await expect(page.getByRole('button', { name: '返回来源' })).toHaveCount(0); // 非正文互链，无来源条
 });
 
 test('已配置 Token（localStorage 预置）：启动不再跳转引导页', async ({ page }) => {
