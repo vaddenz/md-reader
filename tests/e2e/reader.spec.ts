@@ -61,7 +61,7 @@ test('P2 全链路：引导配置 → 自动同步 → mermaid/锚点/返回来�
 });
 
 test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目录抽屉互斥', async ({ page }) => {
-  await configureAndSync(page);
+  const mock = await configureAndSync(page);
 
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
@@ -72,13 +72,18 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: '目录' })).toHaveCount(0);
 
-  // 文件树抽屉：3 篇文档、当前文档高亮
+  // 文件树抽屉：3 篇文档、当前文档高亮、含「更新目录」手动刷新入口（spec §3）
   await page.getByRole('button', { name: '文件' }).click();
   const drawer = page.getByRole('dialog', { name: '全部文档' });
   await expect(drawer).toBeVisible();
   await expect(drawer.locator('.tree-item')).toHaveCount(3);
   await expect(drawer.locator('.tree-current')).toHaveText('a');
   await expect(drawer.locator('.tree-current')).toHaveAttribute('aria-current', 'page');
+  await expect(drawer.getByRole('button', { name: '更新目录' })).toBeVisible();
+
+  // 点「更新目录」触发手动同步（与首页 SyncBadge 同口径：tree 请求 +1）
+  await drawer.getByRole('button', { name: '更新目录' }).click();
+  await expect.poll(() => mock.syncCalls()).toBe(2);
 
   // 点抽屉里的 深挖/b.md → 跳转、抽屉关闭、且不显示「返回来源」（抽屉跳转不是互链）
   await drawer.getByRole('link', { name: 'b', exact: true }).click();

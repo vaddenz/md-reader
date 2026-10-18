@@ -59,6 +59,13 @@
 /* 文件树自带首页外边距，抽屉内不需要 */
 .drawer-body .file-tree { margin-top: 0; }
 
+/* 文件树抽屉的手动刷新入口（复用 SyncBadge 的 .sync-refresh 样式） */
+.tree-drawer-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px 4px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .drawer-overlay { animation: drawer-fade-in 0.16s ease-out; }
   .drawer-panel { animation: drawer-slide-up 0.2s ease-out; }

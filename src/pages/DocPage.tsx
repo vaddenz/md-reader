@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { HOME, toRouterPath } from '../app/nav';
+import { HOME, SETUP, toRouterPath } from '../app/nav';
 import { keyFromLocation, rememberScroll, takeScroll } from '../app/scroll';
 import BackToSource from '../components/BackToSource';
 import DocHeader from '../components/DocHeader';
@@ -10,17 +10,18 @@ import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
 import { DEFAULT_REPO } from '../constants';
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
-import { GitHubClient } from '../data/github';
+import { GitHubClient, GitHubError } from '../data/github';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { downloadDocText } from '../data/sync';
 import { useReadingProgress } from '../hooks/useReadingProgress';
-import { QUOTA_TEXT, isQuotaError } from '../lib/errors';
+import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError } from '../lib/errors';
 import { showToast } from '../lib/toast';
 import { highlightInContainer } from '../markdown/highlight';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
 import type { RepoConfig } from '../state/SyncContext';
+import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 
 type PageState =
@@ -44,6 +45,7 @@ export default function DocPage() {
   const locationKey = keyFromLocation(location);
   const from = (location.state as { from?: string } | null)?.from;
   const { token } = useToken();
+  const { lastSyncAt } = useSync();
   const params = useParams();
   const raw = params['*'] ?? '';
   const path = raw.includes('%') ? safeDecode(raw) : raw;
@@ -66,6 +68,7 @@ export default function DocPage() {
   const copyTimers = useRef(new Map<HTMLElement, number>());
 
   // 目录元数据（knownPaths 判定互链 + 上下篇排序）；就绪前不渲染正文，避免互链被误判为死链。
+  // 同步完成（lastSyncAt 变化）后重读：抽屉内「更新目录」的结果即时反映到文件树（与首页同口径）。
   useEffect(() => {
     let cancelled = false;
     void listFilesMeta().then(
@@ -73,7 +76,7 @@ export default function DocPage() {
       () => { if (!cancelled) setMetasLoaded(true); },
     );
     return () => { cancelled = true; };
-  }, []);
+  }, [lastSyncAt]);
 
   // 三分支：无记录 → 不存在；text === null（已过期）→ 联网按需下载；正常 → 直接渲染。
   useEffect(() => {
@@ -93,12 +96,22 @@ export default function DocPage() {
         const text = await downloadDocText(new GitHubClient(token), cfg, path);
         if (!cancelled) setState({ kind: 'ready', path, title: rec.title, text });
       } catch (err) {
-        // 存储超限（写入 IndexedDB 失败）单独提示，其余（离线/鉴权等）走「需联网下载」重试态
-        if (!cancelled && isQuotaError(err)) showToast(QUOTA_TEXT, { kind: 'error' });
-        if (!cancelled) setState({ kind: 'download-failed', path });
+        if (cancelled) return;
+        if (isQuotaError(err)) {
+          // 存储超限（写入 IndexedDB 失败）单独提示，其余走「需联网下载」重试态
+          showToast(QUOTA_TEXT, { kind: 'error' });
+        } else if (err instanceof GitHubError && err.kind === 'auth') {
+          // 过期文档按需下载遇 401：与同步同口径——提示重新授权并跳引导页（缓存保留）
+          showToast(AUTH_EXPIRED_TEXT, { kind: 'error' });
+          navigate(toRouterPath(`${SETUP}?reauth=1`));
+          return;
+        }
+        setState({ kind: 'download-failed', path });
       }
     })();
     return () => { cancelled = true; };
+    // 依赖不含 navigate：其身份随路由变化，入依赖会在同文档内导航（如 ?q= 变化）时重复触发下载。
+    // 闭包中的旧实例执行绝对路径导航仍然有效（与 SyncContext 自动同步同口径）。
   }, [path, token, retry]);
 
   // 换文档后、新状态就绪前，旧状态不参与渲染（避免闪出上一篇的正文/状态）。
@@ -263,7 +276,8 @@ export default function DocPage() {
     const el = e.target as Element;
     const dead = el.closest('a[data-dead]');
     if (dead) {
-      e.preventDefault(); // 目标不存在的链接停留原处（提示文案留待 T22）
+      e.preventDefault(); // 目标不存在的链接停留原处，仅提示（spec §6.1-2）
+      showToast(dead.getAttribute('data-dead') || '文件不存在');
       return;
     }
     // 站内互链（render 加了 .in-app-link）：拦截原生 hash 导航，记录当前滚动位置，
