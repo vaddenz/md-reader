@@ -58,3 +58,13 @@ test('设置页调整外观：预览联动、防抖持久化、阅读页生效',
   const fontSize = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontSize);
   expect(fontSize).toBe('20px');
 });
+
+test('字体样张页：三种字体并排样张', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/font-preview');
+  await expect(page.getByRole('heading', { name: '字体样张' })).toBeVisible();
+  await expect(page.locator('.font-sample')).toHaveCount(3);
+  await expect(page.locator('.font-sample').nth(0)).toContainText('系统默认');
+  await expect(page.locator('.font-sample').nth(1)).toContainText('等线');
+  await expect(page.locator('.font-sample').nth(2)).toContainText('宋体');
+});

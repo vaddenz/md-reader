@@ -78,6 +78,7 @@ export default function AppearanceSection() {
           <tbody><tr><td>表格文本</td><td>示例</td></tr></tbody>
         </table>
       </div>
+      <p className="settings-note"><a href="#/font-preview">字体并排样张对比 →</a></p>
     </section>
   );
 }
