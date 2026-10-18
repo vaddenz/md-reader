@@ -8,6 +8,7 @@ import { DEFAULT_REPO } from '../constants';
 import { clearAllData, kvGet, kvSet, listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
 import { bytesToText } from '../lib/format';
+import { useOrientation } from '../state/OrientationContext';
 import { useSync, type RepoConfig } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/settings.css';
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { token, setToken, clear } = useToken();
   const { status, progress, lastSyncAt, error, syncNow, timeAgo } = useSync();
+  const { state: orientation, setOrientation } = useOrientation();
 
   const [changing, setChanging] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
@@ -237,6 +239,23 @@ export default function SettingsPage() {
       </section>
 
       <AppearanceSection />
+
+      <section className="settings-section" aria-labelledby="settings-orientation-title">
+        <h2 id="settings-orientation-title">显示方向</h2>
+        <div className="appearance-row" role="radiogroup" aria-label="显示方向">
+          {([
+            ['portrait', '竖屏锁定'],
+            ['landscape', '横屏'],
+            ['landscape-flipped', '横屏（翻转）'],
+          ] as const).map(([id, label]) => (
+            <label key={id} className="appearance-radio">
+              <input type="radio" name="orientation" checked={orientation === id} onChange={() => setOrientation(id)} />
+              {label}
+            </label>
+          ))}
+        </div>
+        <p className="settings-note">方向锁定需要以主屏幕应用（PWA）打开；浏览器标签下可能不支持。默认竖屏锁定、不跟随手机旋转。</p>
+      </section>
 
       <HighlightsSection />
 

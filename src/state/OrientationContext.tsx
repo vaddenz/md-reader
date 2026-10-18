@@ -39,10 +39,13 @@ export function OrientationProvider({ children }: { children: ReactNode }) {
 
   const setOrientation = useCallback((next: OrientationState) => {
     setState(next);
-    void kvSet(ORIENTATION_KEY, next).catch(() => {});
-    void applyOrientation(next).then((ok) => {
+    // 先落库、再锁屏：保证「系统锁定已生效」时状态已持久化，
+    // 用户随即刷新/关闭也不丢（T13 的 reload 恢复用例依赖该顺序）。
+    void (async () => {
+      await kvSet(ORIENTATION_KEY, next).catch(() => {});
+      const ok = await applyOrientation(next);
       if (!ok) showToast('当前环境不支持方向锁定：请用主屏幕应用（PWA）打开', { kind: 'error' });
-    });
+    })();
   }, []);
 
   const toggleLandscape = useCallback(() => {

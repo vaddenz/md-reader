@@ -12,10 +12,25 @@ interface DocHeaderProps {
   favorite?: boolean;
   /** 切换收藏；未提供时（收藏状态尚未读取）不渲染收藏按钮。 */
   onToggleFavorite?: () => void;
+  /** 当前显示方向；未提供 onToggleOrientation 时不渲染方向按钮。 */
+  orientation?: 'portrait' | 'landscape' | 'landscape-flipped';
+  /** 横屏/竖屏切换；未提供时不渲染横屏按钮。 */
+  onToggleOrientation?: () => void;
+  /** 翻转 180°（横屏 ↔ 横屏翻转）；未提供时（非横屏）不渲染旋转按钮。 */
+  onFlipOrientation?: () => void;
 }
 
-/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（文件树 / 目录 / 收藏）。 */
-export default function DocHeader({ title, onOpenToc, onOpenTree, favorite = false, onToggleFavorite }: DocHeaderProps) {
+/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（文件树 / 目录 / 收藏 / 方向）。 */
+export default function DocHeader({
+  title,
+  onOpenToc,
+  onOpenTree,
+  favorite = false,
+  onToggleFavorite,
+  orientation,
+  onToggleOrientation,
+  onFlipOrientation,
+}: DocHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -88,6 +103,47 @@ export default function DocHeader({ title, onOpenToc, onOpenTree, favorite = fal
                 strokeWidth="2"
                 strokeLinejoin="round"
                 d="M12 3.6l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9z"
+              />
+            </svg>
+          </button>
+        )}
+        {onToggleOrientation && (
+          <button
+            type="button"
+            className="doc-header-btn"
+            aria-label="横屏"
+            title="横屏/竖屏"
+            aria-pressed={orientation !== 'portrait'}
+            onClick={onToggleOrientation}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"
+              />
+            </svg>
+          </button>
+        )}
+        {orientation && orientation !== 'portrait' && onFlipOrientation && (
+          <button
+            type="button"
+            className="doc-header-btn"
+            aria-label="旋转"
+            title="翻转 180°"
+            onClick={onFlipOrientation}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 12a8 8 0 1 1 2.3 5.6M4 12V7m0 5h5"
               />
             </svg>
           </button>

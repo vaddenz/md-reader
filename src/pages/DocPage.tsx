@@ -25,6 +25,7 @@ import { applyHighlights, buildHaystack, contentRange, rangeIntersectsExcluded, 
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
+import { useOrientation } from '../state/OrientationContext';
 import type { RepoConfig } from '../state/SyncContext';
 import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
@@ -73,6 +74,7 @@ export default function DocPage() {
   const from = (location.state as { from?: string } | null)?.from;
   const { token } = useToken();
   const { lastSyncAt } = useSync();
+  const { state: orientation, toggleLandscape, flip } = useOrientation();
   const params = useParams();
   const raw = params['*'] ?? '';
   const path = raw.includes('%') ? safeDecode(raw) : raw;
@@ -495,6 +497,9 @@ export default function DocPage() {
         onOpenTree={metas.length > 0 ? openTree : undefined}
         favorite={favorite === true}
         onToggleFavorite={favorite === null ? undefined : toggleFav}
+        orientation={orientation}
+        onToggleOrientation={toggleLandscape}
+        onFlipOrientation={flip}
       />
       {from && <BackToSource />}
       {ready ? (
