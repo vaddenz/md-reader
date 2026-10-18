@@ -37,3 +37,16 @@ test('PWA：manifest 存在且可 200 获取；robots noindex 防收录', async 
 
   await expect(page.locator('meta[name=robots]')).toHaveAttribute('content', /noindex/);
 });
+
+test('PWA：CSP meta 存在且锁定 connect-src（spec §9）', async ({ page }) => {
+  await configureAndSync(page);
+
+  const csp = page.locator('meta[http-equiv="Content-Security-Policy"]');
+  await expect(csp).toHaveCount(1);
+  const content = (await csp.getAttribute('content')) ?? '';
+  expect(content).toContain("default-src 'self'");
+  expect(content).toContain("connect-src 'self' https://api.github.com");
+  expect(content).toContain("script-src 'self'");
+  expect(content).toContain("object-src 'none'");
+  expect(content).toContain("base-uri 'none'");
+});
