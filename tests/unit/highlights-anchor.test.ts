@@ -58,6 +58,26 @@ describe('locateAnchor', () => {
     const el = mount('<p>完全不同。</p>');
     expect(locateAnchor(buildHaystack(el), { exact: '找不到的句子', prefix: '', suffix: '' })).toBeNull();
   });
+  // 单候选短路（批量应用的快路径）：唯一原文命中即答案，不应触碰归一化结构。
+  it('唯一原文命中时不需要归一化结构（prep 不被调用）', () => {
+    const el = mount('<p>甲处有性能优化方案。</p>');
+    const h = buildHaystack(el);
+    const prep = () => { throw new Error('单候选不应触发归一化'); };
+    const got = locateAnchor(h, { exact: '性能优化方案', prefix: '', suffix: '' }, prep);
+    expect(got).not.toBeNull();
+    expect(h.text.slice(got!.start, got!.end)).toBe('性能优化方案');
+  });
+  // 归一化结构可跨记录复用：多候选计分路径仍走传入的 prep。
+  it('多候选消歧使用调用方提供的归一化结构', () => {
+    const el = mount('<p>甲处有性能优化方案。</p><p>乙处有性能优化思路。</p>');
+    const h = buildHaystack(el);
+    let calls = 0;
+    const prep = () => { calls++; return { norm: { norm: 'x', toRaw: [] } }; };
+    // prep 返回的 norm 与 haystack 无关 → 计分必然退化，但不得抛错、仍返回最早候选
+    const got = locateAnchor(h, { exact: '性能优化', prefix: '乙处有', suffix: '思路' }, prep);
+    expect(calls).toBe(1);
+    expect(h.text.slice(got!.start, got!.end)).toBe('性能优化');
+  });
 });
 
 describe('wrapRange / removeMarks', () => {

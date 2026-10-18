@@ -2,6 +2,8 @@ import type { HighlightRecord } from '../data/highlights';
 
 export interface TextPos { node: Text | null; offset: number }
 export interface Haystack { text: string; map: TextPos[] }
+/** 归一化结果：空白串折叠为单空格，并记录每个归一化字符 → 原文下标。 */
+export interface NormalizedText { norm: string; toRaw: number[] }
 
 const SKIP_SELECTOR = 'script, style, pre, code, button, svg, .code-copy, .mermaid, .md-img-error';
 /** 复制口径的跳过清单：与锚定口径相同，但保留 pre/code（代码是正文内容，只剔除界面元素）。 */
@@ -58,7 +60,7 @@ export function visibleText(container: HTMLElement): string {
 }
 
 /** 归一化：空白串折叠为单空格，并记录每个归一化字符 → 原文下标。 */
-function normalize(s: string): { norm: string; toRaw: number[] } {
+function normalize(s: string): NormalizedText {
   const norm: string[] = [];
   const toRaw: number[] = [];
   let i = 0;
@@ -87,18 +89,29 @@ function commonPrefixLen(a: string, b: string): number {
   return n;
 }
 
-export function locateAnchor(haystack: Haystack, anchor: { exact: string; prefix: string; suffix: string }): { start: number; end: number } | null {
+/**
+ * 在 haystack 中定位锚点。`prep` 可选：由调用方惰性构建、跨记录复用的归一化结构
+ * （批量应用时避免逐记录重复归一化）；不传则按需在函数内构建。
+ */
+export function locateAnchor(
+  haystack: Haystack,
+  anchor: { exact: string; prefix: string; suffix: string },
+  prep?: () => { norm: NormalizedText },
+): { start: number; end: number } | null {
   if (!anchor.exact) return null; // 空 exact 无意义，且会让 indexOf 循环不前进
+  const getNorm = (): NormalizedText => (prep ? prep().norm : normalize(haystack.text));
   // 一级：原始精确匹配（候选直接带原文区间）
   const candidates: { start: number; end: number }[] = [];
   for (let i = haystack.text.indexOf(anchor.exact); i !== -1; i = haystack.text.indexOf(anchor.exact, i + 1)) {
     candidates.push({ start: i, end: i + anchor.exact.length });
   }
+  // 单候选短路：唯一原文命中即答案，无需归一化与消歧（批量应用的主路径）。
+  if (candidates.length === 1) return candidates[0];
   // 二级：空白归一化匹配（toRaw 映射回原文；end 取下一归一化字符的原文下标，覆盖整段空白）
-  let normInfo: { norm: string; toRaw: number[] } | null = null;
+  let normInfo: NormalizedText | null = null;
   let nExact = anchor.exact;
   if (candidates.length === 0) {
-    normInfo = normalize(haystack.text);
+    normInfo = getNorm();
     nExact = normalize(anchor.exact).norm;
     if (!nExact) return null;
     for (let i = normInfo.norm.indexOf(nExact); i !== -1; i = normInfo.norm.indexOf(nExact, i + 1)) {
@@ -110,12 +123,14 @@ export function locateAnchor(haystack: Haystack, anchor: { exact: string; prefix
   }
   if (candidates.length === 0) return null;
   // 三级：上下文消歧（归一化空间计分；平分取最早）
-  const useNorm = normInfo ?? normalize(haystack.text);
+  const useNorm = normInfo ?? getNorm();
   const useExact = normInfo ? nExact : normalize(anchor.exact).norm;
   const nPrefix = normalize(anchor.prefix).norm;
   const nSuffix = normalize(anchor.suffix).norm;
-  const rawToNorm = new Map<number, number>(); // 原文下标 → 归一化下标（消歧用）
-  useNorm.toRaw.forEach((raw, i) => { if (!rawToNorm.has(raw)) rawToNorm.set(raw, i); });
+  // 原文下标 → 归一化下标（消歧用）：只映射候选起点（原先全量映射是长文档的主要开销）。
+  const starts = new Set(candidates.map((c) => c.start));
+  const rawToNorm = new Map<number, number>();
+  useNorm.toRaw.forEach((raw, i) => { if (starts.has(raw)) rawToNorm.set(raw, i); });
   let best = { range: candidates[0], score: -1 };
   for (const range of candidates) {
     const nStart = rawToNorm.get(range.start) ?? 0;
@@ -169,11 +184,14 @@ export function applyHighlights(container: HTMLElement, records: HighlightRecord
   const applied = new Map<string, { start: number; end: number }>();
   const sorted = [...records].sort((a, b) => a.createdAt - b.createdAt);
   const haystack = buildHaystack(container);
+  // 归一化结构惰性构建、整次调用复用（逐记录重复归一化 + 全量映射是长文档的主要开销）。
+  let prep: { norm: NormalizedText } | undefined;
+  const getPrep = () => (prep ??= { norm: normalize(haystack.text) });
   const pending: { start: number; end: number; className: string; id: string }[] = [];
   for (const record of sorted) {
     const cls = markClassFor(record);
     if (!cls) continue;
-    const found = locateAnchor(haystack, record);
+    const found = locateAnchor(haystack, record, getPrep);
     if (!found) continue; // 孤儿：保留记录不渲染
     let conflict = false;
     for (const r of applied.values()) if (found.start < r.end && r.start < found.end) { conflict = true; break; }
