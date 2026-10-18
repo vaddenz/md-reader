@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HOME, toRouterPath } from '../app/nav';
 import DocHeader from '../components/DocHeader';
 import PrevNext from '../components/PrevNext';
+import TocDrawer from '../components/TocDrawer';
 import { DEFAULT_REPO } from '../constants';
 import { getFile, kvGet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient } from '../data/github';
@@ -41,6 +42,7 @@ export default function DocPage() {
   const [metas, setMetas] = useState<FileMeta[]>([]);
   const [metasLoaded, setMetasLoaded] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [tocOpen, setTocOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
 
@@ -87,6 +89,17 @@ export default function DocPage() {
     [cur, metasLoaded, knownPaths, path],
   );
   const html = rendered?.html ?? '';
+
+  // 目录抽屉只列 h1–h4（brief 约定）；没有这样的标题时不显示入口。
+  const tocHeadings = useMemo(
+    () => (rendered?.headings ?? []).filter((h) => h.level <= 4),
+    [rendered],
+  );
+  const openToc = useCallback(() => setTocOpen(true), []);
+  const closeToc = useCallback(() => setTocOpen(false), []);
+
+  // 换文档（如浏览器前进/后退）时关闭抽屉，避免展示上一篇的目录。
+  useEffect(() => { setTocOpen(false); }, [path]);
 
   // 图片管线：由仓库路径查 kv.tree 的 sha，再按当前配置鉴权取字节（blob 缓存由管线内部处理）。
   const fetchBlob = useCallback(async (repoPath: string): Promise<Blob> => {
@@ -169,7 +182,7 @@ export default function DocPage() {
 
   return (
     <>
-      <DocHeader title={title} />
+      <DocHeader title={title} onOpenToc={tocHeadings.length > 0 ? openToc : undefined} />
       {ready ? (
         <div
           key="content"
@@ -202,6 +215,7 @@ export default function DocPage() {
         </div>
       )}
       {ready && <PrevNext path={path} metas={metas} />}
+      {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}
     </>
   );
 }

@@ -14,7 +14,8 @@
   border-bottom: 1px solid #d8dee4;
 }
 
-.doc-back {
+.doc-back,
+.doc-header-btn {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -28,7 +29,8 @@
   color: var(--c-text);
   cursor: pointer;
 }
-.doc-back:active { background: #f0f3f6; }
+.doc-back:active,
+.doc-header-btn:active { background: #f0f3f6; }
 
 .doc-title {
   flex: 1 1 auto;
