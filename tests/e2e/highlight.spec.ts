@@ -64,3 +64,102 @@ test('高亮文字被改写：孤儿保留记录、不渲染；改回后恢复',
   await expect(page.locator('.doc-content')).toContainText(QUOTE);
   await expect(page.locator('mark.hl-yellow')).toHaveCount(1); // 改回原文自动恢复
 });
+
+/** 在页面内选中包含 text 的段落片段并派发 contextmenu。 */
+async function selectAndContextMenu(page: import('@playwright/test').Page, text: string) {
+  // 正文为异步渲染（IDB 读取 → render）：先等目标文本出现，避免选中时机早于渲染的竞态。
+  await expect.poll(() =>
+    page.evaluate((t) => (document.querySelector('.doc-content')?.textContent ?? '').includes(t), text),
+  ).toBe(true);
+  await page.evaluate((t) => {
+    const container = document.querySelector('.doc-content')!;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode() as Text | null;
+    while (node) {
+      const i = node.data.indexOf(t);
+      if (i !== -1) {
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, i + t.length);
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+        (node.parentElement ?? container).dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 240 }),
+        );
+        return;
+      }
+      node = walker.nextNode() as Text | null;
+    }
+    throw new Error(`未找到文本：${t}`);
+  }, text);
+}
+
+test('右键菜单：选中文字出现菜单，复制与高亮黄可用', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (t: string) => { (window as any).__copied = t; } },
+    });
+  });
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  await selectAndContextMenu(page, 'MVCC 并发控制');
+  const menu = page.locator('.selection-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '高亮·黄', '高亮·红']);
+
+  await menu.getByRole('menuitem', { name: '复制' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__copied)).toBe('MVCC 并发控制');
+
+  await selectAndContextMenu(page, 'MVCC 并发控制');
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '高亮·黄' }).click();
+  await expect(page.locator('mark.hl-yellow')).toHaveCount(1);
+  await expect(page.locator('mark.hl-yellow')).toHaveText('MVCC 并发控制');
+  // 创建后选区被清空
+  expect(await page.evaluate(() => window.getSelection()?.isCollapsed)).toBe(true);
+  // 已持久化
+  await expect.poll(async () => {
+    const kv = (await readKv(page, 'highlights')) as Record<string, unknown[]> | undefined;
+    return kv?.['a.md']?.length ?? 0;
+  }).toBe(1);
+});
+
+test('换色（红）替换黄；清除高亮', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await selectAndContextMenu(page, 'MVCC 并发控制');
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '高亮·黄' }).click();
+  await expect(page.locator('mark.hl-yellow')).toHaveCount(1);
+
+  // 选中同一段（此时是黄高亮）→ 菜单含清除高亮；点红 → 替换
+  await selectAndContextMenu(page, 'MVCC 并发控制');
+  await expect(page.locator('.selection-menu').getByRole('menuitem', { name: '清除高亮' })).toBeVisible();
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '高亮·红' }).click();
+  await expect(page.locator('mark.hl-yellow')).toHaveCount(0);
+  await expect(page.locator('mark.hl-red')).toHaveCount(1);
+  await expect(page.locator('mark.hl-red')).toHaveCSS('background-color', 'rgb(255, 138, 128)'); // --hl-red: #ff8a80
+  await expect.poll(async () => {
+    const kv = (await readKv(page, 'highlights')) as Record<string, { decorations: { color: string }[] }[]>;
+    return (kv['a.md'] ?? []).map((r) => r.decorations[0].color); // 先清后加之间存在瞬时无记录的窗口
+  }).toEqual(['red']);
+
+  // 清除
+  await selectAndContextMenu(page, 'MVCC 并发控制');
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '清除高亮' }).click();
+  await expect(page.locator('mark.hl')).toHaveCount(0);
+  await expect.poll(async () => {
+    const kv = (await readKv(page, 'highlights')) as Record<string, unknown[]>;
+    return kv['a.md']?.length ?? 0;
+  }).toBe(0);
+});
+
+test('代码块内选区：只提供复制', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/doc/深挖/b.md');
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await selectAndContextMenu(page, 'answer'); // hljs 会把代码拆成多个 span，取单个 token 的文本节点
+  const menu = page.locator('.selection-menu');
+  await expect(menu.getByRole('menuitem')).toHaveText(['复制']);
+});

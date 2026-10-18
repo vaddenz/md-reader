@@ -6,20 +6,22 @@ import BackToSource from '../components/BackToSource';
 import DocHeader from '../components/DocHeader';
 import PrevNext from '../components/PrevNext';
 import RelatedDocs from '../components/RelatedDocs';
+import SelectionMenu from '../components/SelectionMenu';
 import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
 import { DEFAULT_REPO } from '../constants';
 import { appearanceStyle, DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
-import { getDocHighlights } from '../data/highlights';
+import { addHighlight, getDocHighlights, removeHighlights, type HighlightRecord } from '../data/highlights';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { downloadDocText } from '../data/sync';
 import { useReadingProgress } from '../hooks/useReadingProgress';
 import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError } from '../lib/errors';
+import { menuActionsFor, type MenuContext } from '../lib/selection-menu';
 import { showToast } from '../lib/toast';
 import { highlightInContainer } from '../markdown/highlight';
-import { applyHighlights } from '../markdown/highlights';
+import { applyHighlights, buildHaystack, rangeIntersectsExcluded, removeMarks, selectionToAnchor, wrapRange } from '../markdown/highlights';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
@@ -33,6 +35,14 @@ type PageState =
   | { kind: 'missing'; path: string }
   | { kind: 'download-failed'; path: string }
   | { kind: 'ready'; path: string; title: string; text: string };
+
+/** 右键菜单状态：触点位置 + 判定上下文 + 选区锚点（无选区为 null）+ 点中的高亮 id。 */
+interface MenuState {
+  x: number; y: number;
+  ctx: MenuContext;
+  sel: { anchor: { exact: string; prefix: string; suffix: string }; start: number; end: number } | null;
+  markId: string | null; // 无选区时点中的高亮记录 id（「清除高亮」用）
+}
 
 const COPY_LABEL = '复制';
 const COPY_RESET_MS = 1500;
@@ -68,6 +78,7 @@ export default function DocPage() {
   // null = 收藏状态尚未读取（不渲染星标按钮，避免先闪未收藏态）。
   const [favorite, setFavorite] = useState<boolean | null>(null);
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
+  const [menu, setMenu] = useState<MenuState | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
   // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
@@ -142,8 +153,8 @@ export default function DocPage() {
   const closeToc = useCallback(() => setTocOpen(false), []);
   const closeTree = useCallback(() => setTreeOpen(false), []);
 
-  // 换文档（如浏览器前进/后退）时关闭抽屉，避免展示上一篇的目录/高亮。
-  useEffect(() => { setTocOpen(false); setTreeOpen(false); }, [path]);
+  // 换文档（如浏览器前进/后退）时关闭抽屉与右键菜单，避免展示上一篇的目录/高亮。
+  useEffect(() => { setTocOpen(false); setTreeOpen(false); setMenu(null); }, [path]);
 
   // 收藏状态：随文档切换重新读取；读取失败按未收藏处理（按钮仍可用）。
   useEffect(() => {
@@ -333,6 +344,107 @@ export default function DocPage() {
     if (btn) void copyCode(btn);
   }, [copyCode, location.pathname, location.search, locationKey, navigate]);
 
+  // 右键/长按（spec §6）：正文内始终压制原生菜单，按选区/目标算出菜单项与选区锚点。
+  const onContentContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const container = contentRef.current;
+    if (!container) return;
+    const sel = window.getSelection();
+    const range = sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    const inContainer = !!range && container.contains(range.commonAncestorContainer);
+    const excluded = !!range && inContainer && rangeIntersectsExcluded(container, range);
+    const selInfo = range && inContainer && !excluded ? selectionToAnchor(container, range) : null;
+    let intersects = false;
+    if (selInfo) {
+      for (const r of appliedRef.current.values()) {
+        if (selInfo.start < r.end && r.start < selInfo.end) { intersects = true; break; }
+      }
+    }
+    const markEl = (e.target as Element).closest('mark.hl');
+    setMenu({
+      x: e.clientX, y: e.clientY,
+      ctx: {
+        hasSelection: !!range && inContainer, // 有选区（含排除区；能否高亮由 selectionInExcluded 决定）
+        selectionInExcluded: excluded,
+        selectionIntersectsHighlight: intersects,
+        targetOnHighlight: !!markEl,
+      },
+      sel: selInfo,
+      markId: markEl?.getAttribute('data-hl-id') ?? null,
+    });
+  }, []);
+
+  const onMenuAction = useCallback((id: string) => {
+    const current = menu;
+    setMenu(null);
+    const container = contentRef.current;
+    if (!current || !container) return;
+    const sel = window.getSelection();
+
+    if (id === 'copy') {
+      const text = sel?.toString() ?? '';
+      void navigator.clipboard.writeText(text).then(
+        () => showToast('已复制'),
+        () => showToast('复制失败', { kind: 'error' }),
+      );
+      return;
+    }
+    if (id === 'select-all') {
+      const r = document.createRange();
+      r.selectNodeContents(container);
+      sel?.removeAllRanges();
+      sel?.addRange(r);
+      return;
+    }
+    if (id === 'clear') {
+      const ids: string[] = [];
+      if (current.sel) {
+        for (const [recId, r] of appliedRef.current) {
+          if (current.sel.start < r.end && r.start < current.sel.end) ids.push(recId);
+        }
+      } else if (current.markId) {
+        ids.push(current.markId); // 无选区、点在高亮上
+      }
+      if (ids.length) {
+        removeMarks(container, ids);
+        for (const rid of ids) appliedRef.current.delete(rid);
+        void removeHighlights(path, ids).catch(() => {});
+      }
+      sel?.removeAllRanges();
+      return;
+    }
+    if (id.startsWith('hl:')) {
+      const color = id.slice(3);
+      if (!current.sel) return;
+      // 1) 清除与选区相交的已渲染高亮
+      const overlapIds: string[] = [];
+      for (const [recId, r] of appliedRef.current) {
+        if (current.sel.start < r.end && r.start < current.sel.end) overlapIds.push(recId);
+      }
+      if (overlapIds.length) {
+        removeMarks(container, overlapIds);
+        for (const rid of overlapIds) appliedRef.current.delete(rid);
+        void removeHighlights(path, overlapIds).catch(() => {});
+      }
+      // 2) 包裹新高亮（DOM 变化后重建 haystack）
+      const haystack = buildHaystack(container);
+      const record: HighlightRecord = {
+        id: crypto.randomUUID(),
+        exact: current.sel.anchor.exact,
+        prefix: current.sel.anchor.prefix,
+        suffix: current.sel.anchor.suffix,
+        decorations: [{ kind: 'bg', color }],
+        createdAt: Date.now(),
+      };
+      const cls = `hl hl-${color}`;
+      wrapRange(container, haystack, current.sel.start, current.sel.end, cls, record.id);
+      appliedRef.current.set(record.id, { start: current.sel.start, end: current.sel.end });
+      void addHighlight(path, record).catch(() => showToast('高亮保存失败', { kind: 'error' }));
+      window.getSelection()?.removeAllRanges();
+      return;
+    }
+  }, [menu, path]);
+
   // 文件树抽屉选中文档：收起抽屉、记住当前位置，再经 react-router 导航。
   const openDocFromTree = useCallback((href: string) => {
     setTreeOpen(false);
@@ -359,6 +471,7 @@ export default function DocPage() {
           ref={contentRef}
           style={appearanceStyle(appearance)}
           onClick={onContentClick}
+          onContextMenu={onContentContextMenu}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
@@ -391,6 +504,14 @@ export default function DocPage() {
       {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}
       {treeOpen && (
         <TreeDrawer metas={metas} currentPath={path} onSelect={openDocFromTree} onClose={closeTree} />
+      )}
+      {menu && (
+        <SelectionMenu
+          x={menu.x} y={menu.y}
+          actions={menuActionsFor(menu.ctx)}
+          onAction={onMenuAction}
+          onClose={() => setMenu(null)}
+        />
       )}
     </>
   );
