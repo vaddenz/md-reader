@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "icons": "node scripts/gen-icons.mjs",
+    "fonts": "node scripts/fonts.mjs",
     "corpus": "node scripts/corpus.mjs",
     "conformance": "node scripts/conformance.mjs"
   },
@@ -38,6 +39,7 @@
     "typescript": "^5.6.3",
     "vite": "^6.0.0",
     "vite-plugin-pwa": "^0.21.1",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wawoff2": "^2.0.1"
   }
 }
