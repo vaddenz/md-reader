@@ -2,6 +2,11 @@ export const HOME = '#/';
 export const SETUP = '#/setup';
 export const SETTINGS = '#/settings';
 
+/** 应用内 href（'#/…'）→ react-router 路径（'/…'）；所有 navigate() 调用必须经此转换。 */
+export function toRouterPath(href: string): string {
+  return href.startsWith('#') ? href.slice(1) : href;
+}
+
 export function docHref(path: string, opts?: { to?: string; q?: string; i?: number }): string {
   const base = `#/doc/${encodeURIComponent(path)}`;
   const params = new URLSearchParams();

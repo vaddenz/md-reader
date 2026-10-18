@@ -1,14 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HOME } from '../app/nav';
+import { HOME, toRouterPath } from '../app/nav';
 import { DEFAULT_REPO } from '../constants';
 import { kvGet, kvSet } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
 import { useToken } from '../state/TokenContext';
-
-// HashRouter 的 navigate() 接收的是「路由路径」（不含 '#'）；HOME 常量是给 <a href> 用的完整 hash。
-// 直接传 HOME 会被 react-router 解析成 URL 片段（URL 变成 #/setup#/），故去掉前导 '#'。
-const HOME_PATH = HOME.slice(1);
 
 function errorText(err: GitHubError): string {
   switch (err.kind) {
@@ -39,7 +35,7 @@ export default function SetupPage() {
       await new GitHubClient(token).getUser();
       setToken(token);
       if (!(await kvGet('config'))) await kvSet('config', DEFAULT_REPO);
-      navigate(HOME_PATH);
+      navigate(toRouterPath(HOME));
     } catch (err) {
       setError(err instanceof GitHubError ? errorText(err) : '保存失败，请重试');
     } finally {

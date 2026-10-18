@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { docHref, searchHref } from '../../src/app/nav';
+import { docHref, searchHref, toRouterPath } from '../../src/app/nav';
 
 describe('nav', () => {
   it('文档链接对路径与中文正确编码', () => {
@@ -11,5 +11,11 @@ describe('nav', () => {
   });
   it('搜索链接', () => {
     expect(searchHref('gVisor 沙箱')).toBe('#/search?q=' + encodeURIComponent('gVisor 沙箱'));
+  });
+  it('toRouterPath：应用内 href → react-router 路径', () => {
+    expect(toRouterPath('#/')).toBe('/');
+    expect(toRouterPath('#/doc/a.md')).toBe('/doc/a.md');
+    expect(toRouterPath('#/setup?reauth=1')).toBe('/setup?reauth=1');
+    expect(toRouterPath('/x')).toBe('/x');
   });
 });
