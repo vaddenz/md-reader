@@ -97,12 +97,21 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const syncRef = useRef(syncNow);
   useEffect(() => { syncRef.current = syncNow; }, [syncNow]);
 
-  // 启动时：先本地清理，再在 token && config 存在且在线时后台静默同步；恢复在线/配置 Token 后同样触发
+  // 启动时：先本地清理；无 Token 时停留/跳转引导页（spec §3 无 Token 不可用）；
+  // 有 token && config 且在线时后台静默同步；恢复在线/配置 Token 后同样触发。
+  // 注意：依赖不含 navigate（其身份随路由变化，入依赖会导致每次导航都重跑本效应）；
+  // 此处只用绝对路径导航，闭包中的旧实例仍然有效。
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       await sweepExpired().catch(() => {});
-      if (cancelled || !token || !online) return;
+      if (cancelled) return;
+      if (!token) {
+        // 已在引导页则不重复导航（避免 setup 页反复跳转自身）
+        if (!window.location.hash.startsWith('#/setup')) navigate(toRouterPath(SETUP));
+        return;
+      }
+      if (!online) return;
       const cfg = await kvGet<RepoConfig>('config').catch(() => undefined);
       if (!cancelled && cfg) void syncRef.current();
     })();
