@@ -28,3 +28,33 @@ test('未设置外观时保持现状口径（17px / 0.95 / 1）', async ({ page 
   const tableSize = await page.locator('.doc-content table').first().evaluate((el) => getComputedStyle(el).fontSize);
   expect(tableSize).toBe('16.15px'); // 17 × 0.95
 });
+
+test('设置页调整外观：预览联动、防抖持久化、阅读页生效', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/settings');
+
+  const section = page.locator('section', { has: page.getByRole('heading', { name: '阅读外观' }) });
+  await expect(section).toBeVisible();
+
+  // 字号滑块 → 预览即时生效
+  await section.locator('input[type="range"]').first().fill('20');
+  await expect(section.locator('.appearance-preview')).toHaveCSS('font-size', '20px');
+
+  // 表格比例 60% → 预览表格字号 = 20 × 0.6
+  await section.locator('input[type="range"]').nth(1).fill('0.6');
+  await expect(section.locator('.appearance-preview table')).toHaveCSS('font-size', '12px');
+
+  // 字体切换 → 预览字体栈生效
+  await section.getByRole('radio', { name: /等线/ }).check();
+  await expect(section.locator('.appearance-preview')).toHaveCSS('font-family', /LXGW Neo XiHei Screen/);
+
+  // 防抖 300ms 后持久化
+  await expect.poll(async () => (await readKv(page, 'appearance')) as Record<string, unknown> | undefined)
+    .toMatchObject({ fontFamily: 'xihei', fontSize: 20, tableScale: 0.6 });
+
+  // 阅读页生效
+  await page.goto('./#/doc/长文档.md');
+  await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
+  const fontSize = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontSize);
+  expect(fontSize).toBe('20px');
+});
