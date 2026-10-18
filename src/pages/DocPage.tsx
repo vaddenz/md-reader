@@ -9,6 +9,7 @@ import RelatedDocs from '../components/RelatedDocs';
 import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
 import { DEFAULT_REPO } from '../constants';
+import { appearanceStyle, DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
@@ -64,6 +65,7 @@ export default function DocPage() {
   const [treeOpen, setTreeOpen] = useState(false);
   // null = 收藏状态尚未读取（不渲染星标按钮，避免先闪未收藏态）。
   const [favorite, setFavorite] = useState<boolean | null>(null);
+  const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
 
@@ -155,6 +157,13 @@ export default function DocPage() {
       () => {},
     );
   }, [path]);
+
+  // 阅读排版（T1 外观模块）：挂载时读取一次并应用为 .doc-content 的 CSS 变量；读取失败保持默认口径。
+  useEffect(() => {
+    let cancelled = false;
+    void getAppearance().then((a) => { if (!cancelled) setAppearance(a); });
+    return () => { cancelled = true; };
+  }, []);
 
   // 图片管线：由仓库路径查 kv.tree 的 sha，再按当前配置鉴权取字节（blob 缓存由管线内部处理）。
   const fetchBlob = useCallback(async (repoPath: string): Promise<Blob> => {
@@ -331,6 +340,7 @@ export default function DocPage() {
           key="content"
           className="doc-content"
           ref={contentRef}
+          style={appearanceStyle(appearance)}
           onClick={onContentClick}
           dangerouslySetInnerHTML={{ __html: html }}
         />

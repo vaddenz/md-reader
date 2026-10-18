@@ -77,7 +77,8 @@
   max-width: 46rem;
   margin: 0 auto;
   padding: 0 16px calc(96px + env(safe-area-inset-bottom));
-  font-size: 17px;
+  font-family: var(--r-font-family, var(--font-sans));
+  font-size: var(--r-font-size, 17px);
   line-height: 1.8;
   overflow-wrap: break-word;
 }
@@ -143,6 +144,7 @@
   background: #f6f8fa;
   border-left: 4px solid #d0d7de;
   border-radius: 0 6px 6px 0;
+  font-size: calc(1em * var(--r-quote-scale, 1));
 }
 .doc-content blockquote > :last-child { margin-bottom: 0; }
 
@@ -181,7 +183,7 @@
 .code-block pre code {
   padding: 0;
   background: none;
-  font-size: 13px;
+  font-size: calc(var(--r-font-size, 17px) * 0.765);
   line-height: 1.6;
   white-space: pre;
 }
@@ -209,7 +211,7 @@
   overflow-x: auto;
   border-collapse: collapse;
   -webkit-overflow-scrolling: touch;
-  font-size: 0.95em;
+  font-size: calc(1em * var(--r-table-scale, 0.95));
 }
 .doc-content th,
 .doc-content td {

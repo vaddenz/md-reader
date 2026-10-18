@@ -80,6 +80,12 @@ const B_MD = [
 const LONG_MD = [
   '# 长文档',
   '',
+  '> 引用块示例：用于验证引用字号比例。',
+  '',
+  '| 列 A | 列 B |',
+  '| --- | --- |',
+  '| 表格文本 | 示例 |',
+  '',
   ...Array.from({ length: 20 }, (_, i) => `## 第 ${i + 1} 节\n\n第 ${i + 1} 节的正文内容，包含 MVCC 版本控制。\n`),
 ].join('\n');
 
@@ -273,4 +279,57 @@ export async function expireDoc(page: Page, path: string, daysAgo = 8): Promise<
     { path, at },
   );
   if (!ok) throw new Error(`expireDoc 失败：未找到或无法更新 files 记录 ${path}`);
+}
+
+/** 写入 kv 键（测试预置数据用）。 */
+export async function writeKv(page: Page, key: string, value: unknown): Promise<void> {
+  const ok = await page.evaluate(
+    (args) =>
+      new Promise<boolean>((resolve) => {
+        const req = indexedDB.open('mdreader');
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          for (const name of ['files', 'blobs', 'kv']) {
+            if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+          }
+        };
+        req.onerror = () => resolve(false);
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const put = db.transaction('kv', 'readwrite').objectStore('kv').put(args.value, args.key);
+            put.onsuccess = () => { resolve(true); db.close(); };
+            put.onerror = () => { resolve(false); db.close(); };
+          } catch { resolve(false); db.close(); }
+        };
+      }),
+    { key, value },
+  );
+  if (!ok) throw new Error(`writeKv 失败：${key}`);
+}
+
+/** 读取 kv 键；不存在或失败返回 undefined。 */
+export async function readKv(page: Page, key: string): Promise<unknown> {
+  return page.evaluate(
+    (k) =>
+      new Promise<unknown>((resolve) => {
+        const req = indexedDB.open('mdreader');
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          for (const name of ['files', 'blobs', 'kv']) {
+            if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+          }
+        };
+        req.onerror = () => resolve(undefined);
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const get = db.transaction('kv', 'readonly').objectStore('kv').get(k);
+            get.onsuccess = () => { resolve(get.result); db.close(); };
+            get.onerror = () => { resolve(undefined); db.close(); };
+          } catch { resolve(undefined); db.close(); }
+        };
+      }),
+    key,
+  );
 }
