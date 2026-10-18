@@ -1,0 +1,71 @@
+/* ========== 底部抽屉外壳（TOC / 文件树共用，T16 从 toc.css 抽出） ========== */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40; /* 高于吸顶栏（20） */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(36, 41, 47, 0.45);
+}
+
+.drawer-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 46rem;
+  max-height: 60vh;
+  background: var(--c-bg);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -4px 24px rgba(36, 41, 47, 0.18);
+  outline: none;
+}
+
+.drawer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 0 16px;
+}
+.drawer-head-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #57606a;
+}
+.drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #57606a;
+  cursor: pointer;
+}
+.drawer-close:active { background: #f0f3f6; }
+
+/* 内部滚动区；底部预留 iPhone 安全区 */
+.drawer-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 8px calc(12px + env(safe-area-inset-bottom));
+}
+
+/* 文件树自带首页外边距，抽屉内不需要 */
+.drawer-body .file-tree { margin-top: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .drawer-overlay { animation: drawer-fade-in 0.16s ease-out; }
+  .drawer-panel { animation: drawer-slide-up 0.2s ease-out; }
+}
+@keyframes drawer-fade-in {
+  from { opacity: 0; }
+}
+@keyframes drawer-slide-up {
+  from { transform: translateY(100%); }
+}

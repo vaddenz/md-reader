@@ -178,7 +178,7 @@ describe('TocDrawer', () => {
     const { container } = mount(<TocDrawer headings={HEADINGS} onClose={() => {}} />);
     const dialog = container.querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
-    expect(dialog?.getAttribute('aria-label')).toBe('文档目录');
+    expect(dialog?.getAttribute('aria-label')).toBe('目录');
     expect(container.querySelectorAll('.toc-item')).toHaveLength(4);
     expect(container.querySelector('.toc-h1')?.textContent).toBe('第一章');
     expect(container.querySelector('.toc-h4')?.textContent).toBe('细节');
@@ -196,17 +196,17 @@ describe('TocDrawer', () => {
   it('点击背景关闭；点击抽屉内部不关闭', () => {
     const onClose = vi.fn();
     const { container } = mount(<TocDrawer headings={HEADINGS} onClose={onClose} />);
-    act(() => { container.querySelector<HTMLElement>('.toc-drawer')!.click(); });
+    act(() => { container.querySelector<HTMLElement>('.drawer-panel')!.click(); });
     expect(onClose).not.toHaveBeenCalled();
 
-    act(() => { container.querySelector<HTMLElement>('.toc-overlay')!.click(); });
+    act(() => { container.querySelector<HTMLElement>('.drawer-overlay')!.click(); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('关闭按钮与 Esc 均可关闭', () => {
     const onClose = vi.fn();
     const { container } = mount(<TocDrawer headings={HEADINGS} onClose={onClose} />);
-    act(() => { container.querySelector<HTMLButtonElement>('.toc-close')!.click(); });
+    act(() => { container.querySelector<HTMLButtonElement>('.drawer-close')!.click(); });
     expect(onClose).toHaveBeenCalledTimes(1);
 
     act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
@@ -229,7 +229,7 @@ describe('TocDrawer', () => {
   });
 });
 
-describe('DocHeader 目录入口', () => {
+describe('DocHeader 顶栏入口', () => {
   const future = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
   it('提供 onOpenToc 时渲染「目录」按钮并回调；否则不渲染', () => {
@@ -250,5 +250,25 @@ describe('DocHeader 目录入口', () => {
       </MemoryRouter>,
     );
     expect(without.container.querySelector('button[aria-label="目录"]')).toBeNull();
+  });
+
+  it('提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', () => {
+    const onOpenTree = vi.fn();
+    const withBtn = mount(
+      <MemoryRouter future={future}>
+        <DocHeader title="标题" onOpenTree={onOpenTree} />
+      </MemoryRouter>,
+    );
+    const btn = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="文件"]');
+    expect(btn).not.toBeNull();
+    act(() => { btn!.click(); });
+    expect(onOpenTree).toHaveBeenCalledTimes(1);
+
+    const without = mount(
+      <MemoryRouter future={future}>
+        <DocHeader title="标题" />
+      </MemoryRouter>,
+    );
+    expect(without.container.querySelector('button[aria-label="文件"]')).toBeNull();
   });
 });

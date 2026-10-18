@@ -1,60 +1,4 @@
-/* ========== 目录抽屉（T14）：底部弹出 sheet ========== */
-.toc-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40; /* 高于吸顶栏（20） */
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(36, 41, 47, 0.45);
-}
-
-.toc-drawer {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 46rem;
-  max-height: 60vh;
-  background: var(--c-bg);
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -4px 24px rgba(36, 41, 47, 0.18);
-  outline: none;
-}
-
-.toc-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px 0 16px;
-}
-.toc-head-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #57606a;
-}
-.toc-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: #57606a;
-  cursor: pointer;
-}
-.toc-close:active { background: #f0f3f6; }
-
-/* 内部滚动区；底部预留 iPhone 安全区 */
-.toc-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 8px calc(12px + env(safe-area-inset-bottom));
-}
+/* ========== 目录抽屉内容（外壳见 drawer.css，T16 抽出） ========== */
 
 /* 目录项：44px+ 触控目标；按 h1–h4 层级缩进 */
 .toc-item {
@@ -85,15 +29,4 @@
   color: var(--c-primary);
   background: rgba(31, 111, 235, 0.08);
   font-weight: 600;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .toc-overlay { animation: toc-fade-in 0.16s ease-out; }
-  .toc-drawer { animation: toc-slide-up 0.2s ease-out; }
-}
-@keyframes toc-fade-in {
-  from { opacity: 0; }
-}
-@keyframes toc-slide-up {
-  from { transform: translateY(100%); }
 }

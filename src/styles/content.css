@@ -49,6 +49,26 @@
   gap: 4px;
 }
 
+/* ========== 返回来源条（T16） ========== */
+.back-to-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 1px solid #eaeef2;
+  background: #f6f8fa;
+  color: var(--c-primary);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.back-to-source:active { background: #eaf2fd; }
+
 /* ========== 正文（中文移动端排版） ========== */
 .doc-content {
   max-width: 46rem;

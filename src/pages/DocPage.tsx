@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HOME, toRouterPath } from '../app/nav';
+import { keyFromLocation, rememberScroll, takeScroll } from '../app/scroll';
+import BackToSource from '../components/BackToSource';
 import DocHeader from '../components/DocHeader';
 import PrevNext from '../components/PrevNext';
 import TocDrawer from '../components/TocDrawer';
+import TreeDrawer from '../components/TreeDrawer';
 import { DEFAULT_REPO } from '../constants';
 import { getFile, kvGet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient } from '../data/github';
@@ -31,18 +34,23 @@ function safeDecode(raw: string): string {
 
 export default function DocPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationKey = keyFromLocation(location);
+  const from = (location.state as { from?: string } | null)?.from;
   const { token } = useToken();
   const params = useParams();
   const raw = params['*'] ?? '';
   const path = raw.includes('%') ? safeDecode(raw) : raw;
   const [searchParams] = useSearchParams();
   const to = searchParams.get('to') ?? '';
+  const q = searchParams.get('q') ?? '';
 
   const [state, setState] = useState<PageState>({ kind: 'loading', path });
   const [metas, setMetas] = useState<FileMeta[]>([]);
   const [metasLoaded, setMetasLoaded] = useState(false);
   const [retry, setRetry] = useState(0);
   const [tocOpen, setTocOpen] = useState(false);
+  const [treeOpen, setTreeOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
 
@@ -88,6 +96,7 @@ export default function DocPage() {
     () => (cur.kind === 'ready' && metasLoaded ? renderDoc(cur.text, { path, knownPaths }) : null),
     [cur, metasLoaded, knownPaths, path],
   );
+  const ready = rendered !== null;
   const html = rendered?.html ?? '';
 
   // 目录抽屉只列 h1–h4（brief 约定）；没有这样的标题时不显示入口。
@@ -95,11 +104,14 @@ export default function DocPage() {
     () => (rendered?.headings ?? []).filter((h) => h.level <= 4),
     [rendered],
   );
-  const openToc = useCallback(() => setTocOpen(true), []);
+  // 两个抽屉互斥：打开一个先收起另一个，避免叠加。
+  const openToc = useCallback(() => { setTreeOpen(false); setTocOpen(true); }, []);
+  const openTree = useCallback(() => { setTocOpen(false); setTreeOpen(true); }, []);
   const closeToc = useCallback(() => setTocOpen(false), []);
+  const closeTree = useCallback(() => setTreeOpen(false), []);
 
-  // 换文档（如浏览器前进/后退）时关闭抽屉，避免展示上一篇的目录。
-  useEffect(() => { setTocOpen(false); }, [path]);
+  // 换文档（如浏览器前进/后退）时关闭抽屉，避免展示上一篇的目录/高亮。
+  useEffect(() => { setTocOpen(false); setTreeOpen(false); }, [path]);
 
   // 图片管线：由仓库路径查 kv.tree 的 sha，再按当前配置鉴权取字节（blob 缓存由管线内部处理）。
   const fetchBlob = useCallback(async (repoPath: string): Promise<Blob> => {
@@ -124,12 +136,44 @@ export default function DocPage() {
     };
   }, [html, path, fetchBlob]);
 
-  // ?to= 锚点滚动；无锚点回到页首（T16 将替换为历史滚动位置恢复）。
+  // 持续记录当前历史条目的滚动位置（rAF 节流）。仅在正文就绪时记录：
+  // 切换文档的加载间隙页面会变矮，浏览器把 scrollY 钳制到新高度，
+  // 此时记录会覆盖掉导航前刚记住的真实位置（T16 关键细节）。
   useEffect(() => {
-    if (!html) return;
+    if (!ready) return;
+    let frame = 0;
+    let scheduled = false;
+    const save = () => {
+      scheduled = false;
+      rememberScroll(locationKey, window.scrollY);
+    };
+    const onScroll = () => {
+      if (scheduled) return;
+      scheduled = true;
+      frame = window.requestAnimationFrame(save);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (scheduled) window.cancelAnimationFrame(frame);
+    };
+  }, [locationKey, ready]);
+
+  // 历史滚动恢复：回到本条目（浏览器返回/「返回来源」）时优先还原记录的位置；
+  // 新打开且无 ?to= 锚点时回到页首（?q= 的定位交给搜索页）。
+  useEffect(() => {
+    if (!ready) return;
+    const saved = takeScroll(locationKey);
+    if (saved !== undefined) {
+      const frame = window.requestAnimationFrame(() => {
+        window.scrollTo(0, saved);
+        rememberScroll(locationKey, saved); // 恢复期间若被钳制值覆盖，用真实值写回
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
     if (to) document.getElementById(to)?.scrollIntoView();
-    else window.scrollTo(0, 0);
-  }, [html, to, path]);
+    else if (!q) window.scrollTo(0, 0);
+  }, [ready, to, q, locationKey]);
 
   // 卸载时清掉复制按钮的回退定时器。
   useEffect(() => () => {
@@ -162,6 +206,18 @@ export default function DocPage() {
       e.preventDefault(); // 目标不存在的链接停留原处（提示文案留待 T22）
       return;
     }
+    // 站内互链（render 加了 .in-app-link）：拦截原生 hash 导航，记录当前滚动位置，
+    // 并带上来源 state 交给 react-router（「返回来源」依赖 location.state.from）。
+    const inApp = el.closest<HTMLAnchorElement>('a.in-app-link');
+    if (inApp) {
+      const href = inApp.getAttribute('href') ?? '';
+      if (href.startsWith('#/')) {
+        e.preventDefault();
+        rememberScroll(locationKey, window.scrollY);
+        navigate(toRouterPath(href), { state: { from: location.pathname + location.search } });
+        return;
+      }
+    }
     // 同页锚点（render 约定 href="#slug"）：hash 路由会把 #slug 当路由解析成 404，必须原地拦截后滚动。
     const anchor = el.closest<HTMLAnchorElement>('a[href^="#"]');
     if (anchor) {
@@ -175,14 +231,25 @@ export default function DocPage() {
     }
     const btn = el.closest<HTMLElement>('button.code-copy');
     if (btn) void copyCode(btn);
-  }, [copyCode]);
+  }, [copyCode, location.pathname, location.search, locationKey, navigate]);
+
+  // 文件树抽屉选中文档：收起抽屉、记住当前位置，再经 react-router 导航。
+  const openDocFromTree = useCallback((href: string) => {
+    setTreeOpen(false);
+    rememberScroll(locationKey, window.scrollY);
+    navigate(toRouterPath(href));
+  }, [locationKey, navigate]);
 
   const title = cur.kind === 'ready' ? cur.title : '';
-  const ready = rendered !== null;
 
   return (
     <>
-      <DocHeader title={title} onOpenToc={tocHeadings.length > 0 ? openToc : undefined} />
+      <DocHeader
+        title={title}
+        onOpenToc={tocHeadings.length > 0 ? openToc : undefined}
+        onOpenTree={metas.length > 0 ? openTree : undefined}
+      />
+      {from && <BackToSource />}
       {ready ? (
         <div
           key="content"
@@ -216,6 +283,9 @@ export default function DocPage() {
       )}
       {ready && <PrevNext path={path} metas={metas} />}
       {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}
+      {treeOpen && (
+        <TreeDrawer metas={metas} currentPath={path} onSelect={openDocFromTree} onClose={closeTree} />
+      )}
     </>
   );
 }

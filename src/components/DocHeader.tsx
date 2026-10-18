@@ -6,10 +6,12 @@ interface DocHeaderProps {
   title: string;
   /** 打开目录抽屉；未提供时（文档没有 h1–h4 标题）不渲染目录按钮。 */
   onOpenToc?: () => void;
+  /** 打开文件树抽屉；未提供时（本地没有文档）不渲染文件按钮。 */
+  onOpenTree?: () => void;
 }
 
-/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（目录；文件树 / 返回来源 / 收藏留待后续任务）。 */
-export default function DocHeader({ title, onOpenToc }: DocHeaderProps) {
+/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（文件树 / 目录；收藏留待后续任务）。 */
+export default function DocHeader({ title, onOpenToc, onOpenTree }: DocHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -32,8 +34,28 @@ export default function DocHeader({ title, onOpenToc }: DocHeaderProps) {
         </svg>
       </button>
       <span className="doc-title" title={title || undefined}>{title}</span>
-      {/* T16/T19：文件树 / 返回来源 / 收藏按钮将放入此操作区 */}
+      {/* T19：收藏按钮将放入此操作区 */}
       <div className="doc-header-actions">
+        {onOpenTree && (
+          <button
+            type="button"
+            className="doc-header-btn"
+            aria-label="文件"
+            title="文件"
+            onClick={onOpenTree}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.5 6.5a2 2 0 0 1 2-2h3.6l2 2.5h7.4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"
+              />
+            </svg>
+          </button>
+        )}
         {onOpenToc && (
           <button
             type="button"
