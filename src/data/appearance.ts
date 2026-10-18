@@ -40,7 +40,12 @@ export function sanitizeAppearance(raw: unknown): ReaderAppearance {
 }
 
 export async function getAppearance(): Promise<ReaderAppearance> {
-  return sanitizeAppearance(await kvGet<unknown>(APPEARANCE_KEY));
+  try {
+    return sanitizeAppearance(await kvGet<unknown>(APPEARANCE_KEY));
+  } catch {
+    // spec §3.1：kv 读取失败时回退默认值
+    return { ...DEFAULT_APPEARANCE };
+  }
 }
 
 export function saveAppearance(a: ReaderAppearance): Promise<void> {

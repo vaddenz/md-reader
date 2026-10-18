@@ -1,6 +1,7 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as db from '../../src/data/db';
 import { clearAllData, kvSet } from '../../src/data/db';
 import {
   DEFAULT_APPEARANCE, appearanceStyle, getAppearance, sanitizeAppearance, saveAppearance,
@@ -32,6 +33,14 @@ describe('getAppearance / saveAppearance', () => {
   });
   it('kv 中被外部写坏的数据读取时被清洗', async () => {
     await kvSet('appearance', { fontSize: 'big' });
+    expect(await getAppearance()).toEqual(DEFAULT_APPEARANCE);
+  });
+  it('读取失败时回退默认值（spec §3.1）', async () => {
+    const spy = vi.spyOn(db, 'kvGet').mockRejectedValueOnce(new Error('db down'));
+    expect(await getAppearance()).toEqual(DEFAULT_APPEARANCE);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    // 恢复后仍能正常读回，确认 mock 未污染后续调用
     expect(await getAppearance()).toEqual(DEFAULT_APPEARANCE);
   });
 });
