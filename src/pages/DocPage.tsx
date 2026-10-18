@@ -53,11 +53,12 @@ function safeDecode(raw: string): string {
   try { return decodeURIComponent(raw); } catch { return raw; }
 }
 
-/** 选区是否等价于当前正文容器内、由「全选」建立的选区（对象同一或边界一致）；跨根/已卸载视为不等。 */
+/** 选区是否等价于当前正文容器内、由「全选」建立的选区（对象同一或边界一致）；跨根/已卸载/已塌缩视为不等。 */
 function sameSelectionRange(sel: Selection | null, range: Range | null, container: HTMLElement): boolean {
   if (!range || !sel || sel.rangeCount !== 1) return false;
   const cur = sel.getRangeAt(0);
   if (!container.contains(cur.commonAncestorContainer)) return false; // 旧文档的残留选区
+  if (cur.collapsed) return false; // 旧「全选」Range 在正文换新后塌缩到容器起点：不代表当前存在全选选区
   if (cur === range) return true;
   try {
     return cur.compareBoundaryPoints(Range.START_TO_START, range) === 0
@@ -172,8 +173,14 @@ export default function DocPage() {
   const closeToc = useCallback(() => setTocOpen(false), []);
   const closeTree = useCallback(() => setTreeOpen(false), []);
 
-  // 换文档（如浏览器前进/后退）时关闭抽屉与右键菜单，避免展示上一篇的目录/高亮。
-  useEffect(() => { setTocOpen(false); setTreeOpen(false); setMenu(null); }, [path]);
+  // 换文档（如浏览器前进/后退）时关闭抽屉与右键菜单，并清掉上一篇的选区/高亮引用，避免被旧选区劫持复制。
+  useEffect(() => {
+    setTocOpen(false);
+    setTreeOpen(false);
+    setMenu(null);
+    selectAllRangeRef.current = null;
+    appliedRef.current = new Map();
+  }, [path]);
 
   // 收藏状态：随文档切换重新读取；读取失败按未收藏处理（按钮仍可用）。
   useEffect(() => {
@@ -228,11 +235,17 @@ export default function DocPage() {
     const container = contentRef.current;
     if (!container || !html) return;
     let cancelled = false;
-    void getDocHighlights(path).then((records) => {
-      const el = contentRef.current;
-      if (cancelled || !el) return;
-      appliedRef.current = applyHighlights(el, records);
-    });
+    void getDocHighlights(path).then(
+      (records) => {
+        const el = contentRef.current;
+        if (cancelled || !el) return;
+        appliedRef.current = applyHighlights(el, records);
+      },
+      () => {
+        // 读取失败：静默清空已应用状态（避免残留区间；不打扰用户）。
+        if (!cancelled) appliedRef.current = new Map();
+      },
+    );
     return () => { cancelled = true; };
   }, [html, path]);
 

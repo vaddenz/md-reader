@@ -213,6 +213,45 @@ test('全选后经菜单复制：内容不含界面文本', async ({ page }) => 
   expect(copied).not.toContain('复制');
 });
 
+test('全选后切换文档：复制不再被旧选区劫持', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.evaluate(() => {
+    document.querySelector('.doc-content')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 100, clientY: 200 }));
+  });
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '全选' }).click();
+  await page.goto('./#/doc/深挖/b.md');
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  const copied = await page.evaluate(() => {
+    const dt = new DataTransfer();
+    document.querySelector('.doc-content')!.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: dt }));
+    return dt.getData('text/plain');
+  });
+  expect(copied).toBe(''); // 应用不再改写复制内容
+});
+
+test('全选后正文原位换新（同容器）：复制不再被塌缩旧选区劫持', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.evaluate(() => {
+    document.querySelector('.doc-content')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 100, clientY: 200 }));
+  });
+  await page.locator('.selection-menu').getByRole('menuitem', { name: '全选' }).click();
+  // 同一容器内正文换新（dangerouslySetInnerHTML 更新路径）：旧「全选」Range 塌缩到容器起点，
+  // 且仍是当前 selection 的 range 对象（Chromium）——旧实现 cur === range 短路，复制被劫持为整篇新正文。
+  await page.evaluate(() => {
+    document.querySelector('.doc-content')!.innerHTML = '<h1>原位更新后的正文</h1><p>新的内容。</p>';
+  });
+  const copied = await page.evaluate(() => {
+    const dt = new DataTransfer();
+    document.querySelector('.doc-content')!.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: dt }));
+    return dt.getData('text/plain');
+  });
+  expect(copied).toBe(''); // 塌缩的旧选区不代表全选，应用不得改写复制内容
+});
+
 test('高亮导出 JSON 与导入合并', async ({ page }) => {
   await configureAndSync(page);
   await writeKv(page, 'highlights', { 'a.md': [record('h1')] });
