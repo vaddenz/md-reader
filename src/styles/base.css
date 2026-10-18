@@ -1,0 +1,18 @@
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC",
+    "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --c-primary: #1f6feb;
+  --c-text: #24292f;
+  --c-bg: #ffffff;
+  --header-h: 48px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--c-text);
+  background: var(--c-bg);
+  line-height: 1.6;
+}
