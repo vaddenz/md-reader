@@ -17,15 +17,22 @@
 
 功能：
 
-- 中文排版，内置字体（等线风 / 宋体风，离线可用）；
-- mermaid 流程图、图片、删除线 / 高亮；
+- 中文排版，内置字体（等线风 / 宋体风，首次联网后离线可用）；
+- 阅读排版设置：字体（系统默认 / 等线风 / 宋体风）、正文字号、表格与引用字号比例，设置页实时预览 + 字体样张页（`#/font-preview`）并排对比；
+- 文字高亮：选中文字 → 黄 / 红底色，持久保存于本机（不写回仓库）；
+- 自定义右键菜单：阅读正文内长按 / 右键弹出（复制 / 高亮 / 清除高亮 / 全选）；
+- 手动横屏：阅读页头部「横屏 / 旋转」按钮 + 设置页三态单选（全手动，不跟随传感器）；
+- mermaid 流程图、图片、删除线 / `==高亮==` 语法标记；
 - 灵活的目录跳转、全文搜索；
 - 离线缓存。
 
 ## 文档
 
-- 设计方案：[`docs/specs/2026-10-18-md-reader-design.md`](docs/specs/2026-10-18-md-reader-design.md)
+- 设计方案：[`docs/specs/2026-10-18-md-reader-design.md`](docs/specs/2026-10-18-md-reader-design.md)（v1.0 权威设计）
+- 增量设计（v1.1）：[`docs/specs/2026-10-18-md-reader-v1.1-design.md`](docs/specs/2026-10-18-md-reader-v1.1-design.md)
 - 实施计划：[`docs/plans/2026-10-18-md-reader-implementation.md`](docs/plans/2026-10-18-md-reader-implementation.md)
+- 实施计划（v1.1）：[`docs/plans/2026-10-18-md-reader-v1.1-implementation.md`](docs/plans/2026-10-18-md-reader-v1.1-implementation.md)
+- 真机验收清单（v1.1）：[`docs/acceptance-2026-10-18-v1.1.md`](docs/acceptance-2026-10-18-v1.1.md)
 
 ## 开发与自用
 
@@ -68,6 +75,13 @@ npm run preview  # 预览生产构建
 - 产物为 woff2（`public/fonts/`），由上游 TTF 无损格式转换（仅格式转换，字形全集不变）；
 - 许可全文见 `public/fonts/licenses/`；重新获取 / 转换：`npm run fonts`（一次性脚本，产物入库，不在 CI / 构建中执行）；
 - 缓存策略：字体体积大，不进 Service Worker 预缓存清单，改用 CacheFirst 运行时缓存（缓存名 `mdreader-fonts`，有效期 1 年）。
+- 离线语义：某字体首次使用（联网）后离线可用；从未使用过的字体离线时回退系统字体（`font-display: swap`，不影响阅读）。
+
+### 高亮数据
+
+- 高亮记录仅存本机浏览器（IndexedDB kv 键 `highlights`，按文档路径分组），不写回仓库；
+- 设置页「高亮数据」区可**导出 / 导入 JSON** 备份（导入按 `路径 + 原文 + 装饰` 合并去重，不覆盖本地已有）；**清除站点数据会丢失本机高亮，建议定期导出**；
+- 仓库改动后无法模糊命中的高亮成为「孤儿」：记录保留、暂不渲染，原文恢复后自动重现（导出时一并导出）。
 
 ### 测试
 
