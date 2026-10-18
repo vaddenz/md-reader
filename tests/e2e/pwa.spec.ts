@@ -50,3 +50,15 @@ test('PWA：CSP meta 存在且锁定 connect-src（spec §9）', async ({ page }
   expect(content).toContain("object-src 'none'");
   expect(content).toContain("base-uri 'none'");
 });
+
+test('字体：不进入 SW 预缓存清单，文件可访问', async ({ page }) => {
+  await page.goto('./');
+  const sw = await page.request.get('./sw.js');
+  expect(sw.ok()).toBeTruthy();
+  const body = await sw.text();
+  // 预缓存清单不得包含字体文件（用具体文件名断言，避免受生成代码格式影响）
+  expect(body).not.toContain('lxgw-neo-xihei-screen-full');
+  expect(body).not.toContain('noto-serif-sc-variable');
+  const font = await page.request.get('./fonts/lxgw-neo-xihei-screen-full.woff2');
+  expect(font.status()).toBe(200);
+});

@@ -1,0 +1,12 @@
+/* v1.1 内置字体（完整字符集，无损转换自上游；许可见 public/fonts/licenses/） */
+@font-face {
+  font-family: 'LXGW Neo XiHei Screen';
+  src: url('/md-reader/fonts/lxgw-neo-xihei-screen-full.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('/md-reader/fonts/noto-serif-sc-variable.woff2') format('woff2');
+  font-weight: 200 900;
+  font-display: swap;
+}

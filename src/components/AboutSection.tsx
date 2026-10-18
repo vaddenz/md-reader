@@ -24,6 +24,11 @@ export default function AboutSection() {
         <li>如果你在寻找通用的 Markdown 阅读器，本项目不适合你，请另寻其他开源项目。</li>
       </ul>
 
+      <p className="settings-about-statement">
+        内置字体：霞鹜新晰黑·屏幕阅读版（© 落霞孤鹜，IPA Font License 1.0）；
+        思源宋体 / Noto Serif SC（© Adobe/Google，SIL OFL 1.1）。许可文本见仓库 <code>public/fonts/licenses/</code>。
+      </p>
+
       <p className="settings-about-statement">隐私说明：</p>
       <ul className="settings-about-list">
         <li>GitHub Token 仅保存在本机浏览器（localStorage），不会上传到任何第三方，也不会写入 URL 或日志；</li>

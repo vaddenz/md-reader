@@ -15,6 +15,13 @@
 全文搜索与离线缓存。所有内容数据仅存于你自己的浏览器本地，经由你自己的只读 Token
 直接访问 GitHub API，不经过任何第三方服务。
 
+功能：
+
+- 中文排版，内置字体（等线风 / 宋体风，离线可用）；
+- mermaid 流程图、图片、删除线 / 高亮；
+- 灵活的目录跳转、全文搜索；
+- 离线缓存。
+
 ## 文档
 
 - 设计方案：[`docs/specs/2026-10-18-md-reader-design.md`](docs/specs/2026-10-18-md-reader-design.md)
@@ -48,6 +55,19 @@ npm run preview  # 预览生产构建
   站点若被删除 / 重置，需手动重建一次（如 `gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow`）。
 - 自建 / fork：需把 `vite.config.ts` 的 `base` 改为与自己的仓库名一致（如仓库 `foo` → `base: '/foo/'`），
   否则静态资源 404；本项目为个人自用，其他部署环境的兼容性由使用者自行承担。
+
+### 字体
+
+阅读器内置两套完整字符集字体（随应用同源分发，不请求任何第三方 CDN）：
+
+| 字体 | 来源 | 版本 | 许可 |
+| --- | --- | --- | --- |
+| 霞鹜新晰黑·屏幕阅读版（等线风） | [lxgw/LxgwNeoXiZhi-Screen](https://github.com/lxgw/LxgwNeoXiZhi-Screen) | `26.08.21` | IPA Font License 1.0 |
+| 思源宋体 / Noto Serif SC（宋体风，可变字重 200–900） | [google/fonts](https://github.com/google/fonts) `ofl/notoserifsc` | `main`（浮动引用） | SIL OFL 1.1 |
+
+- 产物为 woff2（`public/fonts/`），由上游 TTF 无损格式转换（仅格式转换，字形全集不变）；
+- 许可全文见 `public/fonts/licenses/`；重新获取 / 转换：`npm run fonts`（一次性脚本，产物入库，不在 CI / 构建中执行）；
+- 缓存策略：字体体积大，不进 Service Worker 预缓存清单，改用 CacheFirst 运行时缓存（缓存名 `mdreader-fonts`，有效期 1 年）。
 
 ### 测试
 
