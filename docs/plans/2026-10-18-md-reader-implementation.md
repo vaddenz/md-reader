@@ -1759,11 +1759,11 @@ import { describe, expect, it } from 'vitest';
 import { buildTree, flattenTree } from '../../src/lib/tree';
 
 describe('tree', () => {
-  it('根文档与子目录分组，中文按本地排序', () => {
+  it('根文档与子目录分组，中文按本地排序（实测：Intl.Collator("zh") 汉字在拉丁字母之前、汉字按拼音）', () => {
     const t = buildTree(['zz.md', 'NodeJS/事件.md', 'NodeJS/内存.md', '智能体/Mem0.md']);
     expect(t.root.map((i) => i.path)).toEqual(['zz.md']);
-    expect(t.dirs.map((d) => d.name)).toEqual(['NodeJS', '智能体']);
-    expect(flattenTree(t)).toEqual(['zz.md', 'NodeJS/事件.md', 'NodeJS/内存.md', '智能体/Mem0.md']);
+    expect(t.dirs.map((d) => d.name)).toEqual(['智能体', 'NodeJS']);
+    expect(flattenTree(t)).toEqual(['zz.md', '智能体/Mem0.md', 'NodeJS/内存.md', 'NodeJS/事件.md']);
   });
 });
 ```

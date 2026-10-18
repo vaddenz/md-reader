@@ -149,6 +149,17 @@ export default function DocPage() {
       e.preventDefault(); // 目标不存在的链接停留原处（提示文案留待 T22）
       return;
     }
+    // 同页锚点（render 约定 href="#slug"）：hash 路由会把 #slug 当路由解析成 404，必须原地拦截后滚动。
+    const anchor = el.closest<HTMLAnchorElement>('a[href^="#"]');
+    if (anchor) {
+      const href = anchor.getAttribute('href') ?? '';
+      if (!href.startsWith('#/')) {
+        e.preventDefault(); // 不改 URL、不产生历史记录
+        const id = safeDecode(href.slice(1));
+        if (id) document.getElementById(id)?.scrollIntoView();
+      }
+      return;
+    }
     const btn = el.closest<HTMLElement>('button.code-copy');
     if (btn) void copyCode(btn);
   }, [copyCode]);

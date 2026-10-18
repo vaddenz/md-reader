@@ -33,7 +33,8 @@ function renderNav(el: ReactElement): string {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
-  act(() => { root.render(<MemoryRouter>{el}</MemoryRouter>); });
+  const future = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
+  act(() => { root.render(<MemoryRouter future={future}>{el}</MemoryRouter>); });
   const html = container.innerHTML;
   act(() => { root.unmount(); });
   container.remove();
