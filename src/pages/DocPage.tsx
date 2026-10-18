@@ -11,6 +11,7 @@ import { DEFAULT_REPO } from '../constants';
 import { getFile, kvGet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient } from '../data/github';
 import { downloadDocText } from '../data/sync';
+import { highlightInContainer } from '../markdown/highlight';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
@@ -44,6 +45,9 @@ export default function DocPage() {
   const [searchParams] = useSearchParams();
   const to = searchParams.get('to') ?? '';
   const q = searchParams.get('q') ?? '';
+  // 命中序号：片段↔正文命中非严格 1:1，越界回退第一处（下方 ?? marks[0]）。
+  const iRaw = searchParams.get('i') ?? '';
+  const markIndex = /^\d+$/.test(iRaw) ? Number(iRaw) : 0;
 
   const [state, setState] = useState<PageState>({ kind: 'loading', path });
   const [metas, setMetas] = useState<FileMeta[]>([]);
@@ -160,9 +164,15 @@ export default function DocPage() {
   }, [locationKey, ready]);
 
   // 历史滚动恢复：回到本条目（浏览器返回/「返回来源」）时优先还原记录的位置；
-  // 新打开且无 ?to= 锚点时回到页首（?q= 的定位交给搜索页）。
+  // 新打开时：?to= 锚点 > ?q= 第 i 处命中（越界回退第一处）> 页首。
+  // 高亮在正文注入 + 懒加载启动（上一个 effect）之后执行：先清理旧命中再重新高亮。
   useEffect(() => {
     if (!ready) return;
+    const container = contentRef.current;
+    if (container) {
+      for (const old of container.querySelectorAll('mark.search-mark')) old.replaceWith(...old.childNodes);
+    }
+    const marks = container && q ? highlightInContainer(container, q) : [];
     const saved = takeScroll(locationKey);
     if (saved !== undefined) {
       const frame = window.requestAnimationFrame(() => {
@@ -172,8 +182,9 @@ export default function DocPage() {
       return () => window.cancelAnimationFrame(frame);
     }
     if (to) document.getElementById(to)?.scrollIntoView();
+    else if (marks.length) (marks[markIndex] ?? marks[0]).scrollIntoView();
     else if (!q) window.scrollTo(0, 0);
-  }, [ready, to, q, locationKey]);
+  }, [ready, to, q, markIndex, locationKey]);
 
   // 卸载时清掉复制按钮的回退定时器。
   useEffect(() => () => {

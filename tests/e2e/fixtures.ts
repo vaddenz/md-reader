@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * GitHub API mock（P2 e2e 基座，P3/P4 复用）：
@@ -46,6 +46,8 @@ const A_MD = [
   '',
   '文末再补一段，确保标题之后仍有内容可滚动。',
   '',
+  '文末补充用于搜索直达：MVCC 并发控制与版本可见性。',
+  '',
   '[去深挖 b](深挖/b.md)',
   '',
 ].join('\n');
@@ -65,11 +67,11 @@ const B_MD = [
   '',
 ].join('\n');
 
-/** 长文档.md：约 20 个标题。 */
+/** 长文档.md：约 20 个标题（每节含 MVCC，用于搜索排序：命中数最多排第一）。 */
 const LONG_MD = [
   '# 长文档',
   '',
-  ...Array.from({ length: 20 }, (_, i) => `## 第 ${i + 1} 节\n\n第 ${i + 1} 节的正文内容。\n`),
+  ...Array.from({ length: 20 }, (_, i) => `## 第 ${i + 1} 节\n\n第 ${i + 1} 节的正文内容，包含 MVCC 版本控制。\n`),
 ].join('\n');
 
 /** sha → 正文（sha 为固定假值，与目录树一一对应）。 */
@@ -124,4 +126,21 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
   });
 
   return { syncCalls: () => syncCalls };
+}
+
+/**
+ * 无 Token 引导 → 表单配置 Token → 首页出现 3 篇文档（自动同步完成，正文已缓存）。
+ * 供 T18 搜索用例复用（T16 reader.spec 保留其本地版本，未改动）。
+ */
+export async function configureAndSync(page: Page, token = 'ghp_e2e_fake_token'): Promise<GitHubMock> {
+  const mock = await installGitHubMock(page);
+  await page.goto('./');
+  await page.waitForURL(/#\/setup$/);
+
+  await page.getByPlaceholder('粘贴 Fine-grained PAT').fill(token);
+  await page.getByRole('button', { name: '验证并保存' }).click();
+
+  await page.waitForURL(/#\/$/);
+  await expect(page.locator('.tree-item')).toHaveCount(3);
+  return mock;
 }

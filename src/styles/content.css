@@ -149,6 +149,11 @@
   color: inherit;
   border-radius: 2px;
 }
+/* 搜索命中（T18）：比 ==高亮== 更醒目；滚动定位时避开吸顶栏 */
+.doc-content mark.search-mark {
+  background: #ffd33d;
+  scroll-margin-top: calc(var(--header-h) + 12px);
+}
 .doc-content s,
 .doc-content del { color: #8b949e; }
 
