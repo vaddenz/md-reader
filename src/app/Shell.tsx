@@ -1,9 +1,12 @@
 import { Outlet } from 'react-router-dom';
+import { TokenProvider } from '../state/TokenContext';
 
 export default function Shell() {
   return (
-    <div className="shell">
-      <Outlet />
-    </div>
+    <TokenProvider>
+      <div className="shell">
+        <Outlet />
+      </div>
+    </TokenProvider>
   );
 }
