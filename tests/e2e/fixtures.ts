@@ -3,6 +3,7 @@ import { expect, type Page } from '@playwright/test';
 /**
  * GitHub API mock（P2 e2e 基座，P3/P4 复用）：
  * 所有请求都在浏览器内被 page.route 拦截，绝不触达真实 api.github.com。
+ * 另附 IndexedDB 直读/直改辅助（P4 过期与缓存保留用例）。
  */
 
 const OWNER = 'vaddenz';
@@ -12,7 +13,7 @@ const BRANCH = 'main';
 export interface GitHubMockOptions {
   /** 预置到 localStorage 的 Token（跳过引导页）；不传则用例走表单配置流程。 */
   token?: string;
-  /** `/user` 返回 401（模拟 Token 无效）。 */
+  /** 所有 API 端点返回 401（模拟 Token 无效 / 运行中失效授权）。 */
   failAuth?: boolean;
   /** 所有 API 请求直接网络失败（模拟断网）。 */
   failNetwork?: boolean;
@@ -21,6 +22,14 @@ export interface GitHubMockOptions {
 export interface GitHubMock {
   /** 目录树请求次数（每次同步恰好请求一次），供用例断言自动同步行为。 */
   syncCalls(): number;
+  /** 运行中切换鉴权失败（401，全部端点）：用于「已有缓存后同步遇 401」场景。 */
+  setFailAuth(value: boolean): void;
+  /**
+   * 运行中切换网络失败。注意：page.route 的拦截响应不经过网络栈，
+   * Playwright 的 `context.setOffline(true)` 不会让被拦截的请求失败（实测），
+   * 离线用例若要断言「下载失败」需同时开启本开关。
+   */
+  setFailNetwork(value: boolean): void;
 }
 
 /** a.md 正文填充：把页面撑到足够高，用于验证滚动位置的记录与恢复。 */
@@ -89,6 +98,8 @@ const TREE = [
 
 export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}): Promise<GitHubMock> {
   let syncCalls = 0;
+  let failAuth = opts.failAuth === true;
+  let failNetwork = opts.failNetwork === true;
 
   if (opts.token !== undefined) {
     await page.addInitScript((t) => {
@@ -97,7 +108,7 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
   }
 
   await page.route('https://api.github.com/**', async (route) => {
-    if (opts.failNetwork) {
+    if (failNetwork) {
       await route.abort('failed');
       return;
     }
@@ -106,8 +117,9 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
     const json = (body: unknown, status = 200) =>
       route.fulfill({ status, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) });
 
+    if (failAuth) return json({ message: 'Bad credentials' }, 401);
     if (url.pathname === '/user') {
-      return opts.failAuth ? json({ message: 'Bad credentials' }, 401) : json({ login: OWNER });
+      return json({ login: OWNER });
     }
     if (url.pathname === `/repos/${OWNER}/${REPO}`) {
       return json({ default_branch: BRANCH });
@@ -125,7 +137,11 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
     return json({ message: 'Not Found' }, 404);
   });
 
-  return { syncCalls: () => syncCalls };
+  return {
+    syncCalls: () => syncCalls,
+    setFailAuth: (value) => { failAuth = value; },
+    setFailNetwork: (value) => { failNetwork = value; },
+  };
 }
 
 /**
@@ -143,4 +159,118 @@ export async function configureAndSync(page: Page, token = 'ghp_e2e_fake_token')
   await page.waitForURL(/#\/$/);
   await expect(page.locator('.tree-item')).toHaveCount(3);
   return mock;
+}
+
+/* ---------------------------------------------------------------------------
+ * IndexedDB 辅助（P4）：在页面内用独立连接直读/直改应用数据（应用自持连接不受影响）。
+ * 记录结构见 src/data/db.ts 的 FileRecord；打开前建 store 的写法与 settings.spec 一致。
+ * ------------------------------------------------------------------------- */
+
+/** files 记录中用例关心的字段。 */
+export interface FileRecordLite {
+  text: string | null;
+  lastUsedAt: number;
+}
+
+/** 读取 files 记录（text/lastUsedAt）；记录不存在或读取失败返回 null。 */
+export async function readFileRecord(page: Page, path: string): Promise<FileRecordLite | null> {
+  return page.evaluate(
+    (p) =>
+      new Promise<FileRecordLite | null>((resolve) => {
+        const req = indexedDB.open('mdreader');
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          for (const name of ['files', 'blobs', 'kv']) {
+            if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+          }
+        };
+        req.onerror = () => resolve(null);
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const get = db.transaction('files', 'readonly').objectStore('files').get(p);
+            get.onsuccess = () => {
+              const rec = get.result as { text?: string | null; lastUsedAt?: number } | undefined;
+              resolve(rec ? { text: rec.text ?? null, lastUsedAt: rec.lastUsedAt ?? 0 } : null);
+              db.close();
+            };
+            get.onerror = () => { resolve(null); db.close(); };
+          } catch {
+            resolve(null);
+            db.close();
+          }
+        };
+      }),
+    path,
+  );
+}
+
+/** files 记录数（-1 = 打开/读取失败）。 */
+export async function countFiles(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const req = indexedDB.open('mdreader');
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          for (const name of ['files', 'blobs', 'kv']) {
+            if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+          }
+        };
+        req.onerror = () => resolve(-1);
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const count = db.transaction('files', 'readonly').objectStore('files').count();
+            count.onsuccess = () => { resolve(count.result); db.close(); };
+            count.onerror = () => { resolve(-1); db.close(); };
+          } catch {
+            resolve(-1);
+            db.close();
+          }
+        };
+      }),
+  );
+}
+
+/**
+ * 把某篇文档的 lastUsedAt 改为 N 天前（默认 8 天 > 7 天 TTL）；
+ * 下次整页加载时应用启动流程的 sweepExpired 会将其正文置空（text → null）。
+ */
+export async function expireDoc(page: Page, path: string, daysAgo = 8): Promise<void> {
+  const at = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+  const ok = await page.evaluate(
+    (args) =>
+      new Promise<boolean>((resolve) => {
+        const req = indexedDB.open('mdreader');
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          for (const name of ['files', 'blobs', 'kv']) {
+            if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+          }
+        };
+        req.onerror = () => resolve(false);
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const store = db.transaction('files', 'readwrite').objectStore('files');
+            const get = store.get(args.path);
+            get.onsuccess = () => {
+              const rec = get.result as { lastUsedAt?: number } | undefined;
+              if (!rec) { resolve(false); db.close(); return; }
+              rec.lastUsedAt = args.at;
+              const put = store.put(rec, args.path);
+              put.onsuccess = () => { resolve(true); db.close(); };
+              put.onerror = () => { resolve(false); db.close(); };
+            };
+            get.onerror = () => { resolve(false); db.close(); };
+          } catch {
+            resolve(false);
+            db.close();
+          }
+        };
+      }),
+    { path, at },
+  );
+  if (!ok) throw new Error(`expireDoc 失败：未找到或无法更新 files 记录 ${path}`);
 }

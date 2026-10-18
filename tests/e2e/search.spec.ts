@@ -7,7 +7,7 @@ test('搜索直达：结果列表 → 打开第 2 条 → 命中高亮并滚动�
   await page.goto('./#/search?q=MVCC');
   const results = page.locator('.search-result');
   await expect(results.first()).toBeVisible();
-  expect(await results.count()).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => results.count()).toBeGreaterThanOrEqual(2);
 
   // 第 2 条为 a.md（命中 1 处、位于文末）；片段中的命中词已高亮
   await expect(results.nth(1).locator('.search-result-title')).toHaveText('文档 A');
