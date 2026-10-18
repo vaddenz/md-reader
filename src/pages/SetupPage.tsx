@@ -36,8 +36,10 @@ export default function SetupPage() {
     setError(null);
     try {
       await new GitHubClient(token).getUser();
-      setToken(token);
+      // 先落盘 config 再 setToken：SyncContext 的 [token] 效应在 render 后立即读取 config，
+      // 顺序颠倒时首次自动同步可能读到空 config 而不触发（T9 竞态；T23 探针确定性复现）。
       if (!(await kvGet('config'))) await kvSet('config', DEFAULT_REPO);
+      setToken(token);
       navigate(toRouterPath(HOME));
     } catch (err) {
       setError(err instanceof GitHubError ? errorText(err) : '保存失败，请重试');
