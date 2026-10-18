@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HOME, docHref, toRouterPath } from '../app/nav';
 import { DEFAULT_REPO } from '../constants';
-import { getFile, kvGet, listFilesMeta, type FileMeta } from '../data/db';
+import { kvGet, listFilesMeta, type FileMeta } from '../data/db';
 import { GitHubClient } from '../data/github';
 import { searchDocs, type SearchHit } from '../data/search';
+import { loadCachedTexts } from '../data/searchCache';
 import { downloadDocText } from '../data/sync';
 import { runPool } from '../lib/pool';
 import { termRanges } from '../markdown/highlight';
@@ -14,28 +15,6 @@ import '../styles/search.css';
 
 /** 输入即时搜索防抖（规格 §7）。 */
 const DEBOUNCE_MS = 200;
-
-/**
- * 已缓存正文的模块级缓存：以 kv.lastSyncAt 为版本键（同步完成后自动失效）。
- * 「纳入全文搜索」下载后由调用方置空强制重建。
- */
-let textCache: { stamp: number | null; texts: Map<string, string> } | null = null;
-
-async function loadCachedTexts(metas: FileMeta[]): Promise<Map<string, string>> {
-  const stamp = (await kvGet<number>('lastSyncAt').catch(() => undefined)) ?? null;
-  if (textCache && textCache.stamp === stamp) return textCache.texts;
-  const texts = new Map<string, string>();
-  await Promise.all(
-    metas
-      .filter((m) => m.cached)
-      .map(async (m) => {
-        const rec = await getFile(m.path).catch(() => undefined);
-        if (rec?.text != null) texts.set(m.path, rec.text);
-      }),
-  );
-  textCache = { stamp, texts };
-  return texts;
-}
 
 /** 片段文本渲染：命中词用 <mark> 包裹（位置由 termRanges 计算）。 */
 function renderSnippet(text: string, query: string): ReactNode {
@@ -91,7 +70,8 @@ export default function SearchPage() {
     return () => window.clearTimeout(timer);
   }, [input, q, setSearchParams]);
 
-  // 查询执行：读已缓存正文 → searchDocs；lastSyncAt 变化（同步完成）自动重跑。
+  // 查询执行：读已缓存正文（模块缓存自愈，含按需下载/过期）→ searchDocs；
+  // lastSyncAt 变化（同步完成）自动重跑。
   useEffect(() => {
     if (!query) {
       setMetas([]);
@@ -104,9 +84,9 @@ export default function SearchPage() {
       const list = await listFilesMeta().catch(() => [] as FileMeta[]);
       if (cancelled) return;
       setMetas(list);
-      const texts = await loadCachedTexts(list);
+      const docs = await loadCachedTexts();
       if (cancelled) return;
-      setHits(searchDocs([...texts].map(([path, text]) => ({ path, text })), query));
+      setHits(searchDocs(docs, query));
     })();
     return () => { cancelled = true; };
   }, [query, lastSyncAt, reload]);
@@ -131,8 +111,7 @@ export default function SearchPage() {
     });
     setFailed(bad);
     setBusy(null);
-    textCache = null; // 正文已更新，强制重建
-    setReload((n) => n + 1);
+    setReload((n) => n + 1); // 重新列元数据并重搜（缓存按命中数自愈）
   }, [busy, token, uncached]);
 
   return (
