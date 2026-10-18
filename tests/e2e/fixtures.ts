@@ -30,6 +30,8 @@ export interface GitHubMock {
    * 离线用例若要断言「下载失败」需同时开启本开关。
    */
   setFailNetwork(value: boolean): void;
+  /** 运行时改文档：换 sha + 换正文；整页加载或「更新目录」同步后拉到新正文。 */
+  updateDoc(path: string, text: string): void;
 }
 
 /** a.md 正文填充：把页面撑到足够高，用于验证滚动位置的记录与恢复。 */
@@ -106,6 +108,9 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
   let syncCalls = 0;
   let failAuth = opts.failAuth === true;
   let failNetwork = opts.failNetwork === true;
+  // 可变副本：updateDoc 在运行中替换 sha 与正文（TREE/DOCS 为模块级常量，保持只读）。
+  let tree = TREE.map((e) => ({ ...e }));
+  const docs: Record<string, string> = { ...DOCS };
 
   if (opts.token !== undefined) {
     await page.addInitScript((t) => {
@@ -132,11 +137,11 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
     }
     if (url.pathname === `/repos/${OWNER}/${REPO}/git/trees/${BRANCH}`) {
       syncCalls += 1;
-      return json({ sha: 'tree-sha', truncated: false, tree: TREE });
+      return json({ sha: 'tree-sha', truncated: false, tree });
     }
     const blob = /^\/repos\/[^/]+\/[^/]+\/git\/blobs\/(.+)$/.exec(url.pathname);
     if (blob) {
-      const text = DOCS[decodeURIComponent(blob[1])];
+      const text = docs[decodeURIComponent(blob[1])];
       if (text === undefined) return json({ message: 'Not Found' }, 404);
       return route.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body: text });
     }
@@ -147,6 +152,14 @@ export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}
     syncCalls: () => syncCalls,
     setFailAuth: (value) => { failAuth = value; },
     setFailNetwork: (value) => { failNetwork = value; },
+    updateDoc: (path, text) => {
+      const entry = tree.find((e) => e.path === path);
+      if (!entry) throw new Error(`updateDoc：未知路径 ${path}`);
+      const sha = `${entry.sha}-v${Date.now()}`;
+      docs[sha] = text;
+      entry.sha = sha;
+      entry.size = text.length;
+    },
   };
 }
 

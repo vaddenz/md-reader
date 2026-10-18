@@ -12,12 +12,14 @@ import { DEFAULT_REPO } from '../constants';
 import { appearanceStyle, DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
+import { getDocHighlights } from '../data/highlights';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { downloadDocText } from '../data/sync';
 import { useReadingProgress } from '../hooks/useReadingProgress';
 import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError } from '../lib/errors';
 import { showToast } from '../lib/toast';
 import { highlightInContainer } from '../markdown/highlight';
+import { applyHighlights } from '../markdown/highlights';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
@@ -68,6 +70,8 @@ export default function DocPage() {
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
+  // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
+  const appliedRef = useRef(new Map<string, { start: number; end: number }>());
 
   // 目录元数据（knownPaths 判定互链 + 上下篇排序）；就绪前不渲染正文，避免互链被误判为死链。
   // 同步完成（lastSyncAt 变化）后重读：抽屉内「更新目录」的结果即时反映到文件树（与首页同口径）。
@@ -188,6 +192,19 @@ export default function DocPage() {
       stopMermaid();
     };
   }, [html, path, fetchBlob]);
+
+  // 高亮重锚：每次正文注入（打开/同步更新）后，异步读记录并锚定；DOM 已被替换为干净正文。
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container || !html) return;
+    let cancelled = false;
+    void getDocHighlights(path).then((records) => {
+      const el = contentRef.current;
+      if (cancelled || !el) return;
+      appliedRef.current = applyHighlights(el, records);
+    });
+    return () => { cancelled = true; };
+  }, [html, path]);
 
   // 持续记录当前历史条目的滚动位置（rAF 节流）。仅在正文就绪时记录：
   // 切换文档的加载间隙页面会变矮，浏览器把 scrollY 钳制到新高度，
