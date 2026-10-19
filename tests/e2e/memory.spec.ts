@@ -301,7 +301,7 @@ test('选择题本地判分与追问链：链排序、母题展开、单选错�
   await page.getByRole('button', { name: '提示' }).click();
   await page.getByRole('button', { name: '提示' }).click();
   await expect(page.getByRole('button', { name: '已给足提示' })).toBeVisible();
-  await expect(page.getByText('这是一道【辨析】题')).toBeVisible();
+  await expect(page.getByText('已排除选项')).toBeVisible();
   const eliminatedKey = (await page.locator('.memory-option-eliminated .memory-option-key').innerText()).trim();
   const pickedKey = eliminatedKey === 'B' ? 'C' : 'B';
   const pickedText = pickedKey === 'B' ? 'V8' : 'zlib';

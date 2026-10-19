@@ -290,36 +290,44 @@ export default function MemoryTrainPage() {
   }, [navigate]);
 
   const onHint = useCallback(() => {
-    if (!current) return;
+    if (!current || hintLevel >= 2) return;
     const q = current.question;
-    if (q.kind !== 'qa' && hintLevel >= 1) {
-      const wrong = (q.options ?? []).map((o) => o.key).filter((k) => !(q.correct ?? []).includes(k));
+    if (q.kind === 'qa') {
+      setHintLevel((l) => Math.min(2, l + 1));
+      return;
+    }
+    // 选择题：作者提示占 L1；排除一个错误项占 L2。没有作者提示时第一次就排除。
+    const wantEliminate = q.hint ? hintLevel >= 1 : true;
+    if (wantEliminate) {
+      const wrong = (q.options ?? [])
+        .map((o) => o.key)
+        .filter((k) => !(q.correct ?? []).includes(k) && k !== eliminated);
       if (wrong.length >= 2) {
         const key = wrong[Math.floor(Math.random() * wrong.length)];
         setEliminated(key);
         setPicked((prev) => prev.filter((k) => k !== key));
+      } else if (!q.hint) {
+        setHintLevel(2);
+        return;
       }
-      setHintLevel(2);
-      return;
     }
     setHintLevel((l) => Math.min(2, l + 1));
-  }, [current, hintLevel]);
+  }, [current, eliminated, hintLevel]);
 
   const hintText = useMemo(() => {
-    if (!current || hintLevel === 0 || current.question.kind !== 'qa') return null;
+    if (!current || hintLevel === 0) return null;
     const q = current.question;
-    if (hintLevel === 1) {
-      return q.hint ?? `这是一道【${q.type}】题${q.chapter ? `，属于「${q.chapter}」` : ''}`;
+    if (q.kind !== 'qa') {
+      // 选择题：L1 给作者提示；没有作者提示时直接走排除法（见 onHint），不显示重复的题型/章节。
+      return q.hint && hintLevel === 1 ? q.hint : null;
     }
     const keys = extractHintKeywords(q.answer ?? '');
-    return keys.length ? keys.join(' · ') : null;
-  }, [current, hintLevel]);
-
-  const hintTextChoice = useMemo(() => {
-    if (!current || hintLevel === 0 || current.question.kind === 'qa') return null;
-    const q = current.question;
-    // L2 排除后 L1 文案保留（无足够错误项时避免提示区空转）。
-    return q.hint ?? `这是一道【${q.type}】题${q.chapter ? `，属于「${q.chapter}」` : ''}`;
+    const keyLine = keys.length ? `关键词：${keys.join(' · ')}` : '';
+    const preview = q.answer ? `先回忆：${q.answer.replace(/^[\s>*\-+]+/, '').slice(0, 50)}…` : '';
+    if (hintLevel === 1) {
+      return q.hint || keyLine || (preview || `这是一道【${q.type}】题${q.chapter ? `，属于「${q.chapter}」` : ''}`);
+    }
+    return (q.hint ? (keyLine || preview) : preview) || null;
   }, [current, hintLevel]);
 
   const parentView = useMemo(() => {
@@ -451,7 +459,6 @@ export default function MemoryTrainPage() {
         {q.prompt && <MarkdownBlock className="memory-prompt" text={q.prompt} path={current.bankPath} knownPaths={knownPaths} />}
         {q.followUpOf && <FollowUpPanel followUpOf={q.followUpOf} parent={parentView} knownPaths={knownPaths} />}
         {hintText && <p className="memory-hint" role="status">提示：{hintText}</p>}
-        {hintTextChoice && <p className="memory-hint" role="status">提示：{hintTextChoice}</p>}
         {eliminated && <p className="memory-hint" role="status">已排除选项 {eliminated}</p>}
         {q.kind === 'qa' ? (
           <textarea
@@ -506,10 +513,20 @@ function OptionList(props: {
             ? `${pickedIt ? ' memory-option-on' : ''}${eliminatedIt ? ' memory-option-eliminated' : ''}`
             : `${isCorrect ? ' memory-option-correct' : pickedIt ? ' memory-option-wrong' : eliminatedIt ? ' memory-option-eliminated' : ''}`
         }`;
+        const tag = onPick
+          ? ''
+          : eliminatedIt
+            ? '已排除'
+            : isCorrect
+              ? (pickedIt ? '已选 · 正确' : '漏选')
+              : pickedIt
+                ? '误选'
+                : '';
         const inner = (
           <>
             <span className="memory-option-key">{o.key}</span>
             <span className="memory-option-text">{o.text}</span>
+            {tag && <span className="memory-option-tag">{tag}</span>}
           </>
         );
         return onPick ? (

@@ -3,6 +3,7 @@ import { MEMORY, SETTINGS, docHref, searchHref } from '../app/nav';
 import FileTree from '../components/FileTree';
 import SyncBadge from '../components/SyncBadge';
 import { listFilesMeta, type FileMeta } from '../data/db';
+import { loadSrsMap } from '../data/memory';
 import { getFavorites, getProgress, recentDocs, type RecentDoc } from '../data/prefs';
 import { useSync } from '../state/SyncContext';
 import '../styles/home.css';
@@ -36,13 +37,14 @@ function SettingsIcon() {
   );
 }
 
-/** 记忆助手入口图标（卡片列表意象）。 */
+/** 记忆助手入口图标（记忆卡片意象：两张叠放的卡片）。 */
 function MemoryIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <rect x="4" y="7" width="13" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
       <path
-        fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
-        d="M5 4h11a1 1 0 0 1 1 1v11H7a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1Zm12 3h2a1 1 0 0 1 1 1v9a3 3 0 0 1-3 3H7M8 8h6M8 12h6"
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        d="M8 4h9a3 3 0 0 1 3 3v9M8 12h5M8 16h5"
       />
     </svg>
   );
@@ -54,6 +56,21 @@ export default function HomePage() {
   const [recents, setRecents] = useState<RecentDoc[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [firstRatio, setFirstRatio] = useState<number | null>(null);
+  const [dueCount, setDueCount] = useState<number | null>(null);
+
+  // 记忆助手入口的「今日待复习」提示（仅本机统计，失败静默）
+  useEffect(() => {
+    let cancelled = false;
+    void loadSrsMap().then(
+      (map) => {
+        if (cancelled) return;
+        const now = Date.now();
+        setDueCount([...map.values()].filter((s) => s.dueAt <= now).length);
+      },
+      () => {},
+    );
+    return () => { cancelled = true; };
+  }, [lastSyncAt]);
 
   // 进入首页读取一次；同步完成（lastSyncAt 变化）后重读，让「更新目录」新增/过期的文档即时反映到树上。
   useEffect(() => {
@@ -102,10 +119,6 @@ export default function HomePage() {
     <main className="home">
       <header className="home-header">
         <h1 className="home-title">知识库</h1>
-        {/* 两个图标都绝对定位在右缘：记忆助手让出齿轮一格，避免重叠。 */}
-        <a className="home-settings home-memory" href={MEMORY} aria-label="记忆助手" title="记忆助手">
-          <MemoryIcon />
-        </a>
         <a className="home-settings" href={SETTINGS} aria-label="设置" title="设置">
           <SettingsIcon />
         </a>
@@ -119,6 +132,18 @@ export default function HomePage() {
           <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M15.4 15.4 21 21" />
         </svg>
         <span>搜索文档</span>
+      </a>
+
+      {/* 记忆助手独立入口：带文字与今日待复习数，避免纯图标入口难以发现。 */}
+      <a className="home-memory-entry" href={MEMORY} aria-label="记忆助手">
+        <span className="home-memory-icon"><MemoryIcon /></span>
+        <span className="home-memory-text">
+          <span className="home-memory-title">记忆助手</span>
+          <span className="home-memory-sub">
+            按遗忘曲线复习{dueCount === null ? '' : ` · 今日 ${dueCount} 题待复习`}
+          </span>
+        </span>
+        <span className="home-memory-arrow" aria-hidden="true">›</span>
       </a>
 
       {/* 首页区块（T19）：继续阅读 → 收藏 → 全部文档树；空态不渲染区块。 */}

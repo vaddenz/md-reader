@@ -44,7 +44,8 @@
 .memory-row-label { flex: none; width: 76px; color: var(--ink2); font-size: 13px; }
 .memory-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .memory-chip {
-  min-height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; min-width: 48px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
   background: var(--card); color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer;
 }
 .memory-chip-on { border-color: var(--acc); color: var(--acc-text); background: rgba(31, 63, 212, .08); }
@@ -80,6 +81,8 @@
 .memory-option-correct { border-color: #2f7d4f; background: rgba(47, 125, 79, .10); }
 .memory-option-wrong { border-color: var(--danger); background: rgba(192, 57, 43, .08); }
 .memory-option-key { flex: none; font-weight: 600; color: var(--ink2); }
+.memory-option-tag { margin-left: auto; padding-left: 8px; flex: none; font-size: 12px; color: var(--ink2); white-space: nowrap; }
+.memory-unit { color: var(--ink2); font-size: 13px; }
 .memory-parent { margin-top: 10px; }
 .memory-parent-ref { margin-right: 8px; color: var(--ink2); font-size: 12.5px; }
 .memory-parent-body { margin-top: 8px; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--shell); }

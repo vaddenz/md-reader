@@ -131,8 +131,8 @@ export default function MemoryRecordsPage() {
           {stats.trend.map((t, i) => (
             <div key={t.day} className="memory-trend-col" title={`${fmtDay(t.day)}：${t.count} 题`}>
               {t.count > 0 && <i style={{ height: `${Math.round((t.count / trendMax) * 100)}%` }} />}
-              {/* 14 列放不下完整日期：隔列显示（始终保留最后一列），保持可读且不溢出 */}
-              <span>{i % 2 === 0 || i === stats.trend.length - 1 ? fmtDay(t.day) : ''}</span>
+              {/* 14 列放不下完整日期：隔列显示，并在显示最后一列时隐藏倒数第二列，避免相邻挤压 */}
+              <span>{(i % 2 === 0 && i !== stats.trend.length - 2) || i === stats.trend.length - 1 ? fmtDay(t.day) : ''}</span>
             </div>
           ))}
         </div>
@@ -171,7 +171,7 @@ export default function MemoryRecordsPage() {
                     {a.missed.length > 0 && <p className="memory-note">遗漏要点：{a.missed.join('、')}</p>}
                     {a.comment && <p className="memory-note">{a.comment}</p>}
                     <p className="memory-note">
-                      用时 {Math.round(a.durationMs / 1000)} 秒
+                      用时 {a.durationMs < 1000 ? '<1 秒' : `${Math.round(a.durationMs / 1000)} 秒`}
                       {a.hintUsed ? ' · 用过提示' : ''}
                       {a.revealed ? ' · 看过答案' : ''}
                     </p>

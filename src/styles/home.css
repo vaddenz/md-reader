@@ -38,8 +38,34 @@
   text-decoration: none;
 }
 
-/* 记忆助手入口：与设置齿轮并排（齿轮固定在右缘，入口向左让出一格）。 */
-.home-settings.home-memory { right: 44px; }
+/* 记忆助手独立入口：白卡 + 图标徽标 + 副标题，比纯图标入口更易发现 */
+.home-memory-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  color: var(--ink);
+  text-decoration: none;
+}
+.home-memory-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-ctl);
+  background: rgba(31, 63, 212, .08);
+  color: var(--acc-text);
+}
+.home-memory-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.home-memory-title { font-size: 15px; font-weight: 500; }
+.home-memory-sub { font-size: 12.5px; color: var(--ink2); }
+.home-memory-arrow { margin-left: auto; color: var(--ink2); font-size: 20px; line-height: 1; }
 
 /* 搜索入口：灰底胶囊行 */
 .home-search {

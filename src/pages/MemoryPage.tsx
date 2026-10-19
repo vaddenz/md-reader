@@ -219,8 +219,7 @@ export default function MemoryPage() {
     if (!token) { showToast('未配置访问 Token，无法获取题库', { kind: 'error' }); return; }
     setBankLoading(path, true);
     try {
-      const bank = await loadBank(path, new GitHubClient(token));
-      if (bank.warnings.length) showToast(`题库已加载：${bank.questions.length} 题，${bank.warnings.length} 处问题`);
+      await loadBank(path, new GitHubClient(token));
     } catch (err) {
       showToast(err instanceof Error ? err.message : '题库获取失败', { kind: 'error' });
     } finally {
@@ -377,6 +376,7 @@ export default function MemoryPage() {
                 updateSelection({ ...selection, newPerDay: n });
               }}
             />
+            <span className="memory-unit">题</span>
           </div>
         </div>
       </section>
