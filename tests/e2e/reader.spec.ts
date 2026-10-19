@@ -147,7 +147,7 @@ test('相关文档面板：双向引用分组 chips，点击互跳；无引用�
   await expect(page.locator('.related-docs')).toHaveCount(0);
 
   // a.md ↔ 深挖/b.md 双向引用：两个分组都出现，chip 显示标题
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
   const panel = page.locator('.related-docs');
@@ -239,7 +239,7 @@ test('顶栏自动隐藏：下滑隐藏、上滑显示', async ({ page }) => {
   await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
 
   // 程序式落位（大跨度跳变）不触发隐藏：直接跳到大文档 90% 处，顶栏应仍在
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   await page.getByRole('link', { name: '长文档', exact: true }).click();
   await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, Math.round(document.documentElement.scrollHeight * 0.9)));

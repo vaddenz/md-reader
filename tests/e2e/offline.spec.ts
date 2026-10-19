@@ -28,7 +28,7 @@ test('离线：已同步文档可读、搜索可用；恢复在线后自动同�
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
   // 离线搜索：命中来自 IndexedDB 缓存正文
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   await page.getByRole('link', { name: '搜索文档' }).click();
   await expect(page).toHaveURL(/#\/search\?q=$/);
   await page.getByLabel('搜索关键词').fill('MVCC');

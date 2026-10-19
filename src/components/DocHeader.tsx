@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SETTINGS, goBackOrHome, searchHref, toRouterPath } from '../app/nav';
+import { HOME, SETTINGS, searchHref, toRouterPath } from '../app/nav';
 import { useTabs } from '../state/TabsContext';
 
 interface DocHeaderProps {
@@ -125,8 +125,8 @@ export default function DocHeader({
       <button
         type="button"
         className="doc-back"
-        aria-label="返回"
-        onClick={() => goBackOrHome(navigate)}
+        aria-label="返回首页"
+        onClick={() => navigate(toRouterPath(HOME))}
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path

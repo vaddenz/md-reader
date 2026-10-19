@@ -28,7 +28,7 @@ test('阅读进度：滚到中部退出，重开自动恢复到记录比例（±
 
   // 退出到首页：新历史条目没有 scroll 记忆 → 重开时按已保存进度默认落位（spec §1.4）
   await revealHeader(page); // 顶栏沉浸隐藏后唤出，避免 click 自动滚到页首污染已记录进度
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible();
   await expect(page.locator('.home-recents')).toBeVisible();
 
@@ -85,7 +85,7 @@ test('收藏：星标后首页出现收藏区块，取消后消失', async ({ pa
 
   // 首页出现「收藏」区块，直达该文档
   await page.keyboard.press('Escape'); // 关掉 ⋯ 再点顶栏
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   const favorites = page.locator('.home-favorites');
   await expect(favorites).toBeVisible();
   await expect(favorites.getByRole('link', { name: '文档 A' })).toBeVisible();
@@ -98,6 +98,6 @@ test('收藏：星标后首页出现收藏区块，取消后消失', async ({ pa
   await expect(page.getByRole('button', { name: '收藏', exact: true })).toHaveAttribute('aria-pressed', 'false');
 
   await page.keyboard.press('Escape'); // 关掉 ⋯ 再点顶栏
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.locator('.home-favorites')).toHaveCount(0);
 });
