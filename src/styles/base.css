@@ -1,10 +1,28 @@
 :root {
+  /* 阅读器视觉系统（spec §2.1 · 中文阅读器世界 · 浅蓝 #1F3FD4 强调） */
+  --page: #FAF9F6;
+  --shell: #F0EFEA;
+  --card: #FFFFFF;
+  --ink: #17181A;
+  --ink2: #5C6066;
+  --line: #E4E1DA;
+  --acc: #1F3FD4;        /* 浅蓝·图形：进度/开关/选中/焦点环（对白 ≥3:1） */
+  --acc-text: #1F3FD4;   /* 浅蓝·文字：链接/百分比（纸面 7.3:1） */
+  --acc-fill: #1F3FD4;   /* 浅蓝·填充：实心按钮白字（7.7:1）——三者同值，分名保留角色语义 */
+  --hl-yellow: #FFF1A8;
+  --hl-red: #FFD9D4;
+  --danger: #C0392B;
+  --shadow-card: 0 6px 18px rgba(40, 44, 52, .10);
+  --r-card: 14px;
+  --r-ctl: 10px;
+  --r-pill: 22px;
+  /* 旧别名（同值，T3–T6 逐步改用新名） */
+  --c-primary: var(--acc);
+  --c-text: var(--ink);
+  --c-bg: var(--page);
   --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC",
     "Source Han Sans SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --c-primary: #1f6feb;
-  --c-text: #24292f;
-  --c-bg: #ffffff;
   --header-h: 48px;
 }
 * { box-sizing: border-box; }
@@ -12,7 +30,18 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   font-family: var(--font-sans);
-  color: var(--c-text);
-  background: var(--c-bg);
+  color: var(--ink);
+  background: var(--shell);
   line-height: 1.6;
+  font-variant-numeric: tabular-nums; /* 数字等宽（spec §2.2；属性继承，CJK 不受影响） */
 }
+
+/* 浏览器表面全部从令牌取色（craft floor） */
+::selection { background: rgba(31, 63, 212, .22); }
+input, textarea, [contenteditable] { caret-color: var(--acc-text); }
+body :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+a { text-decoration-thickness: 1px; text-underline-offset: 3px; }

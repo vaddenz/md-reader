@@ -3,7 +3,7 @@ import { SETTINGS, docHref, searchHref } from '../app/nav';
 import FileTree from '../components/FileTree';
 import SyncBadge from '../components/SyncBadge';
 import { listFilesMeta, type FileMeta } from '../data/db';
-import { getFavorites, recentDocs, type RecentDoc } from '../data/prefs';
+import { getFavorites, getProgress, recentDocs, type RecentDoc } from '../data/prefs';
 import { useSync } from '../state/SyncContext';
 import '../styles/home.css';
 
@@ -41,6 +41,7 @@ export default function HomePage() {
   const [metas, setMetas] = useState<FileMeta[] | null>(null);
   const [recents, setRecents] = useState<RecentDoc[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [firstRatio, setFirstRatio] = useState<number | null>(null);
 
   // 进入首页读取一次；同步完成（lastSyncAt 变化）后重读，让「更新目录」新增/过期的文档即时反映到树上。
   useEffect(() => {
@@ -64,8 +65,20 @@ export default function HomePage() {
 
   // 只展示目录树里仍存在的文档（收藏/进度可能指向已从仓库移除的路径）。
   const known = useMemo(() => new Map((metas ?? []).map((m) => [m.path, m])), [metas]);
-  const recentShown = recents.filter((r) => known.has(r.path));
+  const recentShown = useMemo(() => recents.filter((r) => known.has(r.path)), [recents, known]);
   const favoritesShown = favorites.filter((p) => known.has(p));
+
+  // 首条「继续阅读」的进度：供进度条渲染（同步完成后重读，进度可能被更新/移除）。
+  useEffect(() => {
+    let cancelled = false;
+    const first = recentShown[0]?.path;
+    if (!first) { setFirstRatio(null); return; }
+    void getProgress(first).then(
+      (p) => { if (!cancelled) setFirstRatio(p?.ratio ?? null); },
+      () => {},
+    );
+    return () => { cancelled = true; };
+  }, [recentShown, lastSyncAt]);
 
   const docLink = (path: string) => (
     <a className="home-doc-link" href={docHref(path)}>
@@ -75,27 +88,38 @@ export default function HomePage() {
 
   return (
     <main className="home">
-      <SyncBadge />
-
-      <div className="home-top">
-        <a className="home-search" href={searchHref('')}>
-          <svg className="home-search-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
-            <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M15.4 15.4 21 21" />
-          </svg>
-          <span>搜索文档</span>
-        </a>
+      <header className="home-header">
+        <h1 className="home-title">知识库</h1>
         <a className="home-settings" href={SETTINGS} aria-label="设置" title="设置">
           <SettingsIcon />
         </a>
-      </div>
+      </header>
+
+      <SyncBadge />
+
+      <a className="home-search" href={searchHref('')}>
+        <svg className="home-search-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M15.4 15.4 21 21" />
+        </svg>
+        <span>搜索文档</span>
+      </a>
 
       {/* 首页区块（T19）：继续阅读 → 收藏 → 全部文档树；空态不渲染区块。 */}
       {recentShown.length > 0 && (
         <section className="home-section home-recents" aria-labelledby="home-recents-title">
           <h2 className="home-section-title" id="home-recents-title">继续阅读</h2>
           <ul className="home-section-list">
-            {recentShown.map((r) => <li key={r.path}>{docLink(r.path)}</li>)}
+            {recentShown.map((r, i) => (
+              <li key={r.path}>
+                {docLink(r.path)}
+                {i === 0 && firstRatio !== null && (
+                  <span className="home-progress" aria-hidden="true">
+                    <i style={{ width: `${Math.round(firstRatio * 100)}%` }} />
+                  </span>
+                )}
+              </li>
+            ))}
           </ul>
         </section>
       )}
@@ -121,7 +145,9 @@ export default function HomePage() {
       ) : metas.length === 0 ? (
         <p className="home-empty">暂无文档，点上方「更新目录」同步仓库</p>
       ) : (
-        <FileTree metas={metas} />
+        <div className="home-tree-card">
+          <FileTree metas={metas} />
+        </div>
       )}
     </main>
   );

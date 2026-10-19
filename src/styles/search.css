@@ -153,11 +153,15 @@
   overflow-wrap: break-word;
 }
 
+/* 片段命中 = 搜索命中 token（spec §2.1：--acc 染底 16% + 下划线，与持久高亮区分） */
 .search-snippet mark {
   padding: 0 1px;
-  background: #ffd33d;
+  background: rgba(31, 63, 212, 0.16);
   color: inherit;
   border-radius: 2px;
+  text-decoration: underline;
+  text-decoration-color: var(--acc);
+  text-underline-offset: 2px;
 }
 
 @media (hover: hover) {
