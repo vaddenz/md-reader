@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { configureAndSync, readKv } from './fixtures';
+import { configureAndSync, readKv, writeKv } from './fixtures';
 
 test('标签登记：打开两篇文档 → kv 记录两条、active 为当前；返回首页保留', async ({ page }) => {
   await configureAndSync(page);
@@ -87,4 +87,69 @@ test('多标签：唤出切换器、切换与位置恢复、关闭行为', async
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
   await page.getByRole('button', { name: '切换标签' }).click();
   await expect(page.getByRole('group', { name: '打开的标签' }).locator('.doc-tab-row')).toHaveCount(1);
+});
+
+test('多标签：重启恢复与去重', async ({ page }) => {
+  await configureAndSync(page);
+
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '文件' }).click();
+  await page.getByRole('dialog', { name: '全部文档' }).getByRole('link', { name: 'b', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+
+  // 重启（整页重载）：标签恢复、当前文档聚焦
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await page.getByRole('button', { name: '切换标签' }).click();
+  const panel = page.getByRole('group', { name: '打开的标签' });
+  await expect(panel.locator('.doc-tab-row')).toHaveCount(2);
+  await expect(panel.locator('.doc-tab-current')).toContainText('文档 B');
+  await page.keyboard.press('Escape');
+
+  // 去重：返回首页（v1.2.0 返回语义 = 回来源页：B→A→首页，需两次）→ 重开 B → 仍为两条（聚焦已有，不新开）
+  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page).toHaveURL(/#\/$/);
+  await page.getByRole('link', { name: 'b', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await page.getByRole('button', { name: '切换标签' }).click();
+  await expect(page.getByRole('group', { name: '打开的标签' }).locator('.doc-tab-row')).toHaveCount(2);
+});
+
+test('多标签：边界（损坏清理 / 缺失剔除）', async ({ page }) => {
+  await configureAndSync(page);
+
+  // 损坏存储 → 空标签起步（打开文档后只有 1 条）
+  await writeKv(page, 'tabs', 'garbage');
+  await page.reload();
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect
+    .poll(async () => ((await readKv(page, 'tabs')) as { list?: unknown[] } | undefined)?.list?.length)
+    .toBe(1);
+
+  // 恢复时剔除已不存在的文档（树缓存为准）
+  await writeKv(page, 'tabs', {
+    list: [
+      { id: 't1', docPath: '已删除.md', title: '已删除', openedAt: 1 },
+      { id: 't2', docPath: 'a.md', title: '文档 A', openedAt: 2 },
+    ],
+    activeId: 't1',
+  });
+  await writeKv(page, 'tree', {
+    entries: [
+      { path: 'a.md', sha: 'sha-a' },
+      { path: '深挖/b.md', sha: 'sha-b' },
+      { path: '长文档.md', sha: 'sha-long' },
+    ],
+  });
+  await page.reload();
+  await expect
+    .poll(async () => {
+      const raw = (await readKv(page, 'tabs')) as { list?: { docPath: string }[] } | undefined;
+      return raw?.list?.map((t) => t.docPath).join(',') ?? '';
+    })
+    .toBe('a.md');
 });
