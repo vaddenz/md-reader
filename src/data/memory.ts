@@ -94,11 +94,17 @@ function num(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
+/** 记录去重键（导入合并与列表展开共用）：同题、同毫秒、同形态视为同一条。 */
+export function attemptKey(a: Pick<MemoryAttempt, 'qid' | 'ts' | 'mode'>): string {
+  return `${a.qid}|${a.ts}|${a.mode}`;
+}
+
 export function sanitizeSelection(raw: unknown): MemorySelection {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT_SELECTION, filters: { ...DEFAULT_SELECTION.filters } };
   const r = raw as Record<string, unknown>;
   const f = (r.filters && typeof r.filters === 'object' && !Array.isArray(r.filters)) ? r.filters as Record<string, unknown> : {};
-  const sessionSize = SESSION_SIZE_CHOICES.includes(num(r.sessionSize, 20)) ? num(r.sessionSize, 20) : 20;
+  const rawSize = num(r.sessionSize, DEFAULT_SELECTION.sessionSize);
+  const sessionSize = SESSION_SIZE_CHOICES.includes(rawSize) ? rawSize : DEFAULT_SELECTION.sessionSize;
   const newPerDay = Math.min(50, Math.max(0, Math.round(num(r.newPerDay, 10))));
   return {
     banks: strArray(r.banks),
@@ -275,11 +281,11 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
     srsImported += 1;
   }
 
-  const existingKeys = new Set(((await attStore.getAll()) as MemoryAttempt[]).map((a) => `${a.qid}|${a.ts}|${a.mode}`));
+  const existingKeys = new Set(((await attStore.getAll()) as MemoryAttempt[]).map(attemptKey));
   for (const item of rawAttempts) {
     const a = sanitizeAttempt(item);
     if (!a) continue;
-    const key = `${a.qid}|${a.ts}|${a.mode}`;
+    const key = attemptKey(a);
     if (existingKeys.has(key)) continue;
     const { id: _ignored, ...rest } = a;
     await attStore.add(rest);
@@ -290,19 +296,23 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
   return { srs: srsImported, attempts: attemptsImported };
 }
 
+/** AI 评分记录的分值（非 AI 或无分数返回 null），供均分/趋势统一口径。 */
+function aiScore(a: MemoryAttempt): number | null {
+  return a.mode === 'ai' && typeof a.score === 'number' ? a.score : null;
+}
+
+function mean1(values: number[]): number | null {
+  return values.length ? Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10 : null;
+}
+
 export function summarize(attempts: MemoryAttempt[], srs: SrsState[], now: number = Date.now()): MemoryStats {
   const verdictCounts: Record<Verdict, number> = { excellent: 0, good: 0, hard: 0, again: 0 };
   for (const a of attempts) verdictCounts[a.verdict] += 1;
 
-  const aiScores = attempts.filter((a) => a.mode === 'ai' && typeof a.score === 'number') as (MemoryAttempt & { score: number })[];
-  const avgAiScore = aiScores.length
-    ? Math.round((aiScores.reduce((s, a) => s + a.score, 0) / aiScores.length) * 10) / 10
-    : null;
+  const aiScores = attempts.map(aiScore).filter((v): v is number => v !== null);
+  const avgAiScore = mean1(aiScores);
   const sevenDaysAgo = addDays(dayStart(now), -6);
-  const aiScores7d = aiScores.filter((a) => a.ts >= sevenDaysAgo);
-  const avgAiScore7d = aiScores7d.length
-    ? Math.round((aiScores7d.reduce((s, a) => s + a.score, 0) / aiScores7d.length) * 10) / 10
-    : null;
+  const avgAiScore7d = mean1(attempts.filter((a) => a.ts >= sevenDaysAgo).map(aiScore).filter((v): v is number => v !== null));
 
   const today = dayStart(now);
   const practicedToday = attempts.filter((a) => a.ts >= today).length;
@@ -331,11 +341,11 @@ export function summarize(attempts: MemoryAttempt[], srs: SrsState[], now: numbe
     const from = addDays(today, -i);
     const to = addDays(from, 1);
     const inDay = attempts.filter((a) => a.ts >= from && a.ts < to);
-    const ai = inDay.filter((a) => a.mode === 'ai' && typeof a.score === 'number') as (MemoryAttempt & { score: number })[];
+    const ai = inDay.map(aiScore).filter((v): v is number => v !== null);
     trend.push({
       day: from,
       count: inDay.length,
-      avgScore: ai.length ? Math.round(ai.reduce((s, a) => s + a.score, 0) / ai.length) : null,
+      avgScore: ai.length ? Math.round(ai.reduce((s, v) => s + v, 0) / ai.length) : null,
     });
   }
 

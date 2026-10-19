@@ -102,19 +102,20 @@ export function parseBankText(text: string): ParseResult {
       else { warn(lineNo, 'bad-type', `kind 非法：${String(o.kind)}`); continue; }
     }
 
-    const optStr = (key: string): string | undefined => {
+    const optStr = (key: string, trim = true): string | undefined => {
       const v = o[key];
       if (v === undefined || v === null) return undefined;
       if (typeof v !== 'string') { warn(lineNo, 'bad-type', `${key} 应为字符串`); return undefined; }
-      return v.trim() ? v : undefined;
+      if (!v.trim()) return undefined;
+      return trim ? v.trim() : v;
     };
     const chapter = optStr('chapter');
     const section = optStr('section');
-    const prompt = optStr('prompt');
+    const prompt = optStr('prompt', false);   // 题面保留原始换行/缩进
     const hint = optStr('hint');
     const difficulty = optStr('difficulty');
     const source = optStr('source');
-    const followUpOf = optStr('followUpOf');
+    const followUpOf = optStr('followUpOf');  // 引用型字段必须 trim，避免 " Q1.1 " 误判悬空
 
     let tags: string[] | undefined;
     if (o.tags !== undefined && o.tags !== null) {

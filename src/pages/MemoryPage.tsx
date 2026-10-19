@@ -22,6 +22,13 @@ const KIND_OPTIONS = [
   { value: 'multiple', label: '多选' },
 ];
 
+/** 惰性 Token：所选题库全部已缓存时可离线开始训练，真正需要拉取时才要求 Token。 */
+function clientFor(token: string | null): Pick<GitHubClient, 'getBlobText'> {
+  return token
+    ? new GitHubClient(token)
+    : { getBlobText: () => Promise.reject(new Error('未配置访问 Token，无法获取题库')) };
+}
+
 function FilterRow(props: {
   label: string;
   options: { value: string; label: string }[];
@@ -33,7 +40,7 @@ function FilterRow(props: {
   return (
     <div className="memory-row">
       <span className="memory-row-label">{label}</span>
-      <div className="memory-chips" role="group" aria-label={label}>
+      <div className="memory-chips" role={single ? 'radiogroup' : 'group'} aria-label={label}>
         {options.map((o) => {
           const on = selected.includes(o.value);
           return (
@@ -121,6 +128,13 @@ export default function MemoryPage() {
       : b)) ?? prev);
   }, []);
 
+  /** 拉取（或命中缓存）并落到解析缓存 + 列表计数：自动加载 / 手动勾选 / 开始训练共用。 */
+  const loadBank = useCallback(async (path: string, client: Pick<GitHubClient, 'getBlobText'>) => {
+    const bank = await ensureBankLoaded(path, client);
+    applyParsedMeta(path, bank);
+    return bank;
+  }, [applyParsedMeta]);
+
   const setBankLoading = useCallback((path: string, on: boolean) => {
     setLoadingBanks((prev) => (on
       ? (prev.includes(path) ? prev : [...prev, path])
@@ -137,14 +151,13 @@ export default function MemoryPage() {
       (b) => selection.banks.includes(b.path) && !b.fetched && !autoTried.current.has(`${b.path}\u0000${b.sha}`),
     );
     if (!pending.length) return;
-    const client = new GitHubClient(token);
+    const client = clientFor(token);
     void (async () => {
       for (const b of pending) {
         autoTried.current.add(`${b.path}\u0000${b.sha}`);
         setBankLoading(b.path, true);
         try {
-          const bank = await ensureBankLoaded(b.path, client);
-          applyParsedMeta(b.path, bank);
+          await loadBank(b.path, client);
         } catch {
           // 静默失败：列表保持「未获取」
         } finally {
@@ -152,7 +165,7 @@ export default function MemoryPage() {
         }
       }
     })();
-  }, [applyParsedMeta, banks, selection, setBankLoading, token]);
+  }, [banks, loadBank, selection, setBankLoading, token]);
 
   const stats = useMemo(() => summarize(attempts, srsList, Date.now()), [attempts, srsList]);
 
@@ -206,15 +219,14 @@ export default function MemoryPage() {
     if (!token) { showToast('未配置访问 Token，无法获取题库', { kind: 'error' }); return; }
     setBankLoading(path, true);
     try {
-      const bank = await ensureBankLoaded(path, new GitHubClient(token));
-      applyParsedMeta(path, bank);
+      const bank = await loadBank(path, new GitHubClient(token));
       if (bank.warnings.length) showToast(`题库已加载：${bank.questions.length} 题，${bank.warnings.length} 处问题`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : '题库获取失败', { kind: 'error' });
     } finally {
       setBankLoading(path, false);
     }
-  }, [applyParsedMeta, parsed, selection, setBankLoading, token, updateSelection]);
+  }, [loadBank, parsed, selection, setBankLoading, token, updateSelection]);
 
   const onStart = useCallback(async () => {
     if (!selection || starting) return;
@@ -222,10 +234,7 @@ export default function MemoryPage() {
     setStarting(true);
     setMsg(null);
     try {
-      // Token 惰性：所选题库全部已缓存时可离线开始训练，真正需要拉取时才要求 Token。
-      const client: Pick<GitHubClient, 'getBlobText'> = token
-        ? new GitHubClient(token)
-        : { getBlobText: () => Promise.reject(new Error('未配置访问 Token，无法获取题库')) };
+      const client = clientFor(token);
       if (!token) {
         const metas = await listBanks();
         const allCached = selection.banks.every((path) => metas.find((m) => m.path === path)?.fetched === true);
@@ -234,9 +243,7 @@ export default function MemoryPage() {
 
       const loaded: ParsedBank[] = [];
       for (const path of selection.banks) {
-        const bank = await ensureBankLoaded(path, client);
-        applyParsedMeta(path, bank);
-        loaded.push(bank);
+        loaded.push(await loadBank(path, client));
       }
 
       const candidates: QueueCandidate[] = [];
@@ -269,7 +276,7 @@ export default function MemoryPage() {
     } finally {
       setStarting(false);
     }
-  }, [applyParsedMeta, navigate, selection, starting, token]);
+  }, [loadBank, navigate, selection, starting, token]);
 
   const toggleFilter = useCallback((key: keyof MemorySelection['filters'], value: string) => {
     if (!selection) return;

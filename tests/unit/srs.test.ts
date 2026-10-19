@@ -129,6 +129,11 @@ describe('buildQueue', () => {
     expect(queue(candidates, new Map()).map((e) => e.qid)).toEqual(['q1', 'q2']);
   });
 
+  it('重复 qid 先去重再占用新题额度（不因重复题挤掉后面的新题）', () => {
+    const candidates = [cand('q1'), cand('q1', { line: 9 }), cand('q2', { line: 10 })];
+    expect(queue(candidates, new Map(), { newPerDay: 2 }).map((e) => e.qid)).toEqual(['q1', 'q2']);
+  });
+
   it('筛选：形态 / 题型 / 章节 / 标签 / 难度，空数组 = 不限制', () => {
     const candidates = [
       cand('qa', { type: '概念', chapter: '1. 基础', tags: ['a'], difficulty: '基础' }),

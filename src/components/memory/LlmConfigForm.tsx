@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LlmError, isLlmConfigured, testConnection } from '../../data/llm';
 import type { LlmConfig } from '../../data/memory';
 import { showToast } from '../../lib/toast';
@@ -10,15 +10,23 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : '连接失败';
 }
 
-/** 模型设置（spec §9）：保存只在通过校验后进行；测试连接复用同一配置。 */
+/** 模型设置（spec §9）：保存只在通过校验后进行；测试连接复用同一配置。
+ *  cfg 异步到达时不覆盖用户正在输入的草稿（dirty 后仅「保存」会重置）。 */
 export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onChange: (cfg: LlmConfig) => void }) {
   const [draft, setDraft] = useState<LlmConfig>(props.cfg ?? EMPTY);
   const [busy, setBusy] = useState(false);
+  const dirtyRef = useRef(false);
 
-  useEffect(() => { if (props.cfg) setDraft(props.cfg); }, [props.cfg]);
+  useEffect(() => { if (props.cfg && !dirtyRef.current) setDraft(props.cfg); }, [props.cfg]);
+
+  const edit = (patch: Partial<LlmConfig>) => {
+    dirtyRef.current = true;
+    setDraft((d) => ({ ...d, ...patch }));
+  };
 
   const onSave = () => {
     if (!isLlmConfigured(draft)) { showToast('请先完整填写 URL / Key / 模型名', { kind: 'error' }); return; }
+    dirtyRef.current = false;
     props.onChange(draft);
     showToast('已保存');
   };
@@ -42,17 +50,17 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
       <label className="memory-field">
         <span>Base URL</span>
         <input value={draft.baseUrl} placeholder="https://api.example.com/v1" autoComplete="off"
-          onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })} />
+          onChange={(e) => edit({ baseUrl: e.target.value })} />
       </label>
       <label className="memory-field">
         <span>API Key</span>
         <input type="password" value={draft.apiKey} placeholder="仅存本机" autoComplete="off"
-          onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })} />
+          onChange={(e) => edit({ apiKey: e.target.value })} />
       </label>
       <label className="memory-field">
         <span>模型名</span>
         <input value={draft.model} placeholder="如 deepseek-chat" autoComplete="off"
-          onChange={(e) => setDraft({ ...draft, model: e.target.value })} />
+          onChange={(e) => edit({ model: e.target.value })} />
       </label>
       <div className="memory-row" style={{ marginTop: 10 }}>
         <button type="button" className="memory-primary" style={{ width: 'auto' }} disabled={busy} onClick={onSave}>保存</button>

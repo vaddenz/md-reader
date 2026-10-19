@@ -96,6 +96,18 @@ export function toScoreResult(raw: unknown): ScoreResult | null {
   return { score, verdict: verdictFromScore(score), hit: list(r.hit), missed: list(r.missed), comment };
 }
 
+/** 请求失败的统一分类：外部取消原样抛出；内部超时 → timeout；其余按调用点归类（网络 / 解析）。 */
+function classifyRequestFailure(
+  err: unknown,
+  opts: LlmRequestOpts,
+  controller: AbortController,
+  fallback: LlmError,
+): never {
+  if (opts.signal?.aborted) throw err;
+  if (controller.signal.aborted) throw new LlmError('timeout', '请求超时');
+  throw fallback;
+}
+
 async function requestChat(
   cfg: LlmConfig,
   messages: ChatMessage[],
@@ -122,9 +134,7 @@ async function requestChat(
         signal: controller.signal,
       });
     } catch (err) {
-      if (opts.signal?.aborted) throw err;               // 外部取消：原样抛出，页面忽略
-      if (controller.signal.aborted) throw new LlmError('timeout', '请求超时');
-      throw new LlmError('network', '网络不可用（也可能是服务端未允许跨域）');
+      classifyRequestFailure(err, opts, controller, new LlmError('network', '网络不可用（也可能是服务端未允许跨域）'));
     }
     if (res.status === 401 || res.status === 403) throw new LlmError('auth', 'Key 无效或无权限', res.status);
     if (res.status === 404) throw new LlmError('notfound', 'URL 或模型名不存在', 404);
@@ -139,9 +149,7 @@ async function requestChat(
     try {
       data = await res.json();
     } catch (err) {
-      if (opts.signal?.aborted) throw err;               // 外部取消：原样抛出，页面忽略
-      if (controller.signal.aborted) throw new LlmError('timeout', '请求超时');
-      throw new LlmError('parse', '响应不是合法 JSON');
+      classifyRequestFailure(err, opts, controller, new LlmError('parse', '响应不是合法 JSON'));
     }
     const content = (data as { choices?: { message?: { content?: unknown } }[] } | null)?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || !content.trim()) throw new LlmError('parse', '响应缺少内容');

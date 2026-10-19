@@ -134,6 +134,16 @@ describe('parseBankText 追问关系', () => {
     expect(questions[1].followUpOf).toBe('Q1.1');
   });
 
+  it('followUpOf 首尾空白被 trim（不误报悬空）', () => {
+    const text = [
+      line(QA),
+      line({ id: 'Q1.2', type: '追问', question: '继续？', answer: '- 继续答…', followUpOf: '  Q1.1 ' }),
+    ].join('\n');
+    const { questions, warnings } = parseBankText(text);
+    expect(warnings).toEqual([]);
+    expect(questions[1].followUpOf).toBe('Q1.1');
+  });
+
   it('悬空 / 自引用 / 成环 → bad-followup，但题目保留', () => {
     const text = [
       line({ id: 'A', type: '追问', question: '悬空？', answer: '- 答', followUpOf: '不存在' }),

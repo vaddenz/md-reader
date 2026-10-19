@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HOME } from '../app/nav';
 import {
-  clearTrainingData, exportMemory, getSelection, importMemory, listAttempts, loadSrsMap, summarize,
+  attemptKey, clearTrainingData, exportMemory, getSelection, importMemory, listAttempts, loadSrsMap, summarize,
   type MemoryAttempt,
 } from '../data/memory';
 import { listBanks, type BankMeta } from '../data/qbankIndex';
@@ -16,9 +16,10 @@ function fmtDay(ts: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-/** 展开键：qid + 时间 + 形态，与导入去重口径一致，稳定且唯一（不随排序/筛选变化）。 */
-function recordKey(a: MemoryAttempt): string {
-  return `${a.qid}|${a.ts}|${a.mode}`;
+/** 导出文件名用的本地日期戳（YYYYMMDD，避免 UTC 与本地日期差一天）。 */
+function localStamp(): string {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /** 已选题库中已缓存题库的题量和；无已选题库或全部未缓存时返回 null（界面显示「—」）。 */
@@ -46,6 +47,9 @@ export default function MemoryRecordsPage() {
     setSrs([...srsMap.values()]);
     setTotalQuestions(totalCachedQuestions(selection.banks, banks));
     setOpenKey(null);
+    // 筛选项指向的题库可能已随导入/清除消失：回退到「全部」，避免空列表误报。
+    const available = new Set(att.map((a) => a.bankPath));
+    setBankFilter((f) => (f && !available.has(f) ? '' : f));
   }, []);
 
   useEffect(() => {
@@ -67,7 +71,7 @@ export default function MemoryRecordsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `md-reader-memory-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`;
+      a.download = `md-reader-memory-${localStamp()}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -149,16 +153,16 @@ export default function MemoryRecordsPage() {
         ) : (
           <ul className="memory-records">
             {shown.map((a) => (
-              <li key={recordKey(a)}>
+              <li key={attemptKey(a)}>
                 <button
                   type="button"
                   className="memory-record"
-                  onClick={() => setOpenKey(openKey === recordKey(a) ? null : recordKey(a))}
+                  onClick={() => setOpenKey(openKey === attemptKey(a) ? null : attemptKey(a))}
                 >
                   <span className="memory-record-label">{a.idLabel} · {a.mode === 'ai' ? `${a.score} 分` : VERDICT_LABELS[a.verdict]}</span>
                   <span className="memory-bank-meta">{new Date(a.ts).toLocaleString('zh-CN', { hour12: false })}</span>
                 </button>
-                {openKey === recordKey(a) && (
+                {openKey === attemptKey(a) && (
                   <div className="memory-record-body">
                     {a.answer && <p className="memory-note">作答：{a.answer}</p>}
                     {a.picked && <p className="memory-note">选择：{a.picked.join('、')}{a.correct ? `（正确：${a.correct.join('、')}）` : ''}</p>}

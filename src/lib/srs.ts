@@ -170,7 +170,15 @@ function chainSort(queue: QueueCandidate[]): QueueCandidate[] {
 }
 
 export function buildQueue(input: BuildQueueInput): QueueEntry[] {
-  const pool = input.candidates.filter((c) => matches(c, input.filters));
+  // 先按 qid 去重（保留首次出现）再分池：重复题不得占用新题额度或到期槽位。
+  const pool: QueueCandidate[] = [];
+  const poolSeen = new Set<string>();
+  for (const c of input.candidates) {
+    if (!matches(c, input.filters)) continue;
+    if (poolSeen.has(c.qid)) continue;
+    poolSeen.add(c.qid);
+    pool.push(c);
+  }
   const due: QueueCandidate[] = [];
   const fresh: QueueCandidate[] = [];
   for (const c of pool) {
@@ -186,12 +194,7 @@ export function buildQueue(input: BuildQueueInput): QueueEntry[] {
   fresh.sort((a, b) => a.bankIndex - b.bankIndex || a.line - b.line);
 
   const quota = Math.max(0, input.newPerDay - Math.max(0, input.newIntroducedToday));
-  const seen = new Set<string>();
-  const merged = [...due, ...fresh.slice(0, quota)].filter((c) => {
-    if (seen.has(c.qid)) return false;
-    seen.add(c.qid);
-    return true;
-  });
+  const merged = [...due, ...fresh.slice(0, quota)];
   const capped = input.sessionSize > 0 ? merged.slice(0, input.sessionSize) : merged;
   return chainSort(capped).map((c) => ({ qid: c.qid, bankPath: c.bankPath, id: c.id }));
 }

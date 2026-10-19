@@ -98,14 +98,15 @@ export default function MemoryTrainPage() {
     void clearSession();
   }, [currentIndex, phase, session]);
 
-  // 结束视图的档位分布：读取本次会话开始之后的记录（含自评与选择题）。
+  // 结束视图的档位分布：只统计本次会话队列内题目、且发生在会话开始之后的记录。
   useEffect(() => {
     if (phase !== 'finished' || !session) return;
     let cancelled = false;
+    const qids = new Set(session.items.map((i) => i.qid));
     void listAttempts().then((all) => {
       if (cancelled) return;
       const counts: Record<Verdict, number> = { ...EMPTY_VERDICT_COUNTS };
-      for (const a of all) if (a.ts >= session.startedAt) counts[a.verdict] += 1;
+      for (const a of all) if (a.ts >= session.startedAt && qids.has(a.qid)) counts[a.verdict] += 1;
       setSessionVerdicts(counts);
     });
     return () => { cancelled = true; };
@@ -401,20 +402,7 @@ export default function MemoryTrainPage() {
                 {result.mode === 'choice' && `${VERDICT_LABELS[result.verdict]} · 已记录（本地判分）`}
               </p>
               {result.mode === 'choice' && q.options && (
-                <div className="memory-options">
-                  {q.options.map((o) => {
-                    const isCorrect = (q.correct ?? []).includes(o.key);
-                    const pickedIt = (result.picked ?? []).includes(o.key);
-                    const eliminatedIt = result.eliminated === o.key;
-                    const cls = `memory-option${isCorrect ? ' memory-option-correct' : pickedIt ? ' memory-option-wrong' : eliminatedIt ? ' memory-option-eliminated' : ''}`;
-                    return (
-                      <div key={o.key} className={cls}>
-                        <span className="memory-option-key">{o.key}</span>
-                        <span className="memory-option-text">{o.text}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <OptionList q={q} picked={result.picked ?? []} eliminated={result.eliminated} />
               )}
               {result.hit.length > 0 && <p className="memory-note">命中要点：{result.hit.join('、')}</p>}
               {result.missed.length > 0 && <p className="memory-note">遗漏要点：{result.missed.join('、')}</p>}
@@ -452,7 +440,7 @@ export default function MemoryTrainPage() {
     <main className="memory">
       <header className="memory-header">
         <button type="button" className="memory-back" onClick={() => navigate(toRouterPath(MEMORY))}>← 暂时离开</button>
-        <span className="memory-meta memory-bank-meta">第 {(session?.answered ?? 0) + 1} / {session?.items.length ?? 0} 题</span>
+        <span className="memory-meta memory-bank-meta">第 {(currentIndex ?? 0) + 1} / {session?.items.length ?? 0} 题</span>
       </header>
       <section className="memory-card" aria-labelledby="memory-question-title">
         <h2 id="memory-question-title" className="memory-card-title">
@@ -475,29 +463,15 @@ export default function MemoryTrainPage() {
             onChange={(e) => setAnswerText(e.target.value)}
           />
         ) : (
-          <div className="memory-options" role="group" aria-label="选项">
-            {q.options?.map((o) => {
-              const on = picked.includes(o.key);
-              const off = eliminated === o.key;
-              return (
-                <button
-                  key={o.key}
-                  type="button"
-                  role={q.kind === 'single' ? 'radio' : 'checkbox'}
-                  aria-checked={on}
-                  disabled={off}
-                  className={`memory-option${on ? ' memory-option-on' : ''}${off ? ' memory-option-eliminated' : ''}`}
-                  onClick={() => {
-                    if (q.kind === 'single') setPicked([o.key]);
-                    else setPicked((prev) => (prev.includes(o.key) ? prev.filter((k) => k !== o.key) : [...prev, o.key]));
-                  }}
-                >
-                  <span className="memory-option-key">{o.key}</span>
-                  <span className="memory-option-text">{o.text}</span>
-                </button>
-              );
-            })}
-          </div>
+          <OptionList
+            q={q}
+            picked={picked}
+            eliminated={eliminated}
+            onPick={(key) => {
+              if (q.kind === 'single') setPicked([key]);
+              else setPicked((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+            }}
+          />
         )}
         <div className="memory-row">
           <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => void onSubmit()} disabled={(q.kind === 'qa' ? !answerText.trim() : picked.length === 0 || saving) || phase === 'scoring'}>
@@ -510,6 +484,51 @@ export default function MemoryTrainPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+/** 选项列表：答题态（可点）与结果回放态（着色）共用同一套着色优先级：正确 > 误选 > 已排除。 */
+function OptionList(props: {
+  q: BankQuestion;
+  picked: string[];
+  eliminated?: string | null;
+  onPick?: (key: string) => void;
+}) {
+  const { q, picked, eliminated, onPick } = props;
+  return (
+    <div className="memory-options" role={onPick ? 'group' : undefined} aria-label={onPick ? '选项' : undefined}>
+      {q.options?.map((o) => {
+        const isCorrect = (q.correct ?? []).includes(o.key);
+        const pickedIt = picked.includes(o.key);
+        const eliminatedIt = eliminated === o.key;
+        const cls = `memory-option${
+          onPick
+            ? `${pickedIt ? ' memory-option-on' : ''}${eliminatedIt ? ' memory-option-eliminated' : ''}`
+            : `${isCorrect ? ' memory-option-correct' : pickedIt ? ' memory-option-wrong' : eliminatedIt ? ' memory-option-eliminated' : ''}`
+        }`;
+        const inner = (
+          <>
+            <span className="memory-option-key">{o.key}</span>
+            <span className="memory-option-text">{o.text}</span>
+          </>
+        );
+        return onPick ? (
+          <button
+            key={o.key}
+            type="button"
+            role={q.kind === 'single' ? 'radio' : 'checkbox'}
+            aria-checked={pickedIt}
+            disabled={eliminatedIt}
+            className={cls}
+            onClick={() => onPick(o.key)}
+          >
+            {inner}
+          </button>
+        ) : (
+          <div key={o.key} className={cls}>{inner}</div>
+        );
+      })}
+    </div>
   );
 }
 
