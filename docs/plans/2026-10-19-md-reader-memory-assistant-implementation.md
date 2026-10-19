@@ -135,7 +135,7 @@ describe('parseBankText 基本解析', () => {
   it('id 重复告警但保留；题干重复跳过后者', () => {
     const text = [line(QA), line({ ...QA, id: 'Q9', question: '另一题？' }), line({ ...QA, id: 'Q1.1', question: QA.question })].join('\n');
     const { questions, warnings } = parseBankText(text);
-    expect(warnings.map((w) => w.kind)).toEqual(['duplicate-id', 'duplicate-id', 'duplicate-qid']);
+    expect(warnings.map((w) => w.kind)).toEqual(['duplicate-id', 'duplicate-qid']);
     expect(questions).toHaveLength(2);
   });
 });
@@ -631,7 +631,7 @@ describe('buildQueue', () => {
       cand('D', { line: 2, followUpOf: 'Z' }), // Z 不在候选
       cand('B2', { line: 6, followUpOf: 'B' }), // 二级链
     ];
-    expect(queue(candidates, new Map()).map((e) => e.qid)).toEqual(['A', 'B', 'B2', 'C', 'D']);
+    expect(queue(candidates, new Map()).map((e) => e.qid)).toEqual(['A', 'B', 'B2', 'D', 'C']);
   });
 
   it('成环不悬挂：两题都在队列时都能出，且不无限循环', () => {
@@ -1249,7 +1249,7 @@ export function sanitizeSelection(raw: unknown): MemorySelection {
   return {
     banks: strArray(r.banks),
     filters: {
-      kinds: strArray(f.kinds),
+      kinds: strArray(f.kinds).filter((k) => ['qa', 'single', 'multiple'].includes(k)),
       chapters: strArray(f.chapters),
       types: strArray(f.types),
       tags: strArray(f.tags),
@@ -2307,8 +2307,8 @@ import LlmConfigForm from '../components/memory/LlmConfigForm';
 import { GitHubClient } from '../data/github';
 import { isLlmConfigured } from '../data/llm';
 import {
-  DEFAULT_SELECTION, SESSION_SIZE_CHOICES, getLlmConfig, getSelection, loadSrsMap, listAttempts,
-  saveSelection, saveSession, summarize,
+  SESSION_SIZE_CHOICES, getLlmConfig, getSelection, loadSrsMap, listAttempts,
+  saveLlmConfig, saveSelection, saveSession, summarize,
   type LlmConfig, type MemoryAttempt, type MemorySelection,
 } from '../data/memory';
 import { ensureBankLoaded, getParsedBank, listBanks, type BankMeta, type ParsedBank } from '../data/qbankIndex';
@@ -2619,7 +2619,7 @@ export default function MemoryPage() {
 
       <LlmConfigForm
         cfg={llm}
-        onChange={(next) => { setLlm(next); }}
+        onChange={(next) => { setLlm(next); void saveLlmConfig(next); }}
       />
 
       {progress.length > 0 && (
@@ -2798,7 +2798,7 @@ export function extractHintKeywords(answer: string): string[] {
 ```ts
 const QA_ONLY_SELECTION = {
   banks: ['题库/示例题库.jsonl'],
-  filters: { kinds: ['qa'], chapters: [], types: [], tags: [], difficulty: [] },
+  filters: { kinds: ['qa'], chapters: [], types: ['概念'], tags: [], difficulty: [] },
   sessionSize: 20, newPerDay: 10,
 };
 
