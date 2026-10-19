@@ -113,6 +113,27 @@
 .doc-bottombar-item:hover { color: var(--acc-text); }
 .doc-bottombar-aa { font-size: 17px; font-weight: 700; color: var(--ink); }
 
+/* ========== 续读胶囊（spec §1.3-1：替代自动落位的「上次读到 N%」） ========== */
+.progress-chip {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  cursor: pointer;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
+  box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32);
+}
+.progress-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--acc); }
+
 /* ========== 返回来源条（T16） ========== */
 .back-to-source {
   display: flex;
