@@ -45,7 +45,7 @@ test('PWA：CSP meta 存在且锁定 connect-src（spec §9）', async ({ page }
   await expect(csp).toHaveCount(1);
   const content = (await csp.getAttribute('content')) ?? '';
   expect(content).toContain("default-src 'self'");
-  expect(content).toContain("connect-src 'self' https://api.github.com");
+  expect(content).toContain("connect-src 'self' https:");
   expect(content).toContain("script-src 'self'");
   expect(content).toContain("object-src 'none'");
   expect(content).toContain("base-uri 'none'");

@@ -95,17 +95,30 @@ const LONG_MD = [
   ...Array.from({ length: 20 }, (_, i) => `## 第 ${i + 1} 节\n\n第 ${i + 1} 节的正文内容，包含 MVCC 版本控制。\n`),
 ].join('\n');
 
+/** 记忆助手 e2e 题库：5 道合法题（问答 ×2、单选、多选、追问）+ 1 行坏行。 */
+export const BANK_PATH = '题库/示例题库.jsonl';
+export const BANK_TEXT = [
+  JSON.stringify({ id: 'Q1.1', type: '概念', chapter: '1. 基础', question: '什么是事件循环？', hint: '想 libuv', answer: '- 事件循环负责调度异步回调。\n- 由 libuv 提供。', tags: ['事件循环'] }),
+  JSON.stringify({ id: 'Q1.2', type: '概念', chapter: '1. 基础', question: '什么是微任务？', answer: '- Promise 回调进入微任务队列。' }),
+  JSON.stringify({ id: 'Q2.1', kind: 'single', type: '辨析', chapter: '2. 进阶', question: '负责事件循环的内置依赖库是？', options: [{ key: 'A', text: 'libuv' }, { key: 'B', text: 'V8' }], correct: ['A'], answer: 'libuv 提供事件循环与线程池。' }),
+  JSON.stringify({ id: 'Q2.2', kind: 'multiple', type: '辨析', chapter: '2. 进阶', question: '以下哪些是内置依赖库？', options: [{ key: 'A', text: 'V8' }, { key: 'B', text: 'libuv' }, { key: 'C', text: 'React' }], correct: ['A', 'B'] }),
+  JSON.stringify({ id: 'Q2.3', type: '追问', chapter: '2. 进阶', question: 'poll 阻塞时来了 I/O 会怎样？', answer: '- 会被唤醒处理。', followUpOf: 'Q1.1' }),
+  '坏行',
+].join('\n') + '\n';
+
 /** sha → 正文（sha 为固定假值，与目录树一一对应）。 */
 const DOCS: Record<string, string> = {
   'sha-a': A_MD,
   'sha-b': B_MD,
   'sha-long': LONG_MD,
+  'sha-bank': BANK_TEXT,
 };
 
 const TREE = [
   { path: 'a.md', mode: '100644', type: 'blob', sha: 'sha-a', size: A_MD.length },
   { path: '深挖/b.md', mode: '100644', type: 'blob', sha: 'sha-b', size: B_MD.length },
   { path: '长文档.md', mode: '100644', type: 'blob', sha: 'sha-long', size: LONG_MD.length },
+  { path: BANK_PATH, mode: '100644', type: 'blob', sha: 'sha-bank', size: BANK_TEXT.length },
 ];
 
 export async function installGitHubMock(page: Page, opts: GitHubMockOptions = {}): Promise<GitHubMock> {
@@ -348,5 +361,26 @@ export async function readKv(page: Page, key: string): Promise<unknown> {
         };
       }),
     key,
+  );
+}
+
+/** 读取任意 object store 的全部记录（无 key）或单条（有 key）；失败返回 null。 */
+export async function readStore(page: Page, store: string, key?: string): Promise<unknown> {
+  return page.evaluate(
+    (args) =>
+      new Promise<unknown>((resolve) => {
+        const req = indexedDB.open('mdreader');
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const tx = db.transaction(args.store, 'readonly');
+            const op = args.key === undefined ? tx.objectStore(args.store).getAll() : tx.objectStore(args.store).get(args.key);
+            op.onsuccess = () => { resolve(op.result ?? null); db.close(); };
+            op.onerror = () => { resolve(null); db.close(); };
+          } catch { resolve(null); db.close(); }
+        };
+        req.onerror = () => resolve(null);
+      }),
+    { store, key },
   );
 }

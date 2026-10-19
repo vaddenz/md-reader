@@ -1,6 +1,9 @@
 export const HOME = '#/';
 export const SETUP = '#/setup';
 export const SETTINGS = '#/settings';
+export const MEMORY = '#/memory';
+export const MEMORY_TRAIN = '#/memory/train';
+export const MEMORY_RECORDS = '#/memory/records';
 
 /** 应用内 href（'#/…'）→ react-router 路径（'/…'）；所有 navigate() 调用必须经此转换。 */
 export function toRouterPath(href: string): string {

@@ -99,10 +99,11 @@ test('设置页：清除全部数据需二次确认，确认后清空并回引�
   await page.getByRole('button', { name: '清除全部数据' }).click();
   await page.waitForURL(/#\/setup$/);
   expect(await page.evaluate(() => localStorage.getItem('mdreader.token'))).toBeNull();
+  // 不钉版本号：清空后应用会立刻以当前 schema 版本重建空库（v2），钉 1 会 VersionError。
   const fileCount = await page.evaluate(
     () =>
       new Promise<number>((resolve) => {
-        const req = indexedDB.open('mdreader', 1);
+        const req = indexedDB.open('mdreader');
         req.onupgradeneeded = () => {
           const db = req.result;
           for (const name of ['files', 'blobs', 'kv']) {

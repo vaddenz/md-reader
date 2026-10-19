@@ -1,0 +1,54 @@
+/* 记忆助手（v1.3）：沿用既有令牌与「软影白卡 + 组标签」形态。 */
+.memory {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(40px + env(safe-area-inset-bottom, 0px));
+}
+.memory-back { display: inline-flex; align-items: center; min-height: 32px; color: var(--acc-text); font-size: 14px; text-decoration: none; }
+.memory-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.memory-title { margin: 8px 0 4px; font-size: 24px; }
+.memory-link { color: var(--acc-text); font-size: 14px; }
+
+.memory-card {
+  margin: 18px 0 0; padding: 6px 16px 16px;
+  border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow-card);
+}
+.memory-card-title { margin: 10px 0 6px; font-size: 12.5px; font-weight: 500; color: var(--ink2); letter-spacing: 0.04em; }
+.memory-note { margin: 8px 0 0; color: var(--ink2); font-size: 13px; line-height: 1.6; }
+
+.memory-stats { display: flex; gap: 8px; margin: 6px 0 12px; }
+.memory-stat { flex: 1; text-align: center; padding: 10px 4px; border-radius: var(--r-ctl); background: var(--shell); }
+.memory-stat b { display: block; font-size: 20px; }
+.memory-stat span { color: var(--ink2); font-size: 12px; }
+
+.memory-primary {
+  width: 100%; min-height: 44px; border: 0; border-radius: var(--r-ctl);
+  background: var(--acc-fill); color: #fff; font: inherit; font-size: 15px; cursor: pointer;
+}
+.memory-primary:disabled { opacity: .6; cursor: default; }
+
+.memory-banks { list-style: none; margin: 4px 0 0; padding: 0; }
+.memory-bank { padding: 6px 0; border-top: 1px solid var(--line); }
+.memory-bank:first-child { border-top: 0; }
+.memory-bank label { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+.memory-bank input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--acc-fill); }
+.memory-bank-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.memory-bank-meta { color: var(--ink2); font-size: 12.5px; white-space: nowrap; }
+
+.memory-filters { margin-top: 10px; display: grid; gap: 8px; }
+.memory-row { display: flex; align-items: center; gap: 8px; }
+.memory-row-label { flex: none; width: 76px; color: var(--ink2); font-size: 13px; }
+.memory-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.memory-chip {
+  min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--card); color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.memory-chip-on { border-color: var(--acc); color: var(--acc-text); background: rgba(31, 63, 212, .08); }
+.memory-row input[type='number'] { width: 72px; min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; }
+.memory-field { display: grid; gap: 4px; margin: 8px 0 0; }
+.memory-field span { color: var(--ink2); font-size: 13px; }
+.memory-field input { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; }
+.memory-progress { list-style: none; margin: 4px 0 0; padding: 0; }
+.memory-progress li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.memory-progress li:first-child { border-top: 0; }
+.memory-footnote { margin: 16px 0 0; color: var(--ink2); font-size: 12.5px; line-height: 1.6; }

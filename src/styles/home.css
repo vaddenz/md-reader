@@ -38,6 +38,9 @@
   text-decoration: none;
 }
 
+/* 记忆助手入口：与设置齿轮并排（齿轮固定在右缘，入口向左让出一格）。 */
+.home-settings.home-memory { right: 44px; }
+
 /* 搜索入口：灰底胶囊行 */
 .home-search {
   display: flex;
