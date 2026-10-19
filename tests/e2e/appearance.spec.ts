@@ -59,6 +59,16 @@ test('设置页调整外观：预览联动、防抖持久化、阅读页生效',
   expect(fontSize).toBe('20px');
 });
 
+test('设置分组卡皮肤：区块为软影白卡、单选选中为浅蓝', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/settings');
+  const section = page.locator('section', { has: page.getByRole('heading', { name: '阅读外观' }) });
+  await expect(section).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(section).toHaveCSS('border-radius', '14px');
+  await section.getByRole('radio', { name: /等线/ }).check();
+  await expect(section.getByRole('radio', { name: /等线/ })).toHaveCSS('accent-color', 'rgb(31, 63, 212)');
+});
+
 test('字体样张页：三种字体并排样张', async ({ page }) => {
   await configureAndSync(page);
   await page.goto('./#/font-preview');
