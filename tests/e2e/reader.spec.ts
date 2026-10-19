@@ -229,6 +229,7 @@ test('悬浮目录按钮：点击开目录、拖拽后位置持久化', async ({
 
   const fab = page.getByRole('button', { name: '目录' });
   await expect(fab).toBeVisible();
+  await expect(fab).toHaveClass(/doc-toc-fab/); // 钉到悬浮按钮本体：底栏旧「目录」项存在时此处即失败
 
   // 拖到左侧偏上：down → move → up
   const box = (await fab.boundingBox())!;

@@ -27,7 +27,11 @@ interface Props { onOpen: () => void }
 
 /** 悬浮目录按钮（spec §2.3）：点击开目录；可拖拽，松手吸附最近边缘，位置按设备持久化。 */
 export default function FloatingTocButton({ onOpen }: Props) {
-  const [pos, setPos] = useState<Stored>(() => readStored());
+  // 挂载即钳制：旋转/视口变矮后重开也不会渲染到视口外（resize 事件只在页面存活期间生效）。
+  const [pos, setPos] = useState<Stored>(() => {
+    const s = readStored();
+    return { side: s.side, y: s.y === 0 ? 0 : clampY(s.y) };
+  });
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const drag = useRef<{ id: number; startX: number; startY: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
