@@ -125,7 +125,7 @@ export default function SettingsPage() {
 
   async function onClearAll() {
     if (clearing) return;
-    if (!window.confirm('确定清除全部数据吗？将删除本机全部缓存、收藏、阅读进度与 Token，且不可恢复。')) return;
+    if (!window.confirm('确定清除全部数据吗？将删除本机全部缓存、收藏、阅读进度、记忆训练数据与 Token，且不可恢复。')) return;
     setClearing(true);
     setClearError(null);
     try {

@@ -24,6 +24,7 @@
 - 手动横屏：阅读页头部「横屏 / 旋转」按钮 + 设置页三态单选（全手动，不跟随传感器）；锁定需要全屏上下文，浏览器标签下会自动进入全屏后重试（仍建议以主屏幕应用 / PWA 打开）；
 - mermaid 流程图、图片、删除线 / `==高亮==` 语法标记；
 - 灵活的目录跳转、全文搜索；
+- 记忆助手：从仓库 JSONL 题库（问答 / 单选 / 多选 / 追问）按艾宾浩斯间隔训练，AI 评分（可配 OpenAI 兼容接口）或离线自评，本地训练记录与统计（`#/memory`）；
 - 离线缓存。
 
 ## 文档
@@ -33,6 +34,8 @@
 - 实施计划：[`docs/plans/2026-10-18-md-reader-implementation.md`](docs/plans/2026-10-18-md-reader-implementation.md)
 - 实施计划（v1.1）：[`docs/plans/2026-10-18-md-reader-v1.1-implementation.md`](docs/plans/2026-10-18-md-reader-v1.1-implementation.md)
 - 真机验收清单（v1.1）：[`docs/acceptance-2026-10-18-v1.1.md`](docs/acceptance-2026-10-18-v1.1.md)
+- 记忆助手设计：[`docs/specs/2026-10-19-memory-assistant-design.md`](docs/specs/2026-10-19-memory-assistant-design.md)
+- 记忆助手实施计划：[`docs/plans/2026-10-19-md-reader-memory-assistant-implementation.md`](docs/plans/2026-10-19-md-reader-memory-assistant-implementation.md)
 
 ## 开发与自用
 
