@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HOME, SETTINGS, searchHref, toRouterPath } from '../app/nav';
+import { SETTINGS, goBackOrHome, searchHref, toRouterPath } from '../app/nav';
 
 interface DocHeaderProps {
   /** 当前文档标题（来自 files.title）；未加载完成时为空串。 */
@@ -98,8 +98,8 @@ export default function DocHeader({
       <button
         type="button"
         className="doc-back"
-        aria-label="返回首页"
-        onClick={() => navigate(toRouterPath(HOME))}
+        aria-label="返回"
+        onClick={() => goBackOrHome(navigate)}
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path
@@ -130,6 +130,10 @@ export default function DocHeader({
         {more && (
           <div className="doc-more" role="group" aria-label="更多操作">
             <button type="button" className="doc-more-item" onClick={() => act(() => { remember?.(); navigate(toRouterPath(searchHref(''))); })}>
+              <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
+                <path d="M16.5 16.5 21 21" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
               搜索
             </button>
             {onToggleFavorite && (
@@ -139,16 +143,30 @@ export default function DocHeader({
                 aria-pressed={favorite === true}
                 onClick={() => actStay(onToggleFavorite)}
               >
+                <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path
+                    fill={favorite ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                    d="M12 3.6l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9z"
+                  />
+                </svg>
                 {favorite ? '取消收藏' : '收藏'}
               </button>
             )}
             {onOpenAppearance && (
               <button type="button" className="doc-more-item" onClick={() => act(onOpenAppearance)}>
+                <span className="doc-more-aa" aria-hidden="true">Aa</span>
                 外观
               </button>
             )}
             {onOpenTree && (
               <button type="button" className="doc-more-item" onClick={() => act(onOpenTree)}>
+                <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" d="M7 3h7l4 4v14H7z" />
+                  <path fill="none" stroke="currentColor" strokeWidth="2" d="M14 3v4h4" />
+                </svg>
                 文件
               </button>
             )}
@@ -159,15 +177,27 @@ export default function DocHeader({
                 aria-pressed={orientation !== 'portrait'}
                 onClick={() => actStay(onToggleOrientation)}
               >
+                <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <rect x="3.5" y="7.5" width="17" height="9" rx="2.2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <circle cx="17.2" cy="12" r="1.1" fill="currentColor" />
+                </svg>
                 横屏
               </button>
             )}
             {orientation && orientation !== 'portrait' && onFlipOrientation && (
               <button type="button" className="doc-more-item" onClick={() => actStay(onFlipOrientation)}>
+                <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M20 12 A8 8 0 1 1 12 4" />
+                  <path fill="currentColor" d="M12 1.8 15.6 4 12 6.2Z" />
+                </svg>
                 旋转
               </button>
             )}
             <button type="button" className="doc-more-item" onClick={() => act(() => { remember?.(); navigate(toRouterPath(SETTINGS)); })}>
+              <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="2" />
+                <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2" />
+              </svg>
               设置
             </button>
           </div>

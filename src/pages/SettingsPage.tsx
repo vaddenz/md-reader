@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HOME, SETUP, toRouterPath } from '../app/nav';
+import { SETUP, goBackOrHome, toRouterPath } from '../app/nav';
 import AboutSection from '../components/AboutSection';
 import AppearanceSection from '../components/AppearanceSection';
 import HighlightsSection from '../components/HighlightsSection';
@@ -144,7 +144,7 @@ export default function SettingsPage() {
 
   return (
     <main className="settings">
-      <a className="settings-back" href={HOME}>← 返回首页</a>
+      <button type="button" className="settings-back" aria-label="返回" onClick={() => goBackOrHome(navigate)}>← 返回</button>
       <h1 className="settings-title">设置</h1>
 
       <section className="settings-section" aria-labelledby="settings-token-title">
