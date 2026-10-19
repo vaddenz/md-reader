@@ -261,14 +261,24 @@ test('选择题本地判分与追问链：链排序、母题展开、单选错�
   await page.getByRole('button', { name: '会', exact: true }).click();
   await page.getByRole('button', { name: '下一题' }).click();
 
-  // 第 4 题：单选（Q2.1）——选错 → 错选、选项着色、记录 picked/correct
+  // 第 4 题：单选（Q2.1）——提示 L2 排除一个错误项，选剩下的错误项 → 错选、选项着色
   await expect(page.locator('.memory-question')).toContainText('负责事件循环的内置依赖库是？');
-  await expect(page.locator('.memory-option')).toHaveCount(2);
-  await page.locator('.memory-option').filter({ hasText: 'V8' }).click();
-  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.locator('.memory-option')).toHaveCount(3);
+  await page.getByRole('button', { name: '提示' }).click();
+  await page.getByRole('button', { name: '提示' }).click();
+  await expect(page.getByRole('button', { name: '已给足提示' })).toBeVisible();
+  await expect(page.getByText('这是一道【辨析】题')).toBeVisible();
+  const eliminatedKey = (await page.locator('.memory-option-eliminated .memory-option-key').innerText()).trim();
+  const pickedKey = eliminatedKey === 'B' ? 'C' : 'B';
+  const pickedText = pickedKey === 'B' ? 'V8' : 'zlib';
+  const eliminatedText = eliminatedKey === 'B' ? 'V8' : 'zlib';
+  await page.locator('.memory-option').filter({ hasText: pickedText }).click();
+  // 双击提交：防重复写记录（点击期间按钮禁用）
+  await page.getByRole('button', { name: '提交' }).click({ clickCount: 2, delay: 0 });
   await expect(page.locator('.memory-score')).toContainText('错选');
   await expect(page.locator('.memory-option-correct')).toContainText('libuv');
-  await expect(page.locator('.memory-option-wrong')).toContainText('V8');
+  await expect(page.locator('.memory-option-wrong')).toContainText(pickedText);
+  await expect(page.locator('.memory-option-eliminated')).toContainText(eliminatedText);
   await page.getByRole('button', { name: '下一题' }).click();
 
   // 第 5 题：多选（Q2.2）——只选 A → 漏选
@@ -278,8 +288,9 @@ test('选择题本地判分与追问链：链排序、母题展开、单选错�
   await expect(page.locator('.memory-score')).toContainText('漏选');
 
   const attempts = await readStore(page, 'mem_attempts') as { mode: string; verdict: string; picked?: string[]; correct?: string[] }[];
-  const choice = attempts.find((a) => a.mode === 'choice');
-  expect(choice).toMatchObject({ verdict: 'again', picked: ['B'], correct: ['A'] });
+  const choiceAttempts = attempts.filter((a) => a.mode === 'choice');
+  expect(choiceAttempts).toHaveLength(2); // 双击提交未产生重复记录
+  expect(choiceAttempts[0]).toMatchObject({ verdict: 'again', picked: [pickedKey], correct: ['A'] });
   const last = attempts.find((a) => a.mode === 'choice' && a.picked?.includes('A') && (a.correct?.length ?? 0) === 2);
   expect(last).toMatchObject({ verdict: 'hard', correct: ['A', 'B'] });
 });

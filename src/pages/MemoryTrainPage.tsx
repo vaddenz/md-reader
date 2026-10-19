@@ -25,6 +25,7 @@ interface ResultState {
   comment: string;
   mode: 'ai' | 'self' | 'choice';
   picked?: string[];
+  eliminated?: string;
 }
 
 const EMPTY_VERDICT_COUNTS: Record<Verdict, number> = { excellent: 0, good: 0, hard: 0, again: 0 };
@@ -160,10 +161,22 @@ export default function MemoryTrainPage() {
     if (!session || currentIndex === null || !current) return;
     const q = current.question;
     if (q.kind === 'single' || q.kind === 'multiple') {
+      if (saving) return;
       const verdict = verdictFromChoice(q.kind, picked, q.correct ?? []);
-      await persist({ verdict, mode: 'choice', score: null, picked });
-      setResult({ score: null, verdict, hit: [], missed: [], comment: '', mode: 'choice', picked: [...picked] });
-      setPhase('result');
+      setError(null);
+      setSaving(true);
+      try {
+        await persist({ verdict, mode: 'choice', score: null, picked });
+        setResult({
+          score: null, verdict, hit: [], missed: [], comment: '', mode: 'choice', picked: [...picked],
+          ...(eliminated ? { eliminated } : {}),
+        });
+        setPhase('result');
+      } catch {
+        setError('保存失败，请重试');
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     const text = answerText.trim();
@@ -203,7 +216,7 @@ export default function MemoryTrainPage() {
 
     setAwaitingSelf(true);
     setPhase('result');
-  }, [answerText, current, currentIndex, llm, persist, picked, session]);
+  }, [answerText, current, currentIndex, eliminated, llm, persist, picked, saving, session]);
 
   const onSelfVerdict = useCallback(async (verdict: Verdict) => {
     setSaving(true);
@@ -224,17 +237,29 @@ export default function MemoryTrainPage() {
     const q = current?.question;
     if (q && q.kind !== 'qa') {
       // 选择题提交前查看参考答案：直接按「不会」记录并展示解析（spec §8.3）。
+      if (saving) return;
+      setError(null);
+      setSaving(true);
       void (async () => {
-        await persist({ verdict: 'again', mode: 'choice', score: null, picked, revealed: true });
-        setResult({ score: null, verdict: 'again', hit: [], missed: [], comment: '', mode: 'choice', picked: [...picked] });
-        setPhase('result');
+        try {
+          await persist({ verdict: 'again', mode: 'choice', score: null, picked, revealed: true });
+          setResult({
+            score: null, verdict: 'again', hit: [], missed: [], comment: '', mode: 'choice', picked: [...picked],
+            ...(eliminated ? { eliminated } : {}),
+          });
+          setPhase('result');
+        } catch {
+          setError('保存失败，请重试');
+        } finally {
+          setSaving(false);
+        }
       })();
       return;
     }
     setAwaitingSelf(true);
     setResult(null);
     setPhase('result');
-  }, [current, persist, picked]);
+  }, [current, eliminated, persist, picked, saving]);
 
   const onNext = useCallback(async () => {
     if (!session || currentIndex === null) { setPhase('finished'); return; }
@@ -290,8 +315,8 @@ export default function MemoryTrainPage() {
   const hintTextChoice = useMemo(() => {
     if (!current || hintLevel === 0 || current.question.kind === 'qa') return null;
     const q = current.question;
-    if (hintLevel === 1) return q.hint ?? `这是一道【${q.type}】题${q.chapter ? `，属于「${q.chapter}」` : ''}`;
-    return null;
+    // L2 排除后 L1 文案保留（无足够错误项时避免提示区空转）。
+    return q.hint ?? `这是一道【${q.type}】题${q.chapter ? `，属于「${q.chapter}」` : ''}`;
   }, [current, hintLevel]);
 
   const parentView = useMemo(() => {
@@ -375,7 +400,8 @@ export default function MemoryTrainPage() {
                   {q.options.map((o) => {
                     const isCorrect = (q.correct ?? []).includes(o.key);
                     const pickedIt = (result.picked ?? []).includes(o.key);
-                    const cls = `memory-option${isCorrect ? ' memory-option-correct' : pickedIt ? ' memory-option-wrong' : ''}`;
+                    const eliminatedIt = result.eliminated === o.key;
+                    const cls = `memory-option${isCorrect ? ' memory-option-correct' : pickedIt ? ' memory-option-wrong' : eliminatedIt ? ' memory-option-eliminated' : ''}`;
                     return (
                       <div key={o.key} className={cls}>
                         <span className="memory-option-key">{o.key}</span>
@@ -428,6 +454,7 @@ export default function MemoryTrainPage() {
           {current.bankName} · {q.chapter ?? '未分章'} · {q.id} · 【{q.type}】
         </h2>
         <MarkdownBlock className="memory-question" text={q.question} path={current.bankPath} knownPaths={knownPaths} />
+        {error && <p className="memory-note" role="alert">{error}</p>}
         {q.prompt && <MarkdownBlock className="memory-prompt" text={q.prompt} path={current.bankPath} knownPaths={knownPaths} />}
         {q.followUpOf && <FollowUpPanel followUpOf={q.followUpOf} parent={parentView} knownPaths={knownPaths} />}
         {hintText && <p className="memory-hint" role="status">提示：{hintText}</p>}
@@ -468,13 +495,13 @@ export default function MemoryTrainPage() {
           </div>
         )}
         <div className="memory-row">
-          <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => void onSubmit()} disabled={(q.kind === 'qa' ? !answerText.trim() : picked.length === 0) || phase === 'scoring'}>
+          <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => void onSubmit()} disabled={(q.kind === 'qa' ? !answerText.trim() : picked.length === 0 || saving) || phase === 'scoring'}>
             {phase === 'scoring' ? '评分中…' : '提交'}
           </button>
           <button type="button" className="memory-chip" onClick={onHint} disabled={hintLevel >= 2}>
-            提示
+            {hintLevel >= 2 ? '已给足提示' : '提示'}
           </button>
-          <button type="button" className="memory-chip" onClick={onReveal}>查看参考答案</button>
+          <button type="button" className="memory-chip" onClick={onReveal} disabled={q.kind !== 'qa' && saving}>查看参考答案</button>
         </div>
       </section>
     </main>

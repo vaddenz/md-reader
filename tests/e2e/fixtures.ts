@@ -100,7 +100,7 @@ export const BANK_PATH = '题库/示例题库.jsonl';
 export const BANK_TEXT = [
   JSON.stringify({ id: 'Q1.1', type: '概念', chapter: '1. 基础', question: '什么是事件循环？', hint: '想 libuv', answer: '- 事件循环负责调度异步回调。\n- 由 libuv 提供。', tags: ['事件循环'] }),
   JSON.stringify({ id: 'Q1.2', type: '概念', chapter: '1. 基础', question: '什么是微任务？', answer: '- Promise 回调进入微任务队列。' }),
-  JSON.stringify({ id: 'Q2.1', kind: 'single', type: '辨析', chapter: '2. 进阶', question: '负责事件循环的内置依赖库是？', options: [{ key: 'A', text: 'libuv' }, { key: 'B', text: 'V8' }], correct: ['A'], answer: 'libuv 提供事件循环与线程池。' }),
+  JSON.stringify({ id: 'Q2.1', kind: 'single', type: '辨析', chapter: '2. 进阶', question: '负责事件循环的内置依赖库是？', options: [{ key: 'A', text: 'libuv' }, { key: 'B', text: 'V8' }, { key: 'C', text: 'zlib' }], correct: ['A'], answer: 'libuv 提供事件循环与线程池。' }),
   JSON.stringify({ id: 'Q2.2', kind: 'multiple', type: '辨析', chapter: '2. 进阶', question: '以下哪些是内置依赖库？', options: [{ key: 'A', text: 'V8' }, { key: 'B', text: 'libuv' }, { key: 'C', text: 'React' }], correct: ['A', 'B'] }),
   JSON.stringify({ id: 'Q2.3', type: '追问', chapter: '2. 进阶', question: 'poll 阻塞时来了 I/O 会怎样？', answer: '- 会被唤醒处理。', followUpOf: 'Q1.1' }),
   '坏行',
