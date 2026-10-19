@@ -79,7 +79,12 @@
   border-radius: 8px;
   color: var(--ink);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
+.doc-more-icon { flex: none; }
+.doc-more-aa { flex: none; width: 18px; text-align: center; font-size: 14px; font-weight: 700; }
 .doc-more-item:hover,
 .doc-more-item:focus-visible { background: var(--shell); }
 .doc-more-item[aria-pressed='true'] { color: var(--acc-text); font-weight: 600; }
