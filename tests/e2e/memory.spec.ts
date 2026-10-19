@@ -153,3 +153,73 @@ test('自评降级与提示：hint 优先、刷新恢复、查看答案后自评
   expect(await readStore(page, 'mem_attempts')).toMatchObject([{ mode: 'self', verdict: 'good', revealed: true }]);
   expect(await readStore(page, 'mem_srs')).toMatchObject([{ stage: 1 }]);
 });
+
+test('评分中点查看参考答案：取消在途评分，直接进入自评视图且不落记录', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+  await writeKv(page, 'llmConfig', { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' });
+  // 延迟 1.5s 才返回：留出「评分中」窗口，用于在途评分被取消的场景。
+  await page.route('https://llm.example/**', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ score: 82, hit: [], missed: [], comment: '迟到结果' }) } }] }),
+      });
+    } catch {
+      // 请求已被页面取消，mock 的迟到响应无处投递，忽略。
+    }
+  });
+
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+
+  await page.getByLabel('作答').fill('事件循环负责调度异步回调，由 libuv 支持。');
+  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.getByRole('button', { name: '评分中…' })).toBeVisible();
+
+  // 评分进行中点「查看参考答案」：取消请求 → 进入自评视图（而非退回作答视图）
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await expect(page.locator('.memory-answer')).toBeVisible();
+  await expect(page.getByRole('button', { name: '会', exact: true })).toBeVisible();
+  await expect(page.locator('.memory-input')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '评分中…' })).toHaveCount(0);
+
+  // 被取消的评分不写入记录与进度
+  expect(await readStore(page, 'mem_attempts')).toEqual([]);
+  expect(await readStore(page, 'mem_srs')).toEqual([]);
+});
+
+test('结束训练清理会话：尾部题目已不在题库时，点「下一题」结束并删除 memSession', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+
+  // 用真实 qid 拼一个「首题可作答 + 尾题已从题库消失」的会话：答完首题后无下一题可作答。
+  const bank = await readStore(page, 'mem_banks', BANK_PATH) as { questions: { qid: string; id: string }[] };
+  const qid = bank.questions.find((q) => q.id === 'Q1.1')?.qid;
+  expect(qid).toBeTruthy();
+  await writeKv(page, 'memSession', {
+    createdAt: Date.now(), startedAt: Date.now(), index: 0, answered: 0, scores: [],
+    items: [
+      { qid, bankPath: BANK_PATH, id: 'Q1.1' },
+      { qid: 'q_missing_from_bank', bankPath: BANK_PATH, id: 'QX' },
+    ],
+  });
+
+  await page.goto('./#/memory/train');
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await page.getByRole('button', { name: '会', exact: true }).click();
+  await expect(page.getByText('已记录（自评）')).toBeVisible();
+
+  await page.getByRole('button', { name: '下一题' }).click();
+  await expect(page.getByRole('heading', { name: '本次训练完成' })).toBeVisible();
+  expect(await readKv(page, 'memSession')).toBeUndefined();
+});

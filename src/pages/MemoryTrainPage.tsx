@@ -42,6 +42,8 @@ export default function MemoryTrainPage() {
   const [error, setError] = useState<string | null>(null);
   const questionStartedAt = useRef(Date.now());
   const abortRef = useRef<AbortController | null>(null);
+  /** 「查看参考答案」发起的取消：区分于其它取消，取消后保留 onReveal 设置的 result + 自评视图。 */
+  const revealRequestedRef = useRef(false);
 
   // 载入会话 + 已缓存题库（离线可用；题目不在题库时的跳过在视图层处理）
   useEffect(() => {
@@ -88,6 +90,7 @@ export default function MemoryTrainPage() {
     setRevealed(false);
     setHintLevel(0);
     setError(null);
+    revealRequestedRef.current = false;
     questionStartedAt.current = Date.now();
   }, []);
 
@@ -145,7 +148,12 @@ export default function MemoryTrainPage() {
         await persist({ verdict: res.verdict, mode: 'ai', score: res.score, hit: res.hit, missed: res.missed, comment: res.comment });
         setResult({ ...res, mode: 'ai' });
       } catch (err) {
-        if ((err as Error)?.name === 'AbortError') { setPhase('answering'); return; }
+        if ((err as Error)?.name === 'AbortError') {
+          // 查看参考答案触发的取消：不改回作答视图，让 onReveal 设置的 result + 自评视图生效；
+          // 其它取消（无 reveal 意图）维持原行为：回到作答视图。
+          if (!revealRequestedRef.current) setPhase('answering');
+          return;
+        }
         setError(err instanceof LlmError ? `评分失败：${err.message}` : '评分失败，可重试或改为自评');
         setAwaitingSelf(true);
       } finally {
@@ -166,6 +174,7 @@ export default function MemoryTrainPage() {
   }, [persist]);
 
   const onReveal = useCallback(() => {
+    revealRequestedRef.current = true; // 先标记「查看参考答案」意图，再取消在途评分
     abortRef.current?.abort();
     setRevealed(true);
     setAwaitingSelf(true);
@@ -173,7 +182,7 @@ export default function MemoryTrainPage() {
     setPhase('result');
   }, []);
 
-  const onNext = useCallback(() => {
+  const onNext = useCallback(async () => {
     if (!session || currentIndex === null) { setPhase('finished'); return; }
     let next: number | null = null;
     for (let i = currentIndex + 1; i < session.items.length; i++) {
@@ -182,6 +191,7 @@ export default function MemoryTrainPage() {
     if (next === null) {
       setSession((s) => (s ? { ...s, index: s.items.length } : s));
       setPhase('finished');
+      await clearSession();
       return;
     }
     const advanced = { ...session, index: next };
@@ -279,7 +289,7 @@ export default function MemoryTrainPage() {
 
           <div className="memory-row" style={{ marginTop: 12 }}>
             {result && (
-              <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={onNext}>下一题</button>
+              <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => void onNext()}>下一题</button>
             )}
           </div>
         </section>
