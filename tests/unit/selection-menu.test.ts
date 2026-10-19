@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { menuActionsFor, type MenuContext } from '../../src/lib/selection-menu';
+import { menuActionsFor, rangesEqual, type MenuContext } from '../../src/lib/selection-menu';
 
 /** 基础情境：无选区、未点高亮。 */
 const base: MenuContext = {
@@ -38,5 +39,49 @@ describe('menuActionsFor（spec §6.2 菜单项判定）', () => {
 
   it('无选区（普通）：仅全选', () => {
     expect(menuActionsFor(base)).toEqual([{ id: 'select-all', label: '全选' }]);
+  });
+});
+
+describe('rangesEqual（选区快照等价判定）', () => {
+  function rangeAt(text: string, start: number, end: number): Range {
+    const p = document.createElement('p');
+    p.textContent = text;
+    document.body.append(p);
+    const r = document.createRange();
+    r.setStart(p.firstChild!, start);
+    r.setEnd(p.firstChild!, end);
+    return r;
+  }
+
+  it('对象同一 → true；边界一致的副本 → true', () => {
+    const r = rangeAt('MVCC 并发控制', 0, 4);
+    expect(rangesEqual(r, r)).toBe(true);
+    expect(rangesEqual(r, r.cloneRange())).toBe(true);
+  });
+
+  it('边界不同 → false', () => {
+    const a = rangeAt('MVCC 并发控制', 0, 4);
+    const b = rangeAt('MVCC 并发控制', 1, 4);
+    expect(rangesEqual(a, b)).toBe(false);
+    expect(rangesEqual(a, rangeAt('MVCC 并发控制', 0, 3))).toBe(false);
+  });
+
+  it('null 组合：仅 null/null 相等', () => {
+    const r = rangeAt('MVCC 并发控制', 0, 4);
+    expect(rangesEqual(null, null)).toBe(true);
+    expect(rangesEqual(r, null)).toBe(false);
+    expect(rangesEqual(null, r)).toBe(false);
+  });
+
+  it('跨文档 Range：比较抛错按不等处理', () => {
+    const a = rangeAt('MVCC 并发控制', 0, 4);
+    const other = document.implementation.createHTMLDocument('x');
+    const p = other.createElement('p');
+    p.textContent = 'MVCC 并发控制';
+    other.body.append(p);
+    const b = other.createRange();
+    b.setStart(p.firstChild!, 0);
+    b.setEnd(p.firstChild!, 4);
+    expect(rangesEqual(a, b)).toBe(false);
   });
 });

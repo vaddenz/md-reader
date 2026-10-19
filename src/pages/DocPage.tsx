@@ -37,12 +37,14 @@ type PageState =
   | { kind: 'download-failed'; path: string }
   | { kind: 'ready'; path: string; title: string; text: string };
 
-/** 右键菜单状态：触点位置 + 判定上下文 + 选区锚点（无选区为 null）+ 点中的高亮 id。 */
+/** 右键菜单状态：触点位置 + 判定上下文 + 选区锚点（无选区为 null）+ 打开时的选区快照/矩形 + 点中的高亮 id。 */
 interface MenuState {
   x: number; y: number;
   ctx: MenuContext;
   sel: { anchor: { exact: string; prefix: string; suffix: string }; start: number; end: number } | null;
   markId: string | null; // 无选区时点中的高亮记录 id（「清除高亮」用）
+  range: Range | null; // 打开时的实时选区（菜单随 selectionchange 变化自动关闭）
+  rect: DOMRect | null; // 打开时的选区矩形（菜单避开选区定位；无选区为 null）
 }
 
 const COPY_LABEL = '复制';
@@ -403,6 +405,10 @@ export default function DocPage() {
       },
       sel: selInfo,
       markId: markEl?.getAttribute('data-hl-id') ?? null,
+      // 快照须克隆：选区被拖动/改写时浏览器会原地变更 live Range 的边界，
+      // 存 live 对象会让「变化后」与快照同体而无法察觉。
+      range: range ? range.cloneRange() : null,
+      rect: range ? range.getBoundingClientRect() : null,
     });
   }, []);
 
@@ -559,6 +565,8 @@ export default function DocPage() {
       {menu && (
         <SelectionMenu
           x={menu.x} y={menu.y}
+          rect={menu.rect}
+          selectionSnapshot={menu.range}
           actions={menuActionsFor(menu.ctx)}
           onAction={onMenuAction}
           onClose={() => setMenu(null)}

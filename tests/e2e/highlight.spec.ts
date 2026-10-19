@@ -126,6 +126,31 @@ test('右键菜单：选中文字出现菜单，复制与高亮黄可用', async
   }).toBe(1);
 });
 
+test('菜单随选区变化自动关闭，且不覆盖选区', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await selectAndContextMenu(page, 'MVCC 并发控制');
+  const menu = page.locator('.selection-menu');
+  await expect(menu).toBeVisible();
+  const overlaps = await page.evaluate(() => {
+    const sel = window.getSelection()!;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    const m = document.querySelector('.selection-menu')!.getBoundingClientRect();
+    return m.top < rect.bottom && m.bottom > rect.top && m.left < rect.right && m.right > rect.left;
+  });
+  expect(overlaps).toBe(false);
+  // 模拟拖动选择手柄（选区变化）→ 菜单自动关闭
+  await page.evaluate(() => {
+    const sel = window.getSelection()!;
+    const r = sel.getRangeAt(0);
+    r.setStart(r.startContainer, Math.max(0, r.startOffset - 1));
+    sel.removeAllRanges();
+    sel.addRange(r);
+  });
+  await expect(menu).toBeHidden();
+});
+
 test('换色（红）替换黄；清除高亮', async ({ page }) => {
   await configureAndSync(page);
   await page.goto('./#/doc/a.md');

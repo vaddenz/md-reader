@@ -8,6 +8,21 @@ export interface MenuContext {
 }
 export interface MenuAction { id: string; label: string }
 
+/**
+ * 两个 Range 是否等价：对象同一，或起止边界一致（compareBoundaryPoints）。
+ * null 仅与 null 相等；跨文档/已卸载/异常视为不等（try/catch → false）。
+ */
+export function rangesEqual(a: Range | null, b: Range | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return a.compareBoundaryPoints(Range.START_TO_START, b) === 0
+      && a.compareBoundaryPoints(Range.END_TO_END, b) === 0;
+  } catch {
+    return false;
+  }
+}
+
 /** 菜单项判定（spec §6.2 表格；纯函数，单测见 tests/unit/selection-menu.test.ts）。 */
 export function menuActionsFor(ctx: MenuContext): MenuAction[] {
   if (ctx.hasSelection) {
