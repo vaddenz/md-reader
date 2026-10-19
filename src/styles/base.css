@@ -38,7 +38,7 @@ body {
 /* 浏览器表面全部从令牌取色（craft floor） */
 ::selection { background: rgba(31, 63, 212, .22); }
 input, textarea, [contenteditable] { caret-color: var(--acc-text); }
-:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+body :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }

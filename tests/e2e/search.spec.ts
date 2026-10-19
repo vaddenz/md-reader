@@ -36,3 +36,12 @@ test('搜索页输入即时搜索：空查询提示 → 输入后防抖出结果
   await expect(page.locator('.search-result')).toHaveCount(2);
   await expect(page.locator('.search-result-title').first()).toHaveText('长文档');
 });
+
+test('搜索框聚焦有焦点环（craft floor：表面焦点指示）', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: '搜索文档' }).click();
+  const input = page.getByLabel('搜索关键词');
+  await input.focus();
+  await expect(input).toHaveCSS('outline-style', 'solid');
+  await expect(input).toHaveCSS('outline-color', 'rgb(31, 63, 212)');
+});
