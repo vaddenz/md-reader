@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { HOME, SETUP, toRouterPath } from '../app/nav';
 import { keyFromLocation, rememberScroll, takeScroll } from '../app/scroll';
 import BackToSource from '../components/BackToSource';
+import BottomBar from '../components/BottomBar';
 import DocHeader from '../components/DocHeader';
 import PrevNext from '../components/PrevNext';
 import RelatedDocs from '../components/RelatedDocs';
@@ -506,20 +507,28 @@ export default function DocPage() {
     navigate(toRouterPath(href));
   }, [locationKey, navigate]);
 
+  // 底部工具条导航（搜索/外观/设置）：离开阅读页前记住滚动，与互链/抽屉跳转同口径。
+  const remember = useCallback(() => rememberScroll(locationKey, window.scrollY), [locationKey]);
+
   const title = cur.kind === 'ready' ? cur.title : '';
 
   return (
     <>
       <DocHeader
         title={title}
-        onOpenToc={tocHeadings.length > 0 ? openToc : undefined}
         onOpenTree={metas.length > 0 ? openTree : undefined}
-        favorite={favorite === true}
-        onToggleFavorite={favorite === null ? undefined : toggleFav}
         orientation={orientation}
         onToggleOrientation={toggleLandscape}
         onFlipOrientation={flip}
       />
+      {ready && (
+        <BottomBar
+          onOpenToc={tocHeadings.length > 0 ? openToc : undefined}
+          favorite={favorite === true}
+          onToggleFavorite={favorite === null ? undefined : toggleFav}
+          remember={remember}
+        />
+      )}
       {from && <BackToSource />}
       {ready ? (
         <div

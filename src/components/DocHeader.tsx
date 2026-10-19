@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HOME, toRouterPath } from '../app/nav';
 
@@ -20,21 +21,45 @@ interface DocHeaderProps {
   onFlipOrientation?: () => void;
 }
 
-/** 阅读页吸顶栏：返回首页 + 文档标题 + 操作区（文件树 / 目录 / 收藏 / 方向）。 */
+/**
+ * 阅读页吸顶栏（spec §3.2）：返回 · 标题 · ⋯。
+ * onOpenToc / onToggleFavorite 已迁往底部工具条（BottomBar），但 props 签名保留（调用方可继续传入）。
+ */
 export default function DocHeader({
   title,
-  onOpenToc,
   onOpenTree,
-  favorite = false,
-  onToggleFavorite,
   orientation,
   onToggleOrientation,
   onFlipOrientation,
 }: DocHeaderProps) {
   const navigate = useNavigate();
+  const [more, setMore] = useState(false);
+  const moreRef = useRef<HTMLElement>(null);
+
+  // ⋯ 弹层：外部 pointerdown（捕获）或 Escape 关闭；点击菜单项由 act() 先关再执行。
+  useEffect(() => {
+    if (!more) return;
+    const onDown = (e: PointerEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMore(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMore(false);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [more]);
+
+  const act = (fn?: () => void) => {
+    setMore(false);
+    fn?.();
+  };
 
   return (
-    <header className="doc-header">
+    <header className="doc-header" ref={moreRef}>
       <button
         type="button"
         className="doc-back"
@@ -54,99 +79,42 @@ export default function DocHeader({
       </button>
       <span className="doc-title" title={title || undefined}>{title}</span>
       <div className="doc-header-actions">
-        {onOpenTree && (
-          <button
-            type="button"
-            className="doc-header-btn"
-            aria-label="文件"
-            title="文件"
-            onClick={onOpenTree}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.5 6.5a2 2 0 0 1 2-2h3.6l2 2.5h7.4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"
-              />
-            </svg>
-          </button>
-        )}
-        {onOpenToc && (
-          <button
-            type="button"
-            className="doc-header-btn"
-            aria-label="目录"
-            title="目录"
-            onClick={onOpenToc}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" d="M4 7h16M4 12h16M4 17h10" />
-            </svg>
-          </button>
-        )}
-        {onToggleFavorite && (
-          <button
-            type="button"
-            className="doc-header-btn doc-fav"
-            aria-label={favorite ? '取消收藏' : '收藏'}
-            aria-pressed={favorite}
-            title={favorite ? '取消收藏' : '收藏'}
-            onClick={onToggleFavorite}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path
-                fill={favorite ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-                d="M12 3.6l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9z"
-              />
-            </svg>
-          </button>
-        )}
-        {onToggleOrientation && (
-          <button
-            type="button"
-            className="doc-header-btn"
-            aria-label="横屏"
-            title="横屏/竖屏"
-            aria-pressed={orientation !== 'portrait'}
-            onClick={onToggleOrientation}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"
-              />
-            </svg>
-          </button>
-        )}
-        {orientation && orientation !== 'portrait' && onFlipOrientation && (
-          <button
-            type="button"
-            className="doc-header-btn"
-            aria-label="旋转"
-            title="翻转 180°"
-            onClick={onFlipOrientation}
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 12a8 8 0 1 1 2.3 5.6M4 12V7m0 5h5"
-              />
-            </svg>
-          </button>
+        <button
+          type="button"
+          className="doc-header-btn"
+          aria-label="更多"
+          aria-expanded={more}
+          onClick={() => setMore((v) => !v)}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="5" cy="12" r="1.9" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.9" fill="currentColor" />
+            <circle cx="19" cy="12" r="1.9" fill="currentColor" />
+          </svg>
+        </button>
+        {more && (
+          <div className="doc-more" role="group" aria-label="更多操作">
+            {onOpenTree && (
+              <button type="button" className="doc-more-item" onClick={() => act(onOpenTree)}>
+                文件
+              </button>
+            )}
+            {onToggleOrientation && (
+              <button
+                type="button"
+                className="doc-more-item"
+                aria-pressed={orientation !== 'portrait'}
+                onClick={() => act(onToggleOrientation)}
+              >
+                横屏
+              </button>
+            )}
+            {orientation && orientation !== 'portrait' && onFlipOrientation && (
+              <button type="button" className="doc-more-item" onClick={() => act(onFlipOrientation)}>
+                旋转
+              </button>
+            )}
+          </div>
         )}
       </div>
     </header>

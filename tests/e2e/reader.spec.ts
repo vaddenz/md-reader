@@ -73,6 +73,7 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await expect(page.getByRole('dialog', { name: '目录' })).toHaveCount(0);
 
   // 文件树抽屉：3 篇文档、当前文档高亮、含「更新目录」手动刷新入口（spec §3）
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '文件' }).click();
   const drawer = page.getByRole('dialog', { name: '全部文档' });
   await expect(drawer).toBeVisible();
@@ -90,6 +91,19 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: '全部文档' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '返回来源' })).toHaveCount(0);
+});
+
+test('底部工具条：搜索与外观直达', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '搜索' }).click();
+  await expect(page).toHaveURL(/#\/search/);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '外观' }).click();
+  await expect(page).toHaveURL(/#\/settings/);
+  await expect(page.getByRole('heading', { name: '阅读外观' })).toBeVisible();
 });
 
 test('相关文档面板：双向引用分组 chips，点击互跳；无引用不渲染', async ({ page }) => {

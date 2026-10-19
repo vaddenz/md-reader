@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { configureAndSync, installGitHubMock } from './fixtures';
 
+/** 顶栏重组后「横屏/旋转」收进 ⋯ 弹层：点击前先展开（结构契约：弹层内仍是普通 button）。 */
+async function openMore(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: '更多' }).click();
+}
+
 async function stubOrientation(page: import('@playwright/test').Page, behavior: 'ok' | 'reject' = 'ok') {
   await page.addInitScript((mode) => {
     const calls: string[] = [];
@@ -27,14 +32,17 @@ test('头部横屏开关与旋转：调用序列与持久化', async ({ page }) 
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
+  await openMore(page);
   await page.getByRole('button', { name: '横屏' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-primary');
 
+  await openMore(page);
   await page.getByRole('button', { name: '旋转' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-secondary');
 
   await page.reload();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-secondary'); // 启动恢复
+  await openMore(page); // 旋转按钮仍在，只是默认藏于 ⋯ 弹层
   await expect(page.getByRole('button', { name: '旋转' })).toBeVisible();
 });
 
@@ -43,6 +51,7 @@ test('不支持时：用户操作给出安装提示', async ({ page }) => {
   await configureAndSync(page);
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await openMore(page);
   await page.getByRole('button', { name: '横屏' }).click();
   await expect(page.getByText(/不支持方向锁定/)).toBeVisible();
 });
@@ -80,11 +89,13 @@ test('浏览器标签：锁被拒时自动进入全屏并重试；回竖屏退�
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
+  await openMore(page);
   await page.getByRole('button', { name: '横屏' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-primary');
   await expect.poll(() => page.evaluate(() => (window as any).__fsCalls)).toContain('request');
   await expect(page.getByText(/不支持方向锁定/)).toHaveCount(0);
 
+  await openMore(page); // 弹层在上一次点击后已关闭，回竖屏前重新展开
   await page.getByRole('button', { name: '横屏' }).click(); // 回竖屏
   await expect.poll(() => page.evaluate(() => (window as any).__fsCalls)).toContain('exit');
   await expect(page.getByText(/不支持方向锁定/)).toHaveCount(0);

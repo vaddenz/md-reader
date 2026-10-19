@@ -1,17 +1,17 @@
-/* ========== 阅读页顶栏（吸顶） ========== */
+/* ========== 阅读页顶栏（吸顶，返回 · 标题 · ⋯） ========== */
 .doc-header {
   position: sticky;
   top: 0;
   z-index: 20;
+  height: var(--header-h);
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: var(--header-h);
-  padding: 0 8px;
-  background: rgba(255, 255, 255, 0.92);
-  -webkit-backdrop-filter: saturate(180%) blur(8px);
-  backdrop-filter: saturate(180%) blur(8px);
-  border-bottom: 1px solid #d8dee4;
+  gap: 8px;
+  padding: 0 6px;
+  background: rgba(240, 239, 234, 0.96);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
 }
 
 .doc-back,
@@ -26,31 +26,92 @@
   border: 0;
   border-radius: 8px;
   background: none;
-  color: var(--c-text);
+  color: var(--ink);
   cursor: pointer;
 }
 .doc-back:active,
-.doc-header-btn:active { background: #f0f3f6; }
-
-/* 收藏星标（T19）：已收藏为实心金色 */
-.doc-header-btn.doc-fav[aria-pressed='true'] { color: #bf8700; }
+.doc-header-btn:active { background: var(--shell); }
 
 .doc-title {
   flex: 1 1 auto;
   min-width: 0;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .doc-header-actions {
+  position: relative;
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
+
+/* ⋯ 弹层（spec §3.2）：文件 / 横屏 / 旋转（内部仍是普通 button，保留可访问名契约） */
+.doc-more {
+  position: absolute;
+  right: 4px;
+  top: calc(100% + 6px);
+  min-width: 132px;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 6px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+}
+.doc-more-item {
+  appearance: none;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 15px;
+  padding: 11px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.doc-more-item:hover,
+.doc-more-item:focus-visible { background: var(--shell); }
+.doc-more-item[aria-pressed='true'] { color: var(--acc-text); font-weight: 600; }
+
+/* ========== 底部工具条（spec §3.2：目录/搜索/外观/收藏/设置，毛玻璃 + 安全区） ========== */
+.doc-bottombar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(250, 249, 246, 0.96);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+}
+.doc-bottombar-item {
+  appearance: none;
+  border: 0;
+  background: none;
+  min-width: 56px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--ink2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.doc-bottombar-item[aria-pressed='true'],
+.doc-bottombar-item:hover { color: var(--acc-text); }
+.doc-bottombar-aa { font-size: 17px; font-weight: 700; color: var(--ink); }
 
 /* ========== 返回来源条（T16） ========== */
 .back-to-source {
@@ -72,11 +133,13 @@
 }
 .back-to-source:active { background: #eaf2fd; }
 
-/* ========== 正文（中文移动端排版） ========== */
+/* ========== 正文（中文移动端排版；纸面 + 底部工具条留白） ========== */
 .doc-content {
   max-width: 46rem;
   margin: 0 auto;
-  padding: 0 16px calc(96px + env(safe-area-inset-bottom));
+  /* 底部留白与工具条匹配：56px + 安全区 + 余量 */
+  padding: 0 16px calc(108px + env(safe-area-inset-bottom, 0px));
+  background: var(--page);
   font-family: var(--r-font-family, var(--font-sans));
   font-size: var(--r-font-size, 17px);
   line-height: 1.8;
@@ -337,7 +400,8 @@
   gap: 12px;
   max-width: 46rem;
   margin: 0 auto;
-  padding: 0 16px calc(32px + env(safe-area-inset-bottom));
+  /* 避开固定底部工具条（56px + 安全区 + 余量） */
+  padding: 0 16px calc(108px + env(safe-area-inset-bottom, 0px));
 }
 .prev-next-item {
   flex: 1 1 0;

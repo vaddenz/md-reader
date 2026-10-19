@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
+import BottomBar from '../../src/components/BottomBar';
 import DocHeader from '../../src/components/DocHeader';
 import TocDrawer from '../../src/components/TocDrawer';
 import { useScrollSpy } from '../../src/hooks/useScrollSpy';
@@ -229,14 +230,14 @@ describe('TocDrawer', () => {
   });
 });
 
-describe('DocHeader 顶栏入口', () => {
+describe('阅读页顶栏与底部工具条入口', () => {
   const future = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
-  it('提供 onOpenToc 时渲染「目录」按钮并回调；否则不渲染', () => {
+  it('BottomBar：提供 onOpenToc 时渲染「目录」按钮并回调；否则不渲染', () => {
     const onOpenToc = vi.fn();
     const withBtn = mount(
       <MemoryRouter future={future}>
-        <DocHeader title="标题" onOpenToc={onOpenToc} />
+        <BottomBar onOpenToc={onOpenToc} remember={() => {}} />
       </MemoryRouter>,
     );
     const btn = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="目录"]');
@@ -246,29 +247,40 @@ describe('DocHeader 顶栏入口', () => {
 
     const without = mount(
       <MemoryRouter future={future}>
-        <DocHeader title="标题" />
+        <BottomBar remember={() => {}} />
       </MemoryRouter>,
     );
     expect(without.container.querySelector('button[aria-label="目录"]')).toBeNull();
   });
 
-  it('提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', () => {
+  it('DocHeader ⋯ 弹层：提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', () => {
     const onOpenTree = vi.fn();
     const withBtn = mount(
       <MemoryRouter future={future}>
         <DocHeader title="标题" onOpenTree={onOpenTree} />
       </MemoryRouter>,
     );
-    const btn = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="文件"]');
-    expect(btn).not.toBeNull();
+    // 默认收起：弹层不渲染
+    expect(withBtn.container.querySelector('.doc-more')).toBeNull();
+    const more = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
+    expect(more).not.toBeNull();
+    act(() => { more!.click(); });
+    // 弹层内是普通 button（保持 getByRole('button', {name:'文件'}) 契约）
+    const btn = Array.from(withBtn.container.querySelectorAll<HTMLButtonElement>('.doc-more button'))
+      .find((b) => b.textContent === '文件');
+    expect(btn).toBeDefined();
     act(() => { btn!.click(); });
     expect(onOpenTree).toHaveBeenCalledTimes(1);
+    // 点击菜单项后弹层关闭
+    expect(withBtn.container.querySelector('.doc-more')).toBeNull();
 
     const without = mount(
       <MemoryRouter future={future}>
         <DocHeader title="标题" />
       </MemoryRouter>,
     );
-    expect(without.container.querySelector('button[aria-label="文件"]')).toBeNull();
+    const moreOnly = without.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
+    act(() => { moreOnly!.click(); });
+    expect(without.container.textContent).not.toContain('文件');
   });
 });
