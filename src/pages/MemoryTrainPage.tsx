@@ -365,9 +365,9 @@ export default function MemoryTrainPage() {
               </div>
             ))}
           </div>
-          <div className="memory-row" style={{ marginTop: 12 }}>
-            <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => navigate(toRouterPath(MEMORY))}>返回概览</button>
-            <button type="button" className="memory-chip" onClick={() => navigate(toRouterPath(MEMORY))}>继续训练</button>
+          <div className="memory-actions">
+            <button type="button" className="memory-primary" onClick={() => navigate(toRouterPath(MEMORY))}>返回概览</button>
+            <button type="button" className="memory-secondary" onClick={() => navigate(toRouterPath(MEMORY))}>继续训练</button>
           </div>
         </section>
       </main>
@@ -419,10 +419,10 @@ export default function MemoryTrainPage() {
           ) : awaitingSelf ? (
             <div className="memory-self">
               <p className="memory-note">{error ? '可重试评分，或对照参考答案自评：' : '对照参考答案，给自己评一档：'}</p>
-              <div className="memory-row">
-                <button type="button" className="memory-chip" onClick={() => void onSelfVerdict('good')} disabled={saving}>会</button>
-                <button type="button" className="memory-chip" onClick={() => void onSelfVerdict('hard')} disabled={saving}>模糊</button>
-                <button type="button" className="memory-chip" onClick={() => void onSelfVerdict('again')} disabled={saving}>不会</button>
+              <div className="memory-actions-row memory-grade">
+                <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('good')} disabled={saving}>会</button>
+                <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('hard')} disabled={saving}>模糊</button>
+                <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('again')} disabled={saving}>不会</button>
               </div>
             </div>
           ) : null}
@@ -431,14 +431,12 @@ export default function MemoryTrainPage() {
             <MarkdownBlock className="memory-answer" text={q.answer} path={current.bankPath} knownPaths={knownPaths} />
           )}
 
-          <div className="memory-row" style={{ marginTop: 12 }}>
-            {result && (
-              <>
-                <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => void onNext()}>下一题</button>
-                <button type="button" className="memory-chip" onClick={() => void onEnd()}>结束训练</button>
-              </>
-            )}
-          </div>
+          {result && (
+            <div className="memory-actions">
+              <button type="button" className="memory-primary" onClick={() => void onNext()}>下一题</button>
+              <button type="button" className="memory-secondary" onClick={() => void onEnd()}>结束训练</button>
+            </div>
+          )}
         </section>
       </main>
     );
@@ -480,15 +478,19 @@ export default function MemoryTrainPage() {
             }}
           />
         )}
-        <div className="memory-row">
-          <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => void onSubmit()} disabled={(q.kind === 'qa' ? !answerText.trim() : picked.length === 0 || saving) || phase === 'scoring'}>
-            {phase === 'scoring' ? '评分中…' : '提交'}
-          </button>
-          <button type="button" className="memory-chip" onClick={onHint} disabled={hintLevel >= 2}>
-            {hintLevel >= 2 ? '已给足提示' : '提示'}
-          </button>
-          <button type="button" className="memory-chip" onClick={onReveal} disabled={q.kind !== 'qa' && saving}>查看参考答案</button>
-        </div>
+          <div className="memory-actions">
+            <button type="button" className="memory-primary" onClick={() => void onSubmit()} disabled={(q.kind === 'qa' ? !answerText.trim() : picked.length === 0 || saving) || phase === 'scoring'}>
+              {phase === 'scoring' ? '评分中…' : '提交'}
+            </button>
+            <div className="memory-actions-row">
+              <button type="button" className="memory-secondary" onClick={onHint} disabled={hintLevel >= 2}>
+                {hintLevel >= 2 ? '已给足提示' : '提示'}
+              </button>
+              <button type="button" className="memory-secondary" onClick={onReveal} disabled={q.kind !== 'qa' && saving}>
+                查看参考答案
+              </button>
+            </div>
+          </div>
       </section>
     </main>
   );

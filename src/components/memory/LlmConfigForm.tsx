@@ -62,11 +62,13 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
         <input value={draft.model} placeholder="如 deepseek-chat" autoComplete="off"
           onChange={(e) => edit({ model: e.target.value })} />
       </label>
-      <div className="memory-row" style={{ marginTop: 10 }}>
-        <button type="button" className="memory-primary" style={{ width: 'auto' }} disabled={busy} onClick={onSave}>保存</button>
-        <button type="button" className="memory-chip" disabled={busy} onClick={() => void onTest()}>
-          {busy ? '测试中…' : '测试连接'}
-        </button>
+      <div className="memory-actions" style={{ marginTop: 10 }}>
+        <div className="memory-actions-row">
+          <button type="button" className="memory-primary" disabled={busy} onClick={onSave}>保存</button>
+          <button type="button" className="memory-secondary" disabled={busy} onClick={() => void onTest()}>
+            {busy ? '测试中…' : '测试连接'}
+          </button>
+        </div>
       </div>
       <p className="memory-note">
         问答评分时会把题干、参考答案与你的作答发送到你填写的地址；Key 仅保存在本机。
