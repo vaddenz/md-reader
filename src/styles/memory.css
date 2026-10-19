@@ -63,3 +63,19 @@
 .memory-verdict { margin: 2px 0 0; color: var(--ink2); font-size: 13px; }
 .memory-answer { margin-top: 12px; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--shell); }
 .memory-self { margin-top: 10px; }
+
+.memory-options { display: grid; gap: 8px; margin-top: 10px; }
+.memory-option {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%;
+  padding: 10px; border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--card); color: var(--ink); font: inherit; font-size: 14px;
+  text-align: left; cursor: pointer;
+}
+.memory-option-on { border-color: var(--acc); background: rgba(31, 63, 212, .08); }
+.memory-option-eliminated { opacity: .45; text-decoration: line-through; cursor: default; }
+.memory-option-correct { border-color: #2f7d4f; background: rgba(47, 125, 79, .10); }
+.memory-option-wrong { border-color: var(--danger); background: rgba(192, 57, 43, .08); }
+.memory-option-key { flex: none; font-weight: 600; color: var(--ink2); }
+.memory-parent { margin-top: 10px; }
+.memory-parent-ref { margin-right: 8px; color: var(--ink2); font-size: 12.5px; }
+.memory-parent-body { margin-top: 8px; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--shell); }

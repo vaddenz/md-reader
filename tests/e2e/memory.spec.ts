@@ -223,3 +223,63 @@ test('结束训练清理会话：尾部题目已不在题库时，点「下一�
   await expect(page.getByRole('heading', { name: '本次训练完成' })).toBeVisible();
   expect(await readKv(page, 'memSession')).toBeUndefined();
 });
+
+const ALL_KINDS_SELECTION = {
+  banks: ['题库/示例题库.jsonl'],
+  filters: { kinds: [], chapters: [], types: [], tags: [], difficulty: [] },
+  sessionSize: 20, newPerDay: 10,
+};
+
+test('选择题本地判分与追问链：链排序、母题展开、单选错选、多选漏选', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', ALL_KINDS_SELECTION);
+
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+
+  // 第 1 题：问答题（Q1.1）
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await page.getByRole('button', { name: '会', exact: true }).click();
+  await page.getByRole('button', { name: '下一题' }).click();
+
+  // 第 2 题：追问链排序——母题 Q1.1 在队列中，追问紧随其后
+  await expect(page.locator('.memory-question')).toContainText('poll 阻塞时来了 I/O');
+  await expect(page.getByText('追问自 Q1.1')).toBeVisible();
+  await page.getByRole('button', { name: '查看母题 Q1.1' }).click();
+  await expect(page.getByText('母题上下文，不计入本次记录。')).toBeVisible();
+  await expect(page.locator('.memory-parent-body')).toContainText('什么是事件循环？');
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await page.getByRole('button', { name: '会', exact: true }).click();
+  await page.getByRole('button', { name: '下一题' }).click();
+
+  // 第 3 题：Q1.2（问答），快速跳过
+  await expect(page.locator('.memory-question')).toContainText('什么是微任务？');
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await page.getByRole('button', { name: '会', exact: true }).click();
+  await page.getByRole('button', { name: '下一题' }).click();
+
+  // 第 4 题：单选（Q2.1）——选错 → 错选、选项着色、记录 picked/correct
+  await expect(page.locator('.memory-question')).toContainText('负责事件循环的内置依赖库是？');
+  await expect(page.locator('.memory-option')).toHaveCount(2);
+  await page.locator('.memory-option').filter({ hasText: 'V8' }).click();
+  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.locator('.memory-score')).toContainText('错选');
+  await expect(page.locator('.memory-option-correct')).toContainText('libuv');
+  await expect(page.locator('.memory-option-wrong')).toContainText('V8');
+  await page.getByRole('button', { name: '下一题' }).click();
+
+  // 第 5 题：多选（Q2.2）——只选 A → 漏选
+  await expect(page.locator('.memory-question')).toContainText('以下哪些是内置依赖库？');
+  await page.locator('.memory-option').filter({ hasText: 'V8' }).click();
+  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.locator('.memory-score')).toContainText('漏选');
+
+  const attempts = await readStore(page, 'mem_attempts') as { mode: string; verdict: string; picked?: string[]; correct?: string[] }[];
+  const choice = attempts.find((a) => a.mode === 'choice');
+  expect(choice).toMatchObject({ verdict: 'again', picked: ['B'], correct: ['A'] });
+  const last = attempts.find((a) => a.mode === 'choice' && a.picked?.includes('A') && (a.correct?.length ?? 0) === 2);
+  expect(last).toMatchObject({ verdict: 'hard', correct: ['A', 'B'] });
+});
