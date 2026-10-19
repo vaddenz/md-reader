@@ -9,6 +9,7 @@ import { clearAllData, kvGet, kvSet, listFilesMeta, storageEstimate, type FileMe
 import { GitHubClient, GitHubError } from '../data/github';
 import { bytesToText } from '../lib/format';
 import { useOrientation } from '../state/OrientationContext';
+import { DATA_CLEARED_EVENT } from '../state/TabsContext';
 import { useSync, type RepoConfig } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/settings.css';
@@ -131,6 +132,7 @@ export default function SettingsPage() {
     try {
       await clearAllData();
       clear();
+      window.dispatchEvent(new Event(DATA_CLEARED_EVENT));
       navigate(toRouterPath(SETUP));
     } catch {
       setClearError('清除失败，请重试');

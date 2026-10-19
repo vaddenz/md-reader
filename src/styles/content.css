@@ -477,3 +477,71 @@
   touch-action: none;
 }
 .doc-toc-fab-dragging { opacity: .85; transform: scale(1.06); cursor: grabbing; }
+
+/* ========== 标签切换器（spec §3.3） ========== */
+.doc-title-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  /* 用 font-family 而非 font 简写：字号/字重沿用既有的 .doc-title（DESIGN.md 16/600），
+     font 简写会把它重置为继承值（400）。 */
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* 标题即切换器入口：触控目标补足 DESIGN.md 的 44px 底线（字号/字重仍由 .doc-title 控制）。 */
+  min-height: 44px;
+}
+.doc-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-title-caret { flex: none; color: var(--ink2); }
+.doc-tabs {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 8px;
+  right: 8px;
+  z-index: 60;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.doc-tab-row { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
+.doc-tab-current { background: rgba(31, 63, 212, 0.08); }
+.doc-tab-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 11px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.doc-tab-current .doc-tab-open { color: var(--acc-text); font-weight: 600; }
+.doc-tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-tab-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--ink2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.doc-tab-close:hover { background: var(--shell); color: var(--ink); }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SETTINGS, goBackOrHome, searchHref, toRouterPath } from '../app/nav';
+import { useTabs } from '../state/TabsContext';
 
 interface DocHeaderProps {
   /** 当前文档标题（来自 files.title）；未加载完成时为空串。 */
@@ -39,8 +40,11 @@ export default function DocHeader({
   remember,
 }: DocHeaderProps) {
   const navigate = useNavigate();
+  const { tabs, activateTab, close } = useTabs();
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLElement>(null);
+  const [tabsOpen, setTabsOpen] = useState(false);
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   // 沉浸（spec §2.1）：正文下滑隐藏顶栏、上滑/回到顶部显示；⋯ 弹层打开期间不隐藏。
   const [hidden, setHidden] = useState(false);
@@ -83,6 +87,26 @@ export default function DocHeader({
     };
   }, [more]);
 
+  // 切换器弹层：外部 pointerdown / Escape 关闭；标题按钮自身点击由 closest 排除。
+  useEffect(() => {
+    if (!tabsOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (tabsRef.current?.contains(target as Node)) return;
+      if (target?.closest?.('.doc-title-btn')) return;
+      setTabsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTabsOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [tabsOpen]);
+
   const act = (fn?: () => void) => {
     setMore(false);
     fn?.();
@@ -94,7 +118,10 @@ export default function DocHeader({
   };
 
   return (
-    <header className={hidden && !more ? 'doc-header doc-header--hidden' : 'doc-header'} ref={moreRef}>
+    <header
+      className={hidden && !more && !tabsOpen ? 'doc-header doc-header--hidden' : 'doc-header'}
+      ref={moreRef}
+    >
       <button
         type="button"
         className="doc-back"
@@ -112,14 +139,62 @@ export default function DocHeader({
           />
         </svg>
       </button>
-      <span className="doc-title" title={title || undefined}>{title}</span>
+      <button
+        type="button"
+        className="doc-title doc-title-btn"
+        aria-label="切换标签"
+        aria-expanded={tabsOpen}
+        onClick={() => {
+          setMore(false); // 与 ⋯ 互斥
+          setTabsOpen((v) => !v);
+        }}
+      >
+        <span className="doc-title-text" title={title || undefined}>{title}</span>
+        {tabs.list.length >= 2 && (
+          <svg className="doc-title-caret" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </button>
+      {tabsOpen && (
+        <div className="doc-tabs" role="group" aria-label="打开的标签" ref={tabsRef}>
+          {tabs.list.map((t) => (
+            <div key={t.id} className={t.id === tabs.activeId ? 'doc-tab-row doc-tab-current' : 'doc-tab-row'}>
+              <button
+                type="button"
+                className="doc-tab-open"
+                aria-current={t.id === tabs.activeId ? 'true' : undefined}
+                onClick={() => {
+                  setTabsOpen(false);
+                  activateTab(t.id);
+                }}
+              >
+                <span className="doc-tab-title">{t.title || t.docPath}</span>
+              </button>
+              <button
+                type="button"
+                className="doc-tab-close"
+                aria-label={`关闭标签：${t.title || t.docPath}`}
+                onClick={() => close(t.id)}
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="doc-header-actions">
         <button
           type="button"
           className="doc-header-btn"
           aria-label="更多"
           aria-expanded={more}
-          onClick={() => setMore((v) => !v)}
+          onClick={() => {
+            setTabsOpen(false); // 与切换器互斥
+            setMore((v) => !v);
+          }}
         >
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
             <circle cx="5" cy="12" r="1.9" fill="currentColor" />
