@@ -160,10 +160,6 @@
   scroll-margin-top: calc(var(--header-h) + 12px);
 }
 /* 持久高亮（v1.1）：颜色由注册表 token 映射到变量，真机微调色值不动数据 */
-:root {
-  --hl-yellow: #ffeb3b;
-  --hl-red: #ff8a80;
-}
 .doc-content mark.hl { border-radius: 2px; }
 .doc-content mark.hl-yellow { background: var(--hl-yellow); }
 .doc-content mark.hl-red { background: var(--hl-red); }

@@ -14,7 +14,7 @@ test('高亮渲染：预置记录在打开时锚定并显示', async ({ page }) 
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
   await expect(page.locator('mark.hl-yellow')).toHaveCount(1);
   await expect(page.locator('mark.hl-yellow')).toHaveText(QUOTE);
-  await expect(page.locator('mark.hl-yellow')).toHaveCSS('background-color', 'rgb(255, 235, 59)'); // --hl-yellow: #ffeb3b
+  await expect(page.locator('mark.hl-yellow')).toHaveCSS('background-color', 'rgb(255, 241, 168)'); // 原 rgb(255, 235, 59)
   // 刷新后仍在
   await page.reload();
   await expect(page.locator('mark.hl-yellow')).toHaveCount(1);
@@ -170,7 +170,7 @@ test('换色（红）替换黄；清除高亮', async ({ page }) => {
   await page.locator('.selection-menu').getByRole('menuitem', { name: '高亮·红' }).click();
   await expect(page.locator('mark.hl-yellow')).toHaveCount(0);
   await expect(page.locator('mark.hl-red')).toHaveCount(1);
-  await expect(page.locator('mark.hl-red')).toHaveCSS('background-color', 'rgb(255, 138, 128)'); // --hl-red: #ff8a80
+  await expect(page.locator('mark.hl-red')).toHaveCSS('background-color', 'rgb(255, 217, 212)'); // 原 rgb(255, 138, 128)
   await expect.poll(async () => {
     const kv = (await readKv(page, 'highlights')) as Record<string, { decorations: { color: string }[] }[]>;
     return (kv['a.md'] ?? []).map((r) => r.decorations[0].color); // 先清后加之间存在瞬时无记录的窗口
