@@ -128,6 +128,12 @@ test('阅读内外观面板：不跳转、调整实时生效、Esc 关闭', asyn
 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
+
+  // 点击遮罩关闭（重开一次）
+  await page.getByRole('button', { name: '外观' }).click();
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
+  await page.locator('.appearance-overlay').click({ position: { x: 8, y: 8 } });
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
 });
 
 test('相关文档面板：双向引用分组 chips，点击互跳；无引用不渲染', async ({ page }) => {
