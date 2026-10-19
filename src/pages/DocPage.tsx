@@ -4,7 +4,6 @@ import { HOME, SETUP, toRouterPath } from '../app/nav';
 import { keyFromLocation, rememberScroll, takeScroll } from '../app/scroll';
 import AppearanceSheet from '../components/AppearanceSheet';
 import BackToSource from '../components/BackToSource';
-import BottomBar from '../components/BottomBar';
 import DocHeader from '../components/DocHeader';
 import FloatingTocButton from '../components/FloatingTocButton';
 import PrevNext from '../components/PrevNext';
@@ -509,7 +508,7 @@ export default function DocPage() {
     navigate(toRouterPath(href));
   }, [locationKey, navigate]);
 
-  // 底部工具条导航（搜索/外观/设置）：离开阅读页前记住滚动，与互链/抽屉跳转同口径。
+  // ⋯ 菜单导航（搜索/设置）：离开阅读页前记住滚动，与互链/抽屉跳转同口径。
   const remember = useCallback(() => rememberScroll(locationKey, window.scrollY), [locationKey]);
 
   const title = cur.kind === 'ready' ? cur.title : '';
@@ -519,20 +518,16 @@ export default function DocPage() {
       <DocHeader
         title={title}
         onOpenTree={metas.length > 0 ? openTree : undefined}
+        favorite={favorite === true}
+        onToggleFavorite={favorite === null ? undefined : toggleFav}
+        onOpenAppearance={() => setAppearanceOpen(true)}
         orientation={orientation}
         onToggleOrientation={toggleLandscape}
         onFlipOrientation={flip}
+        remember={remember}
       />
       {ready && tocHeadings.length > 0 && !tocOpen && (
         <FloatingTocButton onOpen={openToc} />
-      )}
-      {ready && (
-        <BottomBar
-          onOpenAppearance={() => setAppearanceOpen(true)}
-          favorite={favorite === true}
-          onToggleFavorite={favorite === null ? undefined : toggleFav}
-          remember={remember}
-        />
       )}
       {from && <BackToSource />}
       {ready ? (

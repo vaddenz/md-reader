@@ -230,7 +230,7 @@ describe('TocDrawer', () => {
   });
 });
 
-describe('阅读页顶栏与底部工具条入口', () => {
+describe('阅读页顶栏与悬浮目录入口', () => {
   const future = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
   it('FloatingTocButton：渲染「目录」按钮并回调', () => {
@@ -271,5 +271,22 @@ describe('阅读页顶栏与底部工具条入口', () => {
     const moreOnly = without.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
     act(() => { moreOnly!.click(); });
     expect(without.container.textContent).not.toContain('文件');
+  });
+
+  it('DocHeader ⋯：横屏点击后保持打开、搜索点击后关闭', () => {
+    const view = mount(
+      <MemoryRouter future={future}>
+        <DocHeader title="标题" onToggleOrientation={() => {}} />
+      </MemoryRouter>,
+    );
+    const more = view.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
+    act(() => { more!.click(); });
+    const item = (text: string) =>
+      Array.from(view.container.querySelectorAll<HTMLButtonElement>('.doc-more button'))
+        .find((b) => b.textContent === text)!;
+    act(() => { item('横屏').click(); });
+    expect(view.container.querySelector('.doc-more')).not.toBeNull();
+    act(() => { item('搜索').click(); });
+    expect(view.container.querySelector('.doc-more')).toBeNull();
   });
 });

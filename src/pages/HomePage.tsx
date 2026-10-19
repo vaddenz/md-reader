@@ -7,7 +7,7 @@ import { getFavorites, getProgress, recentDocs, type RecentDoc } from '../data/p
 import { useSync } from '../state/SyncContext';
 import '../styles/home.css';
 
-/** 收藏星标（小号）：与阅读页顶栏星标同款。 */
+/** 收藏星标（小号）：首页「收藏」区块条目标记。 */
 function StarIcon() {
   return (
     <svg className="home-doc-star" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">

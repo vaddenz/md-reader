@@ -93,24 +93,22 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await expect(page.getByRole('button', { name: '返回来源' })).toHaveCount(0);
 });
 
-test('底部工具条：搜索/设置直达、外观开阅读内面板', async ({ page }) => {
+test('⋯ 菜单：搜索/设置导航（底栏已移除）', async ({ page }) => {
   await configureAndSync(page);
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect(page.locator('.doc-bottombar')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '搜索' }).click();
   await expect(page).toHaveURL(/#\/search/);
+
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
-  // 外观：阅读内面板，不离开阅读上下文（T4 修订；面板细节见「阅读内外观面板」用例）
-  await page.getByRole('button', { name: '外观' }).click();
-  await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
-  await expect(page).toHaveURL(/#\/doc\//);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
-  // 设置：仍直达设置页（外观区标题可见）
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '设置' }).click();
   await expect(page).toHaveURL(/#\/settings/);
-  await expect(page.getByRole('heading', { name: '阅读外观' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
 });
 
 test('阅读内外观面板：不跳转、调整实时生效、Esc 关闭', async ({ page }) => {
@@ -118,6 +116,7 @@ test('阅读内外观面板：不跳转、调整实时生效、Esc 关闭', asyn
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '外观' }).click();
   await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
   await expect(page).toHaveURL(/#\/doc\//); // 不跳设置页
@@ -130,6 +129,7 @@ test('阅读内外观面板：不跳转、调整实时生效、Esc 关闭', asyn
   await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
 
   // 点击遮罩关闭（重开一次）
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '外观' }).click();
   await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
   await page.locator('.appearance-overlay').click({ position: { x: 8, y: 8 } });

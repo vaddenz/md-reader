@@ -65,25 +65,28 @@ test('收藏：星标后首页出现收藏区块，取消后消失', async ({ pa
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
-  // 未收藏 → 点击星标 → 已收藏（aria-pressed 切换）
+  // 未收藏 → ⋯ 菜单点「收藏」→ 已收藏（aria-pressed 切换；菜单保持打开）
+  await page.getByRole('button', { name: '更多' }).click();
   const star = page.getByRole('button', { name: '收藏', exact: true });
-  await expect(star).toBeVisible();
   await expect(star).toHaveAttribute('aria-pressed', 'false');
   await star.click();
   await expect(page.getByRole('button', { name: '取消收藏', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
   // 首页出现「收藏」区块，直达该文档
+  await page.keyboard.press('Escape'); // 关掉 ⋯ 再点顶栏
   await page.getByRole('button', { name: '返回首页' }).click();
   const favorites = page.locator('.home-favorites');
   await expect(favorites).toBeVisible();
   await expect(favorites.getByRole('link', { name: '文档 A' })).toBeVisible();
 
-  // 从收藏区进入 → 取消收藏 → 首页区块消失
+  // 从收藏区进入 → ⋯ 菜单取消收藏 → 首页区块消失
   await favorites.getByRole('link', { name: '文档 A' }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '取消收藏', exact: true }).click();
   await expect(page.getByRole('button', { name: '收藏', exact: true })).toHaveAttribute('aria-pressed', 'false');
 
+  await page.keyboard.press('Escape'); // 关掉 ⋯ 再点顶栏
   await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.locator('.home-favorites')).toHaveCount(0);
 });

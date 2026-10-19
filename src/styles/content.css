@@ -77,42 +77,6 @@
 .doc-more-item:focus-visible { background: var(--shell); }
 .doc-more-item[aria-pressed='true'] { color: var(--acc-text); font-weight: 600; }
 
-/* ========== 底部工具条（spec §3.2：目录/搜索/外观/收藏/设置，毛玻璃 + 安全区） ========== */
-.doc-bottombar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
-  height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  background: rgba(250, 249, 246, 0.96);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--line);
-}
-.doc-bottombar-item {
-  appearance: none;
-  border: 0;
-  background: none;
-  min-width: 56px;
-  min-height: 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--ink2);
-  font-size: 11px;
-  cursor: pointer;
-}
-.doc-bottombar-item[aria-pressed='true'],
-.doc-bottombar-item:hover { color: var(--acc-text); }
-.doc-bottombar-aa { font-size: 17px; font-weight: 700; color: var(--ink); }
-
 /* ========== 返回来源条（T16） ========== */
 .back-to-source {
   display: flex;
@@ -133,12 +97,12 @@
 }
 .back-to-source:active { background: #eaf2fd; }
 
-/* ========== 正文（中文移动端排版；纸面 + 底部工具条留白） ========== */
+/* ========== 正文（中文移动端排版；纸面 + 底部安全区留白） ========== */
 .doc-content {
   max-width: 46rem;
   margin: 0 auto;
-  /* 底部留白与工具条匹配：56px + 安全区 + 余量 */
-  padding: 0 16px calc(108px + env(safe-area-inset-bottom, 0px));
+  /* 底部安全区留白（工具条已移除） */
+  padding: 0 16px calc(32px + env(safe-area-inset-bottom, 0px));
   background: var(--page);
   font-family: var(--r-font-family, var(--font-sans));
   font-size: var(--r-font-size, 17px);
@@ -455,8 +419,8 @@
   gap: 12px;
   max-width: 46rem;
   margin: 0 auto;
-  /* 避开固定底部工具条（56px + 安全区 + 余量） */
-  padding: 0 16px calc(108px + env(safe-area-inset-bottom, 0px));
+  /* 底部安全区与悬浮按钮留白（工具条已移除） */
+  padding: 0 16px calc(32px + env(safe-area-inset-bottom, 0px));
 }
 .prev-next-item {
   flex: 1 1 0;
