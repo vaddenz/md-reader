@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HOME, MEMORY_RECORDS, MEMORY_TRAIN, toRouterPath } from '../app/nav';
 import LlmConfigForm from '../components/memory/LlmConfigForm';
@@ -65,9 +65,11 @@ export default function MemoryPage() {
   const [srsList, setSrsList] = useState<SrsState[]>([]);
   const [attempts, setAttempts] = useState<MemoryAttempt[]>([]);
   const [llm, setLlm] = useState<LlmConfig | undefined>();
-  const [loadingBank, setLoadingBank] = useState<string | null>(null);
+  const [loadingBanks, setLoadingBanks] = useState<string[]>([]);
   const [starting, setStarting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  /** 自动拉取去重：key = 路径 + sha（sha 变化＝题库更新，允许再自动拉一次）。 */
+  const autoTried = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -92,20 +94,65 @@ export default function MemoryPage() {
     return () => { cancelled = true; };
   }, [lastSyncAt]);
 
-  // 已缓存题库的解析结果（筛选选项与进度视图）
+  // 已缓存题库的解析结果（筛选选项与进度视图）；只采用与目录树 sha 一致的缓存，
+  // 同步后 sha 变化 → 旧解析立即失效（避免「行显示未获取、筛选/进度却用旧解析」）。
   useEffect(() => {
-    if (!selection) return;
+    if (!selection || !banks) return;
     let cancelled = false;
     void (async () => {
+      const shaByPath = new Map(banks.map((b) => [b.path, b.sha]));
       const map = new Map<string, ParsedBank>();
       for (const path of selection.banks) {
+        const sha = shaByPath.get(path);
+        if (!sha) continue;
         const p = await getParsedBank(path).catch(() => undefined);
-        if (p) map.set(path, p);
+        if (p && p.sha === sha) map.set(path, p);
       }
       if (!cancelled) setParsed(map);
     })();
     return () => { cancelled = true; };
-  }, [selection]);
+  }, [selection, banks]);
+
+  /** 解析成功后的统一收尾：更新筛选/进度的数据源 + 题库列表体检计数（无需等下一次同步/reload）。 */
+  const applyParsedMeta = useCallback((path: string, bank: ParsedBank) => {
+    setParsed((prev) => new Map(prev).set(path, bank));
+    setBanks((prev) => prev?.map((b) => (b.path === path
+      ? { ...b, fetched: true, questionCount: bank.questions.length, issueCount: bank.warnings.length }
+      : b)) ?? prev);
+  }, []);
+
+  const setBankLoading = useCallback((path: string, on: boolean) => {
+    setLoadingBanks((prev) => (on
+      ? (prev.includes(path) ? prev : [...prev, path])
+      : prev.filter((p) => p !== path)));
+  }, []);
+
+  // 已选中但解析缓存缺失/过期的题库：进入概览页后自动按需拉取。
+  // 仅在线且有 Token 时执行；失败静默（保留「未获取」，可取消/重勾手动重试，不刷 toast）。
+  // 不做取消：结果按「路径 + 目录树 sha」落库，parsed/列表在 banks 变化后自洽重建；
+  // 这样 StrictMode 的「挂载→清理→再挂载」不会把第一次已发出的拉取结果丢掉（去重靠 autoTried）。
+  useEffect(() => {
+    if (!selection || !token || !banks || typeof navigator === 'undefined' || !navigator.onLine) return;
+    const pending = banks.filter(
+      (b) => selection.banks.includes(b.path) && !b.fetched && !autoTried.current.has(`${b.path}\u0000${b.sha}`),
+    );
+    if (!pending.length) return;
+    const client = new GitHubClient(token);
+    void (async () => {
+      for (const b of pending) {
+        autoTried.current.add(`${b.path}\u0000${b.sha}`);
+        setBankLoading(b.path, true);
+        try {
+          const bank = await ensureBankLoaded(b.path, client);
+          applyParsedMeta(b.path, bank);
+        } catch {
+          // 静默失败：列表保持「未获取」
+        } finally {
+          setBankLoading(b.path, false);
+        }
+      }
+    })();
+  }, [applyParsedMeta, banks, selection, setBankLoading, token]);
 
   const stats = useMemo(() => summarize(attempts, srsList, Date.now()), [attempts, srsList]);
 
@@ -157,32 +204,40 @@ export default function MemoryPage() {
     updateSelection({ ...selection, banks: banksNext });
     if (!on || parsed.has(path)) return;
     if (!token) { showToast('未配置访问 Token，无法获取题库', { kind: 'error' }); return; }
-    setLoadingBank(path);
+    setBankLoading(path, true);
     try {
       const bank = await ensureBankLoaded(path, new GitHubClient(token));
-      setParsed((prev) => new Map(prev).set(path, bank));
-      // 同步刷新该题库的体检计数，列表不必等下一次同步/reload 才显示「N 题 · M 处问题」
-      setBanks((prev) => prev?.map((b) => (b.path === path
-        ? { ...b, fetched: true, questionCount: bank.questions.length, issueCount: bank.warnings.length }
-        : b)) ?? prev);
+      applyParsedMeta(path, bank);
       if (bank.warnings.length) showToast(`题库已加载：${bank.questions.length} 题，${bank.warnings.length} 处问题`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : '题库获取失败', { kind: 'error' });
     } finally {
-      setLoadingBank(null);
+      setBankLoading(path, false);
     }
-  }, [parsed, selection, token, updateSelection]);
+  }, [applyParsedMeta, parsed, selection, setBankLoading, token, updateSelection]);
 
   const onStart = useCallback(async () => {
     if (!selection || starting) return;
     if (!selection.banks.length) { setMsg('请先选择至少一个题库'); return; }
-    if (!token) { setMsg('未配置访问 Token，无法获取题库'); return; }
     setStarting(true);
     setMsg(null);
     try {
-      const client = new GitHubClient(token);
+      // Token 惰性：所选题库全部已缓存时可离线开始训练，真正需要拉取时才要求 Token。
+      const client: Pick<GitHubClient, 'getBlobText'> = token
+        ? new GitHubClient(token)
+        : { getBlobText: () => Promise.reject(new Error('未配置访问 Token，无法获取题库')) };
+      if (!token) {
+        const metas = await listBanks();
+        const allCached = selection.banks.every((path) => metas.find((m) => m.path === path)?.fetched === true);
+        if (!allCached) throw new Error('未配置访问 Token，无法获取题库');
+      }
+
       const loaded: ParsedBank[] = [];
-      for (const path of selection.banks) loaded.push(await ensureBankLoaded(path, client));
+      for (const path of selection.banks) {
+        const bank = await ensureBankLoaded(path, client);
+        applyParsedMeta(path, bank);
+        loaded.push(bank);
+      }
 
       const candidates: QueueCandidate[] = [];
       loaded.forEach((bank, bankIndex) => {
@@ -214,7 +269,7 @@ export default function MemoryPage() {
     } finally {
       setStarting(false);
     }
-  }, [navigate, selection, starting, token]);
+  }, [applyParsedMeta, navigate, selection, starting, token]);
 
   const toggleFilter = useCallback((key: keyof MemorySelection['filters'], value: string) => {
     if (!selection) return;
@@ -267,7 +322,7 @@ export default function MemoryPage() {
                   />
                   <span className="memory-bank-name">{b.name}</span>
                   <span className="memory-bank-meta">
-                    {loadingBank === b.path ? '加载中…' : b.fetched ? `${b.questionCount} 题${b.issueCount ? ` · ${b.issueCount} 处问题` : ''}` : '未获取'}
+                    {loadingBanks.includes(b.path) ? '加载中…' : b.fetched ? `${b.questionCount} 题${b.issueCount ? ` · ${b.issueCount} 处问题` : ''}` : '未获取'}
                   </span>
                 </label>
               </li>
