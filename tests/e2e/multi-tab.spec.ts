@@ -118,6 +118,36 @@ test('多标签：重启恢复与去重', async ({ page }) => {
   await expect(page.getByRole('group', { name: '打开的标签' }).locator('.doc-tab-row')).toHaveCount(2);
 });
 
+test('清除全部数据后标签清空（不复活、不写回）', async ({ page }) => {
+  await configureAndSync(page);
+
+  // 开 A、B
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '文件' }).click();
+  await page.getByRole('dialog', { name: '全部文档' }).getByRole('link', { name: 'b', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+
+  // 设置 → 清除全部数据（确认）
+  await page.getByRole('button', { name: '返回', exact: true }).click(); // B → A
+  await page.getByRole('button', { name: '返回', exact: true }).click(); // A → 首页
+  await page.getByRole('link', { name: '设置' }).click();
+  await expect(page).toHaveURL(/#\/settings/);
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: '清除全部数据' }).click();
+  await page.waitForURL(/#\/setup$/);
+
+  // 重新配置 Token → 首页 → 打开 A → 切换器仅 1 条（旧标签不得复活）
+  await page.getByPlaceholder('粘贴 Fine-grained PAT').fill('ghp_e2e_fake_token');
+  await page.getByRole('button', { name: '验证并保存' }).click();
+  await page.waitForURL(/#\/$/);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '切换标签' }).click();
+  await expect(page.getByRole('group', { name: '打开的标签' }).locator('.doc-tab-row')).toHaveCount(1);
+});
+
 test('多标签：边界（损坏清理 / 缺失剔除）', async ({ page }) => {
   await configureAndSync(page);
 

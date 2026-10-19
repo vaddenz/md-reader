@@ -8,6 +8,9 @@ import {
 
 const TABS_KEY = 'tabs';
 
+/** 清除全部数据事件（SettingsPage 在 clearAllData 后派发，Provider 据此重置内存标签）。 */
+export const DATA_CLEARED_EVENT = 'mdreader:data-cleared';
+
 interface TabsCtx {
   /** kv 载入完成（DocPage 的登记 effect 需等待，避免与恢复竞态）。 */
   loaded: boolean;
@@ -52,6 +55,13 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  // 清除全部数据后重置内存标签（SettingsPage 在 clearAllData 后派发）。
+  useEffect(() => {
+    const onCleared = () => setTabs(EMPTY_TABS);
+    window.addEventListener(DATA_CLEARED_EVENT, onCleared);
+    return () => window.removeEventListener(DATA_CLEARED_EVENT, onCleared);
   }, []);
 
   // 持久化：载入完成后任何状态变化都落盘（含载入时的清洗/剔除结果）。
