@@ -111,9 +111,11 @@ export default function HomePage() {
                     <span className="home-card-meta">
                       <svg className="home-card-ring" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                         <circle cx="12" cy="12" r="9" fill="none" stroke="var(--line)" strokeWidth="3" />
-                        <circle cx="12" cy="12" r="9" fill="none" stroke="var(--acc)" strokeWidth="3"
-                          strokeDasharray={`${Math.round(ratio * 56.5)} 56.5`} strokeLinecap="round"
-                          transform="rotate(-90 12 12)" />
+                        {Math.round(ratio * 56.5) > 0 && (
+                          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--acc)" strokeWidth="3"
+                            strokeDasharray={`${Math.round(ratio * 56.5)} 56.5`} strokeLinecap="round"
+                            transform="rotate(-90 12 12)" />
+                        )}
                       </svg>
                       <span className="home-card-pct">{Math.round(ratio * 100)}%</span>
                     </span>

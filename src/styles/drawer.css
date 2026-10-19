@@ -68,11 +68,15 @@
   .drawer-body .tree-dir-toggle:hover { background: var(--line); }
 }
 
-/* 文件树抽屉的手动刷新入口（复用 SyncBadge 的 .sync-refresh 样式） */
+/* 文件树抽屉的手动刷新入口（复用 SyncBadge 的 .sync-refresh 样式）：
+   阅读页唯一的手动同步入口，保持 ≥44px 触控高度（页脚 ghost 的 32px 不适用于此） */
 .tree-drawer-tools {
   display: flex;
   justify-content: flex-end;
   padding: 0 8px 4px;
+}
+.tree-drawer-tools .sync-refresh {
+  min-height: 44px;
 }
 
 @media (prefers-reduced-motion: no-preference) {

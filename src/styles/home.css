@@ -197,9 +197,14 @@
   border-top: 1px solid var(--line);
 }
 
+/* 分组标签不带分隔线（其下首行仍带线，保留「标签 / 行」分隔语义）；标签与行内容同列 12px */
+.tree-list > li.tree-group-label {
+  border-top: 0;
+}
+
 /* 文件树：分组标签与图标（spec §4.2） */
 .tree-group-label {
-  padding: 10px 8px 4px;
+  padding: 10px 12px 4px;
   font-size: 12.5px;
   font-weight: 500;
   letter-spacing: .04em;
