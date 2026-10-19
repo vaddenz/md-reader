@@ -26,7 +26,7 @@
 
 /* 当前阅读位置（scroll-spy） */
 .toc-current {
-  color: var(--c-primary);
-  background: rgba(31, 111, 235, 0.08);
+  color: var(--acc-text);
+  background: rgba(31, 63, 212, 0.08);
   font-weight: 600;
 }

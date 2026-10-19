@@ -161,3 +161,33 @@ test('网络不可用：提示错误且停留在引导页', async ({ page }) => 
   await expect(page.getByRole('alert')).toHaveText('网络不可用');
   await expect(page).toHaveURL(/#\/setup$/);
 });
+
+test('目录抽屉：打开时定位到当前章节', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: '长文档', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
+
+  // 滚到文档后部（约 80% 处），让当前章节的目录项落在抽屉可视区之外，等待 scroll-spy 更新
+  await page.evaluate(() => {
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo(0, Math.round(max * 0.8));
+  });
+  await page.waitForTimeout(300);
+
+  await page.getByRole('button', { name: '目录' }).click();
+  await expect(page.getByRole('dialog', { name: '目录' })).toBeVisible();
+  await expect(page.locator('.toc-item.toc-current')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const item = document.querySelector('.toc-item.toc-current');
+        const body = item?.closest('.drawer-body');
+        if (!item || !body) return false;
+        const i = item.getBoundingClientRect();
+        const b = body.getBoundingClientRect();
+        const center = i.top + i.height / 2;
+        return center >= b.top && center <= b.bottom;
+      }),
+    )
+    .toBe(true);
+});
