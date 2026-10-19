@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HOME, SETTINGS, searchHref, toRouterPath } from '../app/nav';
+import { SETTINGS, goBackOrHome, searchHref, toRouterPath } from '../app/nav';
 
 interface DocHeaderProps {
   /** 当前文档标题（来自 files.title）；未加载完成时为空串。 */
@@ -98,8 +98,8 @@ export default function DocHeader({
       <button
         type="button"
         className="doc-back"
-        aria-label="返回首页"
-        onClick={() => navigate(toRouterPath(HOME))}
+        aria-label="返回"
+        onClick={() => goBackOrHome(navigate)}
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path
