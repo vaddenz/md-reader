@@ -9,7 +9,7 @@
   background: rgba(23, 24, 26, 0.44);
 }
 
-/* 抽屉皮肤（spec §3.2）：壳底 + 顶圆角 16 + 软影（与 toast/胶囊同族的 ink 阴影，向上翻） */
+/* 抽屉皮肤（spec §3.2）：壳底 + 顶圆角 16 + 软影（与 toast 同族的 ink 阴影，向上翻） */
 .drawer-panel {
   display: flex;
   flex-direction: column;
