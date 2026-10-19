@@ -184,6 +184,12 @@ export async function configureAndSync(page: Page, token = 'ghp_e2e_fake_token')
   return mock;
 }
 
+/** 顶栏自动隐藏（spec §2.1）后，用小幅上滑唤出（40px，不破坏相对位置断言）。 */
+export async function revealHeader(page: Page): Promise<void> {
+  await page.evaluate(() => window.scrollBy(0, -40));
+  await page.waitForTimeout(120);
+}
+
 /* ---------------------------------------------------------------------------
  * IndexedDB 辅助（P4）：在页面内用独立连接直读/直改应用数据（应用自持连接不受影响）。
  * 记录结构见 src/data/db.ts 的 FileRecord；打开前建 store 的写法与 settings.spec 一致。

@@ -7,7 +7,7 @@ import { getFavorites, getProgress, recentDocs, type RecentDoc } from '../data/p
 import { useSync } from '../state/SyncContext';
 import '../styles/home.css';
 
-/** 收藏星标（小号）：与阅读页顶栏星标同款。 */
+/** 收藏星标（小号）：首页「收藏」区块条目标记。 */
 function StarIcon() {
   return (
     <svg className="home-doc-star" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -41,7 +41,7 @@ export default function HomePage() {
   const [metas, setMetas] = useState<FileMeta[] | null>(null);
   const [recents, setRecents] = useState<RecentDoc[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [firstRatio, setFirstRatio] = useState<number | null>(null);
+  const [recentRatios, setRecentRatios] = useState<Record<string, number>>({});
 
   // 进入首页读取一次；同步完成（lastSyncAt 变化）后重读，让「更新目录」新增/过期的文档即时反映到树上。
   useEffect(() => {
@@ -68,23 +68,17 @@ export default function HomePage() {
   const recentShown = useMemo(() => recents.filter((r) => known.has(r.path)), [recents, known]);
   const favoritesShown = favorites.filter((p) => known.has(p));
 
-  // 首条「继续阅读」的进度：供进度条渲染（同步完成后重读，进度可能被更新/移除）。
+  // 继续阅读卡片的进度（每张卡一个百分比环）：同步完成后重读，进度可能被更新/移除。
   useEffect(() => {
     let cancelled = false;
-    const first = recentShown[0]?.path;
-    if (!first) { setFirstRatio(null); return; }
-    void getProgress(first).then(
-      (p) => { if (!cancelled) setFirstRatio(p?.ratio ?? null); },
+    void Promise.all(
+      recentShown.map(async (r) => [r.path, (await getProgress(r.path))?.ratio ?? 0] as const),
+    ).then(
+      (pairs) => { if (!cancelled) setRecentRatios(Object.fromEntries(pairs)); },
       () => {},
     );
     return () => { cancelled = true; };
   }, [recentShown, lastSyncAt]);
-
-  const docLink = (path: string) => (
-    <a className="home-doc-link" href={docHref(path)}>
-      <span className="home-doc-name">{known.get(path)?.title || path}</span>
-    </a>
-  );
 
   return (
     <main className="home">
@@ -94,8 +88,6 @@ export default function HomePage() {
           <SettingsIcon />
         </a>
       </header>
-
-      <SyncBadge />
 
       <a className="home-search" href={searchHref('')}>
         <svg className="home-search-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -109,17 +101,28 @@ export default function HomePage() {
       {recentShown.length > 0 && (
         <section className="home-section home-recents" aria-labelledby="home-recents-title">
           <h2 className="home-section-title" id="home-recents-title">继续阅读</h2>
-          <ul className="home-section-list">
-            {recentShown.map((r, i) => (
-              <li key={r.path}>
-                {docLink(r.path)}
-                {i === 0 && firstRatio !== null && (
-                  <span className="home-progress" aria-hidden="true">
-                    <i style={{ width: `${Math.round(firstRatio * 100)}%` }} />
-                  </span>
-                )}
-              </li>
-            ))}
+          <ul className="home-cards">
+            {recentShown.map((r) => {
+              const ratio = recentRatios[r.path] ?? 0;
+              return (
+                <li key={r.path} className="home-card">
+                  <a className="home-card-link" href={docHref(r.path)}>
+                    <span className="home-card-name">{known.get(r.path)?.title || r.path}</span>
+                    <span className="home-card-meta">
+                      <svg className="home-card-ring" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" fill="none" stroke="var(--line)" strokeWidth="3" />
+                        {Math.round(ratio * 56.5) > 0 && (
+                          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--acc)" strokeWidth="3"
+                            strokeDasharray={`${Math.round(ratio * 56.5)} 56.5`} strokeLinecap="round"
+                            transform="rotate(-90 12 12)" />
+                        )}
+                      </svg>
+                      <span className="home-card-pct">{Math.round(ratio * 100)}%</span>
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -143,12 +146,16 @@ export default function HomePage() {
       {metas === null ? (
         <p className="home-empty" role="status">加载中…</p>
       ) : metas.length === 0 ? (
-        <p className="home-empty">暂无文档，点上方「更新目录」同步仓库</p>
+        <p className="home-empty">暂无文档，点「更新目录」同步仓库</p>
       ) : (
         <div className="home-tree-card">
           <FileTree metas={metas} />
         </div>
       )}
+
+      <footer className="home-footer">
+        <SyncBadge />
+      </footer>
     </main>
   );
 }

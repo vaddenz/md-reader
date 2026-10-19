@@ -1,0 +1,27 @@
+/* 阅读内外观面板（spec §2.5） */
+.appearance-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(23, 24, 26, 0.32);
+  display: flex;
+  align-items: flex-end;
+}
+.appearance-sheet {
+  width: 100%;
+  max-height: 72vh;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  box-shadow: var(--shadow-card);
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+}
+/* 控件皮肤对齐设置页外观区（settings.css 的 .settings-section input[...] 只作用于设置页）：
+   面板内的单选/滑杆不落在 .settings-section 内，须就地补同款 accent。 */
+.appearance-sheet input[type='radio'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--acc-fill);
+}
+.appearance-sheet input[type='range'] { accent-color: var(--acc); }

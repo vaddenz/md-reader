@@ -13,13 +13,17 @@
       "accent-graphic": { "role": "primary", "displayName": "阅读器浅蓝（图形）", "canonical": "#1F3FD4" },
       "accent-text": { "role": "primary", "displayName": "阅读器浅蓝（文字）", "canonical": "#1F3FD4" },
       "accent-fill": { "role": "primary", "displayName": "阅读器浅蓝（填充）", "canonical": "#1F3FD4" },
+      "accent-fill-hover": { "role": "primary", "displayName": "阅读器浅蓝（悬停暗 20%）", "canonical": "#1932AA" },
+      "status-idle": { "role": "semantic", "displayName": "状态点·空闲", "canonical": "#7D868F" },
+      "status-offline": { "role": "semantic", "displayName": "状态点·离线", "canonical": "#B87200" },
+      "status-error": { "role": "semantic", "displayName": "状态点·错误", "canonical": "#D1242F" },
       "highlight-yellow": { "role": "tertiary", "displayName": "持久高亮黄", "canonical": "#FFF1A8" },
       "highlight-red": { "role": "tertiary", "displayName": "持久高亮红", "canonical": "#FFD9D4" },
       "danger": { "role": "semantic", "displayName": "危险红", "canonical": "#C0392B" }
     },
     "shadows": [
       { "name": "shadow-card", "value": "0 6px 18px rgba(40, 44, 52, .10)", "purpose": "一切白卡（分组卡、弹层、菜单、同步徽标）的单层海拔" },
-      { "name": "ink-lifted", "value": "0 8px 20px rgba(23, 24, 26, .32)", "purpose": "深墨胶囊（toast、续读胶囊）的落地影" },
+      { "name": "ink-lifted", "value": "0 8px 20px rgba(23, 24, 26, .32)", "purpose": "深墨胶囊（toast）的落地影" },
       { "name": "drawer-up", "value": "0 -8px 24px rgba(23, 24, 26, .24)", "purpose": "底部抽屉向上的影" },
       { "name": "scrim", "value": "rgba(23, 24, 26, .44)", "purpose": "抽屉遮罩，纯色不用 blur" }
     ],
@@ -72,12 +76,12 @@
       "css": ".ds-input { min-height: 40px; padding: 0 10px; border: 1px solid #E4E1DA; border-radius: 10px; background: #ffffff; color: #17181A; font: inherit; font-size: 16px; } .ds-input:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
     },
     {
-      "name": "Ink Pill (Toast / Resume Chip)",
+      "name": "Ink Pill (Toast)",
       "kind": "custom",
       "refersTo": "chip-pill",
-      "description": "深墨药丸：toast 与「回到上次位置」续读胶囊同族，纸面上的悬浮墨块。",
-      "html": "<button class=\"ds-chip-pill\"><i class=\"ds-dot\"></i>上次读到 42%</button>",
-      "css": ".ds-chip-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 9px 16px; border: 0; border-radius: 22px; background: #17181A; color: #ffffff; font: inherit; font-size: 13px; box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32); cursor: pointer; } .ds-chip-pill .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: #1F3FD4; } .ds-chip-pill:active { opacity: 0.85; } .ds-chip-pill:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+      "description": "深墨药丸：toast 专用，纸面上的悬浮墨块（--ink 底白字 + 落地影）。",
+      "html": "<button class=\"ds-chip-pill\">已复制</button>",
+      "css": ".ds-chip-pill { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 11px 18px; border: 0; border-radius: 22px; background: #17181A; color: #ffffff; font: inherit; font-size: 14px; box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32); cursor: pointer; } .ds-chip-pill:active { opacity: 0.85; } .ds-chip-pill:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
     }
   ],
   "narrative": {
@@ -86,9 +90,9 @@
     "keyCharacteristics": [
       "单层海拔：卡片 = 圆角 14 + 软影，不叠边框；行与行之间只用 1px 分隔线",
       "一色三档：#1F3FD4 同值分名（图形/文字/填充），保留角色语义以便日后分档",
-      "阅读页 chrome 极简：44px 顶栏（返回 · 标题 · ⋯）+ 底部五项工具条 + 续读胶囊",
+      "阅读页 chrome 极简：48px 顶栏（返回 · 标题 · ⋯；正文下滑自动隐藏）+ 悬浮目录按钮；功能入口收进 ⋯ 七项菜单",
       "设置页 iOS 式分组卡：组标签在上、软影白卡承载行",
-      "深色只出现在两处：代码块 #1B1D21 与深墨胶囊（toast / 续读），作为纸面上的「墨块」"
+      "深色只出现在两处：代码块 #1B1D21 与深墨胶囊（toast），作为纸面上的「墨块」"
     ],
     "rules": [
       { "name": "The Single Elevation Rule", "body": "卡片只声明一次海拔：圆角 14 + --shadow-card 软影，禁止再叠边框；行间只用 1px --line。", "section": "elevation" },
@@ -101,7 +105,7 @@
       "Do 新表面一律用令牌表取色；选区、光标、滚动条、焦点环保持主题化（craft floor）。",
       "Do 卡片 = 圆角 14 + 单层软影，行间 1px --line；组内行距紧（12–13px）、组间距宽（≥18px）。",
       "Do 主操作用实心浅蓝（--acc-fill 白字），次操作用壳底幽灵，危险用 --danger 红字描边；触控目标 ≥44px。",
-      "Do 深墨胶囊（toast/续读）保持同族：--ink 底、白字、药丸 22、0 8px 20px rgba(23,24,26,.32) 影。",
+      "Do 深墨胶囊（toast）保持同族：--ink 底、白字、药丸 22、0 8px 20px rgba(23,24,26,.32) 影。",
       "Do hover 只在 @media (hover: hover) 下生效，且只换底色（壳/线/暗 20%），不位移不加影。",
       "Do 输入框 16px 字号起步（iOS 聚焦防缩放），表单按钮 ≥36px、图标按钮 44px。"
     ],

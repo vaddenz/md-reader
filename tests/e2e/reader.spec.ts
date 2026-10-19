@@ -93,17 +93,47 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await expect(page.getByRole('button', { name: '返回来源' })).toHaveCount(0);
 });
 
-test('底部工具条：搜索与外观直达', async ({ page }) => {
+test('⋯ 菜单：搜索/设置导航（底栏已移除）', async ({ page }) => {
   await configureAndSync(page);
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect(page.locator('.doc-bottombar')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '搜索' }).click();
   await expect(page).toHaveURL(/#\/search/);
+
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
-  await page.getByRole('button', { name: '外观' }).click();
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '设置' }).click();
   await expect(page).toHaveURL(/#\/settings/);
-  await expect(page.getByRole('heading', { name: '阅读外观' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+});
+
+test('阅读内外观面板：不跳转、调整实时生效、Esc 关闭', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '外观' }).click();
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
+  await expect(page).toHaveURL(/#\/doc\//); // 不跳设置页
+
+  const slider = page.locator('.appearance-sheet input[type="range"]').first();
+  await slider.fill('19');
+  await expect(page.locator('.doc-content')).toHaveCSS('--r-font-size', '19px'); // 实时生效
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
+
+  // 点击遮罩关闭（重开一次）
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '外观' }).click();
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
+  await page.locator('.appearance-overlay').click({ position: { x: 8, y: 8 } });
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
 });
 
 test('相关文档面板：双向引用分组 chips，点击互跳；无引用不渲染', async ({ page }) => {
@@ -160,4 +190,87 @@ test('网络不可用：提示错误且停留在引导页', async ({ page }) => 
 
   await expect(page.getByRole('alert')).toHaveText('网络不可用');
   await expect(page).toHaveURL(/#\/setup$/);
+});
+
+test('目录抽屉：打开时定位到当前章节', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: '长文档', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
+
+  // 滚到文档后部（约 80% 处），让当前章节的目录项落在抽屉可视区之外，等待 scroll-spy 更新
+  await page.evaluate(() => {
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo(0, Math.round(max * 0.8));
+  });
+  await page.waitForTimeout(300);
+
+  await page.getByRole('button', { name: '目录' }).click();
+  await expect(page.getByRole('dialog', { name: '目录' })).toBeVisible();
+  await expect(page.locator('.toc-item.toc-current')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const item = document.querySelector('.toc-item.toc-current');
+        const body = item?.closest('.drawer-body');
+        if (!item || !body) return false;
+        const i = item.getBoundingClientRect();
+        const b = body.getBoundingClientRect();
+        const center = i.top + i.height / 2;
+        return center >= b.top && center <= b.bottom;
+      }),
+    )
+    .toBe(true);
+});
+
+test('顶栏自动隐藏：下滑隐藏、上滑显示', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  const header = page.locator('.doc-header');
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeLessThan(-20);
+
+  await page.evaluate(() => window.scrollBy(0, -60));
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+
+  // 程序式落位（大跨度跳变）不触发隐藏：直接跳到大文档 90% 处，顶栏应仍在
+  await page.getByRole('button', { name: '返回首页' }).click();
+  await page.getByRole('link', { name: '长文档', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, Math.round(document.documentElement.scrollHeight * 0.9)));
+  // 先让 rAF 隐藏判定（若有）落定：跳变后的首帧 y 仍是 0，直接 poll 会假绿（实测竞态）
+  await page.waitForTimeout(300);
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+});
+
+test('悬浮目录按钮：点击开目录、拖拽后位置持久化', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  const fab = page.getByRole('button', { name: '目录' });
+  await expect(fab).toBeVisible();
+  await expect(fab).toHaveClass(/doc-toc-fab/); // 钉到悬浮按钮本体：底栏旧「目录」项存在时此处即失败
+
+  // 拖到左侧偏上：down → move → up
+  const box = (await fab.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(40, 200, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await fab.boundingBox())!.x).toBeLessThan(80);
+
+  // 刷新后仍在左侧（持久化）
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect
+    .poll(async () => (await page.getByRole('button', { name: '目录' }).boundingBox())!.x)
+    .toBeLessThan(80);
+
+  // 点击（非拖拽）打开目录
+  await page.getByRole('button', { name: '目录' }).click();
+  await expect(page.getByRole('dialog', { name: '目录' })).toBeVisible();
 });

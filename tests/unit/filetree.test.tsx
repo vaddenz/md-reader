@@ -46,18 +46,22 @@ const METAS = [
 ];
 
 describe('FileTree', () => {
-  it('根文档与目录分组渲染（默认展开），显示名去 .md，链接为 docHref', () => {
+  it('文件夹组在上、文件组在下（默认展开），显示名去 .md，链接为 docHref，行带图标', () => {
     const c = mount(<FileTree metas={METAS} />);
+    expect([...c.querySelectorAll('.tree-group-label')].map((li) => li.textContent))
+      .toEqual(['文件夹', '文件']);
     expect(links(c).map((a) => a.getAttribute('href'))).toEqual([
-      docHref('zz.md'),
       docHref('智能体/Mem0.md'),
       docHref('NodeJS/内存.md'),
       docHref('NodeJS/事件.md'),
+      docHref('zz.md'),
     ]);
     expect([...c.querySelectorAll('.tree-name')].map((s) => s.textContent))
-      .toEqual(['zz', 'Mem0', '内存', '事件']);
+      .toEqual(['Mem0', '内存', '事件', 'zz']);
     expect([...c.querySelectorAll('.tree-dir-toggle')].map((b) => b.getAttribute('aria-expanded')))
       .toEqual(['true', 'true']);
+    expect(c.querySelectorAll('.tree-folder-icon')).toHaveLength(2);
+    expect(c.querySelectorAll('.tree-file-icon')).toHaveLength(4);
   });
 
   it('目录可折叠：点击隐藏/恢复其子项', () => {
