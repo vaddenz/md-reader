@@ -2,16 +2,18 @@
   to { transform: rotate(360deg); }
 }
 
+/* 徽标 = 壳底上的白卡小控件簇（单层海拔：卡 = 圆角 + 软影，不叠边框） */
 .sync-badge {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 6px;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  background: #f6f8fa;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
   font-size: 13px;
-  color: #57606a;
+  color: var(--ink2);
 }
 
 .sync-badge-status {
@@ -21,6 +23,7 @@
   min-height: 44px;
   padding: 0 6px;
   border: 0;
+  border-radius: var(--r-ctl);
   background: none;
   color: inherit;
   font: inherit;
@@ -38,16 +41,19 @@
   height: 10px;
   border-radius: 50%;
 }
+/* 状态语义色保留（spec §2.1）：白卡底复核 idle 3.1:1 / error 5.2:1 均 ≥3:1；
+   offline 橙明度下调至 #b87200（3.9:1），与离线横幅状态点同值。 */
 .sync-dot-idle { background: #8b949e; }
-.sync-dot-offline { background: #d29922; }
+.sync-dot-offline { background: #b87200; }
 .sync-dot-error { background: #d1242f; }
 .sync-dot-syncing {
   background: transparent;
-  border: 2px solid var(--c-primary);
+  border: 2px solid var(--acc);
   border-top-color: transparent;
   animation: sync-rotate 0.8s linear infinite;
 }
 
+/* 操作按钮：主操作走 --acc（实心浅蓝白字，与设置页主按钮同语言） */
 .sync-refresh {
   display: inline-flex;
   align-items: center;
@@ -55,10 +61,10 @@
   min-height: 44px;
   margin-left: auto;
   padding: 0 12px;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #24292f;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--acc-fill);
+  color: #ffffff;
   font: inherit;
   font-size: 13px;
   white-space: nowrap;
@@ -67,6 +73,11 @@
 .sync-refresh:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+@media (hover: hover) {
+  .sync-badge-status:hover { background: var(--shell); }
+  .sync-refresh:not(:disabled):hover { background: #1932aa; /* 主按钮悬停：accent 暗 20%，同 settings.css */ }
 }
 
 .sync-icon {

@@ -1,11 +1,26 @@
-/* 离线顶部横幅（T22）：细黄条，离线时出现、恢复在线即隐藏（自动同步由 SyncContext 负责）。 */
+/* 离线顶部横幅（T22 · spec §3.4）：壳底 + 橙状态点（语义保留，明度微调保证 ≥3:1）；
+   离线时出现、恢复在线即隐藏（自动同步由 SyncContext 负责）。role=status，文案不动。 */
 
 .offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 12px;
-  border-bottom: 1px solid #d4a72c;
-  background: #fff8c5;
-  color: #7d4e00;
+  border-bottom: 1px solid var(--line);
+  background: var(--shell);
+  color: var(--ink);
   font-size: 13px;
   line-height: 1.5;
   text-align: center;
+}
+
+/* 状态点：纯 CSS 伪元素（不入 DOM/textContent，e2e 文本断言不受影响） */
+.offline-banner::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b87200; /* 离线橙：壳底 3.35:1（非文本图形 ≥3:1；语义同 sync-dot-offline，明度下调） */
 }

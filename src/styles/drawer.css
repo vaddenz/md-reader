@@ -6,18 +6,19 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(36, 41, 47, 0.45);
+  background: rgba(23, 24, 26, 0.44);
 }
 
+/* 抽屉皮肤（spec §3.2）：壳底 + 顶圆角 16 + 软影（与 toast/胶囊同族的 ink 阴影，向上翻） */
 .drawer-panel {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 46rem;
   max-height: 60vh;
-  background: var(--c-bg);
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -4px 24px rgba(36, 41, 47, 0.18);
+  background: var(--shell);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px rgba(23, 24, 26, 0.24);
   outline: none;
 }
 
@@ -31,7 +32,7 @@
 .drawer-head-title {
   font-size: 14px;
   font-weight: 600;
-  color: #57606a;
+  color: var(--ink2);
 }
 .drawer-close {
   display: inline-flex;
@@ -41,12 +42,12 @@
   height: 44px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   background: none;
-  color: #57606a;
+  color: var(--ink2);
   cursor: pointer;
 }
-.drawer-close:active { background: #f0f3f6; }
+.drawer-close:active { background: var(--line); }
 
 /* 内部滚动区；底部预留 iPhone 安全区 */
 .drawer-body {
@@ -58,6 +59,14 @@
 
 /* 文件树自带首页外边距，抽屉内不需要 */
 .drawer-body .file-tree { margin-top: 0; }
+
+/* 抽屉为壳底：文件树行的 hover/徽标需换可分辨底（home.css 的 --shell 同底不可见、
+   .tree-badge 的 --shell 底同理消失），仅在抽屉内覆盖，行/选中态令牌本身不动。 */
+.drawer-body .tree-badge { background: var(--card); }
+@media (hover: hover) {
+  .drawer-body .tree-item:not(.tree-current):hover,
+  .drawer-body .tree-dir-toggle:hover { background: var(--line); }
+}
 
 /* 文件树抽屉的手动刷新入口（复用 SyncBadge 的 .sync-refresh 样式） */
 .tree-drawer-tools {

@@ -1,10 +1,13 @@
+/* 右键/长按菜单（spec §3.2）：白卡圆角 12 + 软影（与 ⋯ 弹层 .doc-more 同族），行 hover 灰。
+   项集与行为完全不变（复制/高亮/清除/全选），仅换肤。 */
+
 .selection-menu {
   position: fixed; z-index: 300; min-width: 168px;
-  background: #ffffff; border: 1px solid #d0d7de; border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(31, 35, 40, 0.18); padding: 6px; display: flex; flex-direction: column;
+  background: var(--card); border: 0; border-radius: 12px;
+  box-shadow: var(--shadow-card); padding: 6px; display: flex; flex-direction: column;
 }
 .selection-menu-item {
   appearance: none; border: 0; background: none; text-align: left;
-  font-size: 15px; padding: 10px 14px; border-radius: 6px; color: var(--c-text); cursor: pointer;
+  font-size: 15px; padding: 10px 14px; border-radius: 8px; color: var(--ink); cursor: pointer;
 }
-.selection-menu-item:hover, .selection-menu-item:focus-visible { background: #f6f8fa; }
+.selection-menu-item:hover, .selection-menu-item:focus-visible { background: var(--shell); }

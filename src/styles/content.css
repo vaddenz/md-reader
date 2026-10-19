@@ -232,15 +232,20 @@
 }
 .doc-content blockquote > :last-child { margin-bottom: 0; }
 
+/* plain ==高亮==：与持久高亮黄同值（spec §2.1，预检裁定①） */
 .doc-content mark {
   padding: 0 2px;
-  background: #fff8c5;
+  background: var(--hl-yellow);
   color: inherit;
   border-radius: 2px;
 }
-/* 搜索命中（T18）：比 ==高亮== 更醒目；滚动定位时避开吸顶栏 */
+/* 搜索命中（T18 · spec §2.1）：--acc 染底 16% + 下划线，与持久高亮区分；
+   滚动定位时避开吸顶栏 */
 .doc-content mark.search-mark {
-  background: #ffd33d;
+  background: rgba(31, 63, 212, 0.16);
+  text-decoration: underline;
+  text-decoration-color: var(--acc);
+  text-underline-offset: 2px;
   scroll-margin-top: calc(var(--header-h) + 12px);
 }
 /* 持久高亮（v1.1）：颜色由注册表 token 映射到变量，真机微调色值不动数据 */
@@ -258,14 +263,16 @@
   font-size: 0.9em;
 }
 
-/* 代码块 + 右上角复制按钮（按钮绝对定位，pre 顶部留出空间） */
+/* 代码块 + 右上角复制按钮（按钮绝对定位，pre 顶部留出空间）；
+   深底 #1B1D21 + #E9EBEF 文字（spec §3.4「代码块深底保留」），圆角 10 */
 .code-block { position: relative; }
 .code-block pre {
   padding: 34px 14px 12px;
   overflow-x: auto;
-  background: #f6f8fa;
-  border: 1px solid #d8dee4;
-  border-radius: 8px;
+  background: #1b1d21;
+  color: #e9ebef;
+  border: 0;
+  border-radius: 10px;
   -webkit-overflow-scrolling: touch;
 }
 .code-block pre code {
@@ -275,6 +282,45 @@
   line-height: 1.6;
   white-space: pre;
 }
+
+/* 深底语法高亮（highlight.js）：字面色专用于 #1B1D21（无既有浅底 token 冲突）；
+   关键字/字符串/注释三类及全表对比度 ≥4.5:1，逐色复核见 task-6-report。 */
+.code-block .hljs-comment,
+.code-block .hljs-quote { color: #8b949e; }  /* 5.5:1 */
+.code-block .hljs-keyword,
+.code-block .hljs-selector-tag,
+.code-block .hljs-literal,
+.code-block .hljs-doctag,
+.code-block .hljs-meta { color: #79b8ff; }  /* 8.1:1 */
+.code-block .hljs-string,
+.code-block .hljs-regexp,
+.code-block .hljs-addition { color: #85e89d; }  /* 11.3:1 */
+.code-block .hljs-number,
+.code-block .hljs-symbol,
+.code-block .hljs-bullet,
+.code-block .hljs-link,
+.code-block .hljs-selector-attr,
+.code-block .hljs-selector-pseudo { color: #f0883e; }  /* 6.7:1 */
+.code-block .hljs-title,
+.code-block .hljs-section,
+.code-block .hljs-name,
+.code-block .hljs-selector-id,
+.code-block .hljs-selector-class { color: #b392f0; }  /* 6.7:1 */
+.code-block .hljs-type,
+.code-block .hljs-built_in,
+.code-block .hljs-class { color: #56d4dd; }  /* 9.5:1 */
+.code-block .hljs-attr,
+.code-block .hljs-attribute,
+.code-block .hljs-property,
+.code-block .hljs-params,
+.code-block .hljs-variable,
+.code-block .hljs-template-variable { color: #a5d6ff; }  /* 11.0:1 */
+.code-block .hljs-deletion { color: #ff7b72; }  /* 6.7:1 */
+.code-block .hljs-subst { color: #e9ebef; }  /* 同正文 14.1:1 */
+.code-block .hljs-emphasis { font-style: italic; }
+.code-block .hljs-strong { font-weight: 700; }
+.code-block .hljs-link { text-decoration: underline; }
+
 .code-copy {
   position: absolute;
   top: 6px;
@@ -316,66 +362,75 @@
 .doc-content img.md-img {
   max-width: 100%;
   height: auto;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 .doc-content .md-img-error {
   min-width: 64px;
   min-height: 24px;
   padding: 4px 8px;
-  outline: 2px dashed #d0d7de;
+  outline: 2px dashed var(--line);
   outline-offset: 2px;
-  color: #57606a;
+  color: var(--ink2);
   font-size: 14px;
 }
 
-/* mermaid：宽图容器横向滚动；失败降级显示源码 */
+/* mermaid：宽图容器横向滚动；失败降级显示源码。
+   占位态（懒渲染完成前容器为空）给虚线框，渲染成功后 :empty 失配、边框自动消失 */
 .md-mermaid {
   margin: 0 0 1em;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+.md-mermaid:empty {
+  min-height: 64px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--shell);
+}
 .md-mermaid svg { display: block; }
 .md-mermaid-failed pre {
   padding: 12px 14px;
   overflow-x: auto;
-  background: #f6f8fa;
-  border: 1px solid #d8dee4;
-  border-radius: 8px;
+  background: var(--shell);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
 }
 .md-mermaid-error {
   margin: 6px 0 0;
-  color: #b42318;
+  color: var(--danger);
   font-size: 13px;
 }
 
-/* ========== 状态页（不存在 / 未缓存 / 加载中） ========== */
+/* ========== 状态页（不存在 / 未缓存 / 加载中）：spec §3.4「纸面 + 居中文字 + 单个主按钮」 ========== */
 .doc-state {
   padding: 64px 0;
   text-align: center;
-  color: #57606a;
+  color: var(--ink);
 }
 .doc-state p { margin: 0 0 16px; }
 .doc-state p.doc-state-path {
   margin: -8px 0 16px;
   font-size: 13px;
-  color: #8b949e;
+  color: var(--ink2);
   overflow-wrap: anywhere;
 }
+/* 主按钮：实心浅蓝白字（与设置页主按钮同语言；原灰底描边降级为兜底态） */
 .doc-state-btn {
   min-height: 44px;
   padding: 0 20px;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--c-text);
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--acc-fill);
+  color: #ffffff;
   font: inherit;
   font-size: 15px;
   cursor: pointer;
 }
-.doc-state-btn:active { background: #f0f3f6; }
+.doc-state-btn:hover,
+.doc-state-btn:active { background: #1932aa; /* accent 暗 20%，同 settings.css 主按钮悬停 */ }
 
 /* ========== 相关文档（T20） ========== */
 .related-docs {
