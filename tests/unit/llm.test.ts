@@ -1,0 +1,157 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  LlmError, chatCompletionsUrl, extractScoreJson, isLlmConfigured, scoreAnswer, testConnection, toScoreResult,
+} from '../../src/data/llm';
+
+const CFG = { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' };
+const INPUT = { type: '概念', chapter: '1. 基础', question: '什么是事件循环？', prompt: '```js\n1\n```', answer: '- 要点 A\n- 要点 B', userAnswer: '我的作答' };
+const OK = JSON.stringify({ score: 82, hit: ['要点 A'], missed: ['要点 B'], comment: '基本正确' });
+
+function chat(content: string, status = 200): Response {
+  return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+/** 永不 resolve、只在 abort 时 reject 的 fetch（超时 / 取消用例）。 */
+const hangingFetch = (_url: unknown, init?: { signal?: AbortSignal }) =>
+  new Promise<Response>((_, reject) => {
+    const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+    if (init?.signal?.aborted) return fail();
+    init?.signal?.addEventListener('abort', fail);
+  });
+
+/** 2xx 响应头已到、但 body 读取挂起并在 abort 时 reject 的响应（响应体阶段取消用例）。 */
+function hangingBody(signal?: AbortSignal): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: () => new Promise((_, reject) => {
+      const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+      if (signal?.aborted) return fail();
+      signal?.addEventListener('abort', fail);
+    }),
+  } as unknown as Response;
+}
+
+describe('chatCompletionsUrl / isLlmConfigured', () => {
+  it('URL 规范化：补 /chat/completions、去尾部斜杠、已完整则原样', () => {
+    expect(chatCompletionsUrl('https://x/v1')).toBe('https://x/v1/chat/completions');
+    expect(chatCompletionsUrl('https://x/v1/')).toBe('https://x/v1/chat/completions');
+    expect(chatCompletionsUrl(' https://x/v1/chat/completions ')).toBe('https://x/v1/chat/completions');
+  });
+  it('三字段齐全才算配置完成', () => {
+    expect(isLlmConfigured(null)).toBe(false);
+    expect(isLlmConfigured({ baseUrl: 'x', apiKey: '', model: 'm' })).toBe(false);
+    expect(isLlmConfigured(CFG)).toBe(true);
+  });
+});
+
+describe('extractScoreJson / toScoreResult', () => {
+  it('脏文本提取：代码围栏、前后杂文、无 JSON 返回 null', () => {
+    expect(extractScoreJson(`好的，结果如下：\n\`\`\`json\n${OK}\n\`\`\`\n请查收`)).toMatchObject({ score: 82 });
+    expect(extractScoreJson(`prefix {"score": 50} suffix`)).toMatchObject({ score: 50 });
+    expect(extractScoreJson('没有 JSON')).toBeNull();
+    expect(extractScoreJson('{broken')).toBeNull();
+  });
+  it('校验与钳制：分数取整钳制、hit/missed 清洗限量、comment 截断', () => {
+    expect(toScoreResult({ score: 120 })).toMatchObject({ score: 100, verdict: 'excellent' });
+    expect(toScoreResult({ score: -5 })).toMatchObject({ score: 0, verdict: 'again' });
+    expect(toScoreResult({ score: 84.6 })).toMatchObject({ score: 85, verdict: 'excellent' });
+    expect(toScoreResult({ hit: 'x' })).toBeNull();
+    const r = toScoreResult({ score: 70, hit: [' a ', 7, ''], missed: Array.from({ length: 12 }, (_, i) => `m${i}`), comment: 'x'.repeat(900) })!;
+    expect(r.hit).toEqual(['a']);
+    expect(r.missed).toHaveLength(8);
+    expect(r.comment.length).toBe(500);
+  });
+});
+
+describe('scoreAnswer', () => {
+  it('正常评分：请求体与鉴权头正确、返回 verdict 映射', async () => {
+    const fetchImpl = vi.fn(async () => chat(OK));
+    const result = await scoreAnswer(CFG, INPUT, { fetchImpl });
+    expect(result).toMatchObject({ score: 82, verdict: 'good', hit: ['要点 A'], missed: ['要点 B'] });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://llm.example/v1/chat/completions');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer k');
+    const body = JSON.parse(String(init.body));
+    expect(body.model).toBe('m');
+    expect(body.temperature).toBe(0.2);
+    expect(body.messages[0].role).toBe('system');
+    expect(body.messages[1].content).toContain('参考答案：');
+    expect(body.messages[1].content).toContain('我的作答');
+  });
+
+  it('配置字段带首尾空白时，请求使用 trim 后的 URL/Key/Model', async () => {
+    const fetchImpl = vi.fn(async () => chat(OK));
+    await scoreAnswer({ baseUrl: ' https://llm.example/v1/ ', apiKey: ' k ', model: ' m ' }, INPUT, { fetchImpl });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://llm.example/v1/chat/completions');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer k');
+    expect(JSON.parse(String(init.body)).model).toBe('m');
+  });
+
+  it('首次输出不是 JSON 时自动重试一次，两轮都失败 → parse 错误', async () => {
+    const retryThenOk = vi.fn()
+      .mockResolvedValueOnce(chat('抱歉，我无法直接评分'))
+      .mockResolvedValueOnce(chat(OK));
+    await expect(scoreAnswer(CFG, INPUT, { fetchImpl: retryThenOk })).resolves.toMatchObject({ score: 82 });
+    expect(retryThenOk).toHaveBeenCalledTimes(2);
+
+    const alwaysBad = vi.fn(async () => chat('还是不给 JSON'));
+    await expect(scoreAnswer(CFG, INPUT, { fetchImpl: alwaysBad })).rejects.toMatchObject({ kind: 'parse' });
+    expect(alwaysBad).toHaveBeenCalledTimes(2);
+  });
+
+  it('错误映射：401/404/429/500/网络不可用', async () => {
+    const cases: [Response | Error, string][] = [
+      [chat('x', 401), 'auth'],
+      [chat('x', 403), 'auth'],
+      [chat('x', 404), 'notfound'],
+      [chat('x', 429), 'ratelimit'],
+      [chat('x', 500), 'server'],
+      [new TypeError('Failed to fetch'), 'network'],
+    ];
+    for (const [res, kind] of cases) {
+      const fetchImpl = vi.fn(async () => { if (res instanceof Error) throw res; return res; });
+      await expect(scoreAnswer(CFG, INPUT, { fetchImpl })).rejects.toMatchObject({ kind });
+    }
+  });
+
+  it('超时 → timeout；外部取消 → 原样抛 AbortError', async () => {
+    await expect(scoreAnswer(CFG, INPUT, { fetchImpl: hangingFetch as typeof fetch, timeoutMs: 10 }))
+      .rejects.toMatchObject({ kind: 'timeout' });
+
+    const ac = new AbortController();
+    ac.abort();
+    await expect(scoreAnswer(CFG, INPUT, { fetchImpl: hangingFetch as typeof fetch, signal: ac.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('响应体读取阶段：外部取消 → 原样抛 AbortError；内部超时 → timeout', async () => {
+    const ac = new AbortController();
+    const abortMidBody = vi.fn(async (_url: string, init?: RequestInit) => {
+      setTimeout(() => ac.abort(), 5);
+      return hangingBody(init?.signal ?? undefined);
+    });
+    await expect(scoreAnswer(CFG, INPUT, { fetchImpl: abortMidBody as unknown as typeof fetch, signal: ac.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+
+    const timeoutMidBody = vi.fn(async (_url: string, init?: RequestInit) => hangingBody(init?.signal ?? undefined));
+    await expect(scoreAnswer(CFG, INPUT, { fetchImpl: timeoutMidBody as unknown as typeof fetch, timeoutMs: 10 }))
+      .rejects.toMatchObject({ kind: 'timeout' });
+  });
+
+  it('LlmError 可识别', async () => {
+    const fetchImpl = vi.fn(async () => chat('x', 401));
+    const err = await scoreAnswer(CFG, INPUT, { fetchImpl }).catch((e) => e);
+    expect(err).toBeInstanceOf(LlmError);
+  });
+});
+
+describe('testConnection', () => {
+  it('2xx 视为可用（不要求响应体可解析）；401 抛 auth', async () => {
+    await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => chat('pong')) })).resolves.toBeUndefined();
+    await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => new Response('not json', { status: 200 })) })).resolves.toBeUndefined();
+    await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => new Response(null, { status: 204 })) })).resolves.toBeUndefined();
+    await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => chat('x', 401)) })).rejects.toMatchObject({ kind: 'auth' });
+  });
+});
