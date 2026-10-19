@@ -144,7 +144,7 @@ export default function HomePage() {
       {metas === null ? (
         <p className="home-empty" role="status">加载中…</p>
       ) : metas.length === 0 ? (
-        <p className="home-empty">暂无文档，点上方「更新目录」同步仓库</p>
+        <p className="home-empty">暂无文档，点「更新目录」同步仓库</p>
       ) : (
         <div className="home-tree-card">
           <FileTree metas={metas} />
