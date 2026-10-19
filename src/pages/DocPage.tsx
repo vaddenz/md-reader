@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HOME, SETUP, toRouterPath } from '../app/nav';
 import { keyFromLocation, rememberScroll, takeScroll } from '../app/scroll';
+import AppearanceSheet from '../components/AppearanceSheet';
 import BackToSource from '../components/BackToSource';
 import BottomBar from '../components/BottomBar';
 import DocHeader from '../components/DocHeader';
@@ -98,6 +99,7 @@ export default function DocPage() {
   // null = 收藏状态尚未读取（不渲染星标按钮，避免先闪未收藏态）。
   const [favorite, setFavorite] = useState<boolean | null>(null);
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
@@ -523,6 +525,7 @@ export default function DocPage() {
       {ready && (
         <BottomBar
           onOpenToc={tocHeadings.length > 0 ? openToc : undefined}
+          onOpenAppearance={() => setAppearanceOpen(true)}
           favorite={favorite === true}
           onToggleFavorite={favorite === null ? undefined : toggleFav}
           remember={remember}
@@ -567,6 +570,13 @@ export default function DocPage() {
       {ready && <RelatedDocs path={path} />}
       {ready && <PrevNext path={path} metas={metas} />}
       {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}
+      {appearanceOpen && (
+        <AppearanceSheet
+          value={appearance}
+          onChange={setAppearance}
+          onClose={() => setAppearanceOpen(false)}
+        />
+      )}
       {treeOpen && (
         <TreeDrawer metas={metas} currentPath={path} onSelect={openDocFromTree} onClose={closeTree} />
       )}

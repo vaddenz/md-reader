@@ -3,6 +3,8 @@ import { SETTINGS, searchHref, toRouterPath } from '../app/nav';
 
 interface Props {
   onOpenToc?: () => void;
+  /** 打开阅读内外观面板（spec §2.5）：不离开阅读上下文，不跳设置页。 */
+  onOpenAppearance?: () => void;
   favorite?: boolean;
   onToggleFavorite?: () => void;
   /** 离开阅读页前记住滚动（与互链/抽屉跳转同口径）。 */
@@ -10,7 +12,7 @@ interface Props {
 }
 
 /** 阅读页底部工具条（spec §3.2）：目录 / 搜索 / 外观 / 收藏 / 设置。 */
-export default function BottomBar({ onOpenToc, favorite = false, onToggleFavorite, remember }: Props) {
+export default function BottomBar({ onOpenToc, onOpenAppearance, favorite = false, onToggleFavorite, remember }: Props) {
   const navigate = useNavigate();
   const go = (to: string) => {
     remember();
@@ -45,7 +47,7 @@ export default function BottomBar({ onOpenToc, favorite = false, onToggleFavorit
         type="button"
         className="doc-bottombar-item doc-bottombar-aa"
         aria-label="外观"
-        onClick={() => go(SETTINGS)}
+        onClick={() => onOpenAppearance?.()}
       >
         <span aria-hidden="true">Aa</span>
       </button>

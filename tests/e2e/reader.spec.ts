@@ -93,7 +93,7 @@ test('阅读页双抽屉：文件树高亮当前文档、点击跳转、与目�
   await expect(page.getByRole('button', { name: '返回来源' })).toHaveCount(0);
 });
 
-test('底部工具条：搜索与外观直达', async ({ page }) => {
+test('底部工具条：搜索/设置直达、外观开阅读内面板', async ({ page }) => {
   await configureAndSync(page);
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
@@ -101,9 +101,33 @@ test('底部工具条：搜索与外观直达', async ({ page }) => {
   await expect(page).toHaveURL(/#\/search/);
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  // 外观：阅读内面板，不离开阅读上下文（T4 修订；面板细节见「阅读内外观面板」用例）
   await page.getByRole('button', { name: '外观' }).click();
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
+  await expect(page).toHaveURL(/#\/doc\//);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
+  // 设置：仍直达设置页（外观区标题可见）
+  await page.getByRole('button', { name: '设置' }).click();
   await expect(page).toHaveURL(/#\/settings/);
   await expect(page.getByRole('heading', { name: '阅读外观' })).toBeVisible();
+});
+
+test('阅读内外观面板：不跳转、调整实时生效、Esc 关闭', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  await page.getByRole('button', { name: '外观' }).click();
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toBeVisible();
+  await expect(page).toHaveURL(/#\/doc\//); // 不跳设置页
+
+  const slider = page.locator('.appearance-sheet input[type="range"]').first();
+  await slider.fill('19');
+  await expect(page.locator('.doc-content')).toHaveCSS('--r-font-size', '19px'); // 实时生效
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '阅读外观' })).toHaveCount(0);
 });
 
 test('相关文档面板：双向引用分组 chips，点击互跳；无引用不渲染', async ({ page }) => {
