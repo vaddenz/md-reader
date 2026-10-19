@@ -46,7 +46,7 @@ test('无进度的文档默认停在页首', async ({ page }) => {
   await expect.poll(() => scrollRatio(page)).toBeLessThan(0.05);
 });
 
-test('首页壳子：标题顶栏、搜索框、继续阅读卡带进度', async ({ page }) => {
+test('首页壳子：标题顶栏、搜索框、继续阅读卡片与文件分组', async ({ page }) => {
   await configureAndSync(page);
 
   // 预置一篇的阅读进度（壳子用例只关心首页渲染，不经由滚动落盘）
@@ -56,8 +56,18 @@ test('首页壳子：标题顶栏、搜索框、继续阅读卡带进度', async
 
   await expect(page.getByRole('heading', { name: '知识库', level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible(); // 结构契约：名称不变
-  await expect(page.locator('.home-recents')).toBeVisible();
-  await expect(page.locator('.home-recents .home-progress')).toBeVisible(); // 新增进度条节点
+
+  // 继续阅读：横向卡片 + 进度百分比
+  await expect(page.locator('.home-recents .home-card')).toHaveCount(1);
+  await expect(page.locator('.home-recents .home-card-pct')).toHaveText('50%');
+
+  // 文件列表：文件夹组在上、文件组在下，带图标
+  await expect(page.locator('.tree-group-label')).toHaveText(['文件夹', '文件']);
+  await expect(page.locator('.tree-folder-icon')).toHaveCount(1);
+  await expect(page.locator('.tree-file-icon')).toHaveCount(3);
+
+  // 同步信息弱化到页脚（更新目录仍在，可点）
+  await expect(page.locator('.home-footer .sync-refresh')).toBeVisible();
 });
 
 test('收藏：星标后首页出现收藏区块，取消后消失', async ({ page }) => {

@@ -2,17 +2,14 @@
   to { transform: rotate(360deg); }
 }
 
-/* 徽标 = 壳底上的白卡小控件簇（单层海拔：卡 = 圆角 + 软影，不叠边框） */
+/* 徽标 = 页脚单行弱化口径（spec §4.3）：12px --ink2 小字 + ghost 图标按钮，无卡皮无阴影 */
 .sync-badge {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: var(--r-ctl);
-  background: var(--card);
-  box-shadow: var(--shadow-card);
-  font-size: 13px;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  font-size: 12px;
   color: var(--ink2);
 }
 
@@ -20,14 +17,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
-  padding: 0 6px;
+  min-height: 32px;
+  padding: 0 4px;
   border: 0;
-  border-radius: var(--r-ctl);
   background: none;
   color: inherit;
   font: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
@@ -37,12 +32,12 @@
 
 .sync-dot {
   flex: none;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
 }
-/* 状态语义色保留（spec §2.1）：白卡底复核 idle 3.1:1 / error 5.2:1 均 ≥3:1；
-   offline 橙明度下调至 #b87200（3.9:1），与离线横幅状态点同值。 */
+/* 状态语义色保留（spec §2.1）；字面量不动，仅底从白卡换为页脚页底 --page：
+   idle 2.9:1（略低于 3:1，状态另有相邻文字冗余表达）、error 5.0:1、offline 3.7:1（与离线横幅状态点同值）。 */
 .sync-dot-idle { background: #8b949e; }
 .sync-dot-offline { background: #b87200; }
 .sync-dot-error { background: #d1242f; }
@@ -53,21 +48,19 @@
   animation: sync-rotate 0.8s linear infinite;
 }
 
-/* 操作按钮：主操作走 --acc（实心浅蓝白字，与设置页主按钮同语言） */
+/* 操作按钮：页脚 ghost 口径（spec §4.3） */
 .sync-refresh {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 44px;
-  margin-left: auto;
-  padding: 0 12px;
+  min-height: 32px;
+  padding: 0 6px;
   border: 0;
-  border-radius: var(--r-ctl);
-  background: var(--acc-fill);
-  color: #ffffff;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
   font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
+  font-size: 12px;
   cursor: pointer;
 }
 .sync-refresh:disabled {
@@ -76,8 +69,8 @@
 }
 
 @media (hover: hover) {
-  .sync-badge-status:hover { background: var(--shell); }
-  .sync-refresh:not(:disabled):hover { background: #1932aa; /* 主按钮悬停：accent 暗 20%，同 settings.css */ }
+  .sync-badge-status:hover,
+  .sync-refresh:not(:disabled):hover { color: var(--acc-text); }
 }
 
 .sync-icon {
