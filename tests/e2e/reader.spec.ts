@@ -235,6 +235,15 @@ test('顶栏自动隐藏：下滑隐藏、上滑显示', async ({ page }) => {
 
   await page.evaluate(() => window.scrollBy(0, -60));
   await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+
+  // 程序式落位（大跨度跳变）不触发隐藏：直接跳到大文档 90% 处，顶栏应仍在
+  await page.getByRole('button', { name: '返回首页' }).click();
+  await page.getByRole('link', { name: '长文档', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, Math.round(document.documentElement.scrollHeight * 0.9)));
+  // 先让 rAF 隐藏判定（若有）落定：跳变后的首帧 y 仍是 0，直接 poll 会假绿（实测竞态）
+  await page.waitForTimeout(300);
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
 });
 
 test('悬浮目录按钮：点击开目录、拖拽后位置持久化', async ({ page }) => {

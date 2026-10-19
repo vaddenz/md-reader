@@ -55,7 +55,8 @@ export default function DocHeader({
         const delta = y - lastY;
         lastY = y;
         if (y <= 80 || delta < -4) setHidden(false);
-        else if (delta > 4 && y > 120) setHidden(true);
+        // 程序式落位（进度恢复/锚点/搜索跳转）是大跨度单帧跳变：只重设基准，不改变隐藏态。
+        else if (delta > 4 && delta <= window.innerHeight && y > 120) setHidden(true);
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
