@@ -32,7 +32,7 @@ test('过期清理：正文置空 + 目录标「未缓存」；点击按需下�
   await expect.poll(async () => (await readFileRecord(page, 'a.md'))?.text ?? null).not.toBeNull();
 
   // 回首页：已重新缓存，徽标消失
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.locator('.tree-badge')).toHaveCount(0);
 });
 

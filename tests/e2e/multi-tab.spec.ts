@@ -24,10 +24,8 @@ test('标签登记：打开两篇文档 → kv 记录两条、active 为当前�
   expect(active?.list?.find((t) => t.id === active.activeId)?.docPath).toBe('深挖/b.md');
 
   // 返回首页后标签保留（kv 不变）。
-  // 返回语义（spec §2.6）是「回到进入前的页面」：B → A → 首页需两次返回（B 由抽屉推入历史）。
-  await page.getByRole('button', { name: '返回', exact: true }).click();
-  await expect(page).toHaveURL(/#\/doc\//);
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  // 阅读页顶栏返回 = 回首页（用户验收裁定），B 由抽屉推入的历史不再需要逐步后退。
+  await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page).toHaveURL(/#\/$/);
   const raw = (await readKv(page, 'tabs')) as { list?: unknown[] } | undefined;
   expect(raw?.list).toHaveLength(2);
@@ -107,10 +105,8 @@ test('多标签：重启恢复与去重', async ({ page }) => {
   await expect(panel.locator('.doc-tab-current')).toContainText('文档 B');
   await page.keyboard.press('Escape');
 
-  // 去重：返回首页（v1.2.0 返回语义 = 回来源页：B→A→首页，需两次）→ 重开 B → 仍为两条（聚焦已有，不新开）
-  await page.getByRole('button', { name: '返回', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
-  await page.getByRole('button', { name: '返回', exact: true }).click();
+  // 去重：返回首页（阅读页顶栏返回 = 回首页，一次）→ 重开 B → 仍为两条（聚焦已有，不新开）
+  await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page).toHaveURL(/#\/$/);
   await page.getByRole('link', { name: 'b', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
@@ -130,8 +126,7 @@ test('清除全部数据后标签清空（不复活、不写回）', async ({ pa
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
 
   // 设置 → 清除全部数据（确认）
-  await page.getByRole('button', { name: '返回', exact: true }).click(); // B → A
-  await page.getByRole('button', { name: '返回', exact: true }).click(); // A → 首页
+  await page.getByRole('button', { name: '返回首页' }).click(); // 顶栏返回 = 回首页（标签保留）
   await page.getByRole('link', { name: '设置' }).click();
   await expect(page).toHaveURL(/#\/settings/);
   page.once('dialog', (d) => d.accept());
