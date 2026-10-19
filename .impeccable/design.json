@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-19T00:00:00+08:00",
+  "title": "Design System: md-reader",
+  "extensions": {
+    "colorMeta": {
+      "page": { "role": "neutral", "displayName": "暖白纸面", "canonical": "#FAF9F6" },
+      "shell": { "role": "neutral", "displayName": "暖灰壳", "canonical": "#F0EFEA" },
+      "card": { "role": "neutral", "displayName": "白卡", "canonical": "#FFFFFF" },
+      "ink": { "role": "neutral", "displayName": "墨", "canonical": "#17181A" },
+      "ink-secondary": { "role": "neutral", "displayName": "次墨", "canonical": "#5C6066" },
+      "line": { "role": "neutral", "displayName": "线", "canonical": "#E4E1DA" },
+      "accent-graphic": { "role": "primary", "displayName": "阅读器浅蓝（图形）", "canonical": "#1F3FD4" },
+      "accent-text": { "role": "primary", "displayName": "阅读器浅蓝（文字）", "canonical": "#1F3FD4" },
+      "accent-fill": { "role": "primary", "displayName": "阅读器浅蓝（填充）", "canonical": "#1F3FD4" },
+      "highlight-yellow": { "role": "tertiary", "displayName": "持久高亮黄", "canonical": "#FFF1A8" },
+      "highlight-red": { "role": "tertiary", "displayName": "持久高亮红", "canonical": "#FFD9D4" },
+      "danger": { "role": "semantic", "displayName": "危险红", "canonical": "#C0392B" }
+    },
+    "shadows": [
+      { "name": "shadow-card", "value": "0 6px 18px rgba(40, 44, 52, .10)", "purpose": "一切白卡（分组卡、弹层、菜单、同步徽标）的单层海拔" },
+      { "name": "ink-lifted", "value": "0 8px 20px rgba(23, 24, 26, .32)", "purpose": "深墨胶囊（toast、续读胶囊）的落地影" },
+      { "name": "drawer-up", "value": "0 -8px 24px rgba(23, 24, 26, .24)", "purpose": "底部抽屉向上的影" },
+      { "name": "scrim", "value": "rgba(23, 24, 26, .44)", "purpose": "抽屉遮罩，纯色不用 blur" }
+    ],
+    "motion": [
+      { "name": "toast-in", "value": "0.18s ease-out（translateY 6px → 0）", "purpose": "toast 入场；prefers-reduced-motion 关闭" },
+      { "name": "drawer-fade-in", "value": "0.16s ease-out", "purpose": "抽屉遮罩淡入；no-preference 才播" },
+      { "name": "drawer-slide-up", "value": "0.2s ease-out（translateY 100% → 0）", "purpose": "抽屉上滑；no-preference 才播" },
+      { "name": "sync-rotate", "value": "0.8s linear infinite", "purpose": "同步中旋转环" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "实心浅蓝主按钮：表单提交、同步刷新、状态页主操作。",
+      "html": "<button class=\"ds-btn-primary\">保存</button>",
+      "css": ".ds-btn-primary { background: #1F3FD4; color: #ffffff; border: 0; border-radius: 10px; padding: 0 14px; min-height: 36px; font: inherit; font-size: 14px; cursor: pointer; transition: background 0.15s ease; } .ds-btn-primary:hover { background: #1932aa; } .ds-btn-primary:disabled { opacity: 0.55; cursor: default; } .ds-btn-primary:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "壳底幽灵按钮：行内工具操作（更换 Token、立即同步、导出/导入）。",
+      "html": "<button class=\"ds-btn-ghost\">立即同步</button>",
+      "css": ".ds-btn-ghost { background: #F0EFEA; color: #17181A; border: 0; border-radius: 10px; padding: 0 14px; min-height: 36px; font: inherit; font-size: 14px; cursor: pointer; transition: background 0.15s ease; } .ds-btn-ghost:hover { background: #E4E1DA; } .ds-btn-ghost:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "危险区按钮：透明底红字红描边，只用于危险区。",
+      "html": "<button class=\"ds-btn-danger\">清除站点数据</button>",
+      "css": ".ds-btn-danger { background: transparent; color: #C0392B; border: 1px solid #C0392B; border-radius: 10px; padding: 0 14px; min-height: 36px; font: inherit; font-size: 14px; cursor: pointer; transition: background 0.15s ease; } .ds-btn-danger:hover { background: rgba(192, 57, 43, 0.07); } .ds-btn-danger:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Grouped Card",
+      "kind": "card",
+      "refersTo": "card-grouped",
+      "description": "iOS 式分组卡：组标签在上、白卡承载行、行间 1px 分线、单层软影无边框。",
+      "html": "<div><div class=\"ds-card-label\">同步</div><div class=\"ds-card-grouped\"><button class=\"ds-row\">立即同步</button><button class=\"ds-row\">导出高亮</button></div></div>",
+      "css": ".ds-card-label { margin: 18px 4px 8px; font-size: 12.5px; font-weight: 500; color: #5C6066; letter-spacing: 0.04em; } .ds-card-grouped { background: #ffffff; border-radius: 14px; box-shadow: 0 6px 18px rgba(40, 44, 52, 0.10); padding: 6px 16px 16px; } .ds-card-grouped .ds-row { appearance: none; display: flex; align-items: center; width: 100%; min-height: 44px; padding: 0; border: 0; border-bottom: 1px solid #E4E1DA; background: none; color: #17181A; font: inherit; font-size: 15px; text-align: left; cursor: pointer; } .ds-card-grouped .ds-row:last-child { border-bottom: 0; } .ds-card-grouped .ds-row:hover { background: #F0EFEA; } .ds-card-grouped .ds-row:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "表单输入：1px 线描边白底圆角 10，16px 字号防 iOS 聚焦缩放。",
+      "html": "<input class=\"ds-input\" placeholder=\"仓库路径 owner/repo\" />",
+      "css": ".ds-input { min-height: 40px; padding: 0 10px; border: 1px solid #E4E1DA; border-radius: 10px; background: #ffffff; color: #17181A; font: inherit; font-size: 16px; } .ds-input:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ink Pill (Toast / Resume Chip)",
+      "kind": "custom",
+      "refersTo": "chip-pill",
+      "description": "深墨药丸：toast 与「回到上次位置」续读胶囊同族，纸面上的悬浮墨块。",
+      "html": "<button class=\"ds-chip-pill\"><i class=\"ds-dot\"></i>上次读到 42%</button>",
+      "css": ".ds-chip-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 9px 16px; border: 0; border-radius: 22px; background: #17181A; color: #ffffff; font: inherit; font-size: 13px; box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32); cursor: pointer; } .ds-chip-pill .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: #1F3FD4; } .ds-chip-pill:active { opacity: 0.85; } .ds-chip-pill:focus-visible { outline: 2px solid #1F3FD4; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "中文阅读器（微信读书一脉的移动阅读手感）",
+    "overview": "md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕新把全站从「把 Markdown 当网页文档打印」的线框默认，带进一个成熟的中文移动阅读器世界：暖白纸面（#FAF9F6）承载正文，暖灰壳底（#F0EFEA）承载结构，白卡以单层软影浮起，浅蓝 #1F3FD4 一色贯穿图形、文字与填充三档角色。浅色定案由使用场景决定：目标场景是「夜间躺读」，暖白纸面比纯黑更接近真实书页；暗色模式明确不做（spec §7 非目标）。",
+    "keyCharacteristics": [
+      "单层海拔：卡片 = 圆角 14 + 软影，不叠边框；行与行之间只用 1px 分隔线",
+      "一色三档：#1F3FD4 同值分名（图形/文字/填充），保留角色语义以便日后分档",
+      "阅读页 chrome 极简：44px 顶栏（返回 · 标题 · ⋯）+ 底部五项工具条 + 续读胶囊",
+      "设置页 iOS 式分组卡：组标签在上、软影白卡承载行",
+      "深色只出现在两处：代码块 #1B1D21 与深墨胶囊（toast / 续读），作为纸面上的「墨块」"
+    ],
+    "rules": [
+      { "name": "The Single Elevation Rule", "body": "卡片只声明一次海拔：圆角 14 + --shadow-card 软影，禁止再叠边框；行间只用 1px --line。", "section": "elevation" },
+      { "name": "The One-Blue Rule", "body": "强调蓝只有一个值 #1F3FD4。搜索命中用它的 16% 染底 + 下划线表达「临时命中」，与持久高亮（黄/红实底）区分；不得引入第二个蓝。", "section": "colors" },
+      { "name": "The Browser-Surface Rule", "body": "文本选区 rgba(31,63,212,.22)、光标、滚动条、:focus-visible 焦点环一律从令牌取色，浏览器表面不得出现未主题化的默认蓝。", "section": "colors" },
+      { "name": "The No-Display-Face Rule", "body": "系统栈是唯一正文面孔；内置 LXGW / Noto Serif SC 只作为用户可选档位存在，不得用作界面标题的装饰面孔。", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "静止态没有阴影的东西不许浮起：有影必须是卡/弹层/深墨胶囊三者之一；hover 不加影、不加位移，只换底色。", "section": "elevation" }
+    ],
+    "dos": [
+      "Do 新表面一律用令牌表取色；选区、光标、滚动条、焦点环保持主题化（craft floor）。",
+      "Do 卡片 = 圆角 14 + 单层软影，行间 1px --line；组内行距紧（12–13px）、组间距宽（≥18px）。",
+      "Do 主操作用实心浅蓝（--acc-fill 白字），次操作用壳底幽灵，危险用 --danger 红字描边；触控目标 ≥44px。",
+      "Do 深墨胶囊（toast/续读）保持同族：--ink 底、白字、药丸 22、0 8px 20px rgba(23,24,26,.32) 影。",
+      "Do hover 只在 @media (hover: hover) 下生效，且只换底色（壳/线/暗 20%），不位移不加影。",
+      "Do 输入框 16px 字号起步（iOS 聚焦防缩放），表单按钮 ≥36px、图标按钮 44px。"
+    ],
+    "donts": [
+      "Don't 在软影卡上再叠边框，或用深色描边分隔区块——分隔靠 --line，边界靠影。",
+      "Don't 引入第二个强调蓝或占用 --acc 做非强调用途；搜索命中不许改用黄/红实底（会与持久高亮混淆）。",
+      "Don't 用 emoji 当图标；图标一律手绘单线宽 SVG。",
+      "Don't 用展示字体/大写英文/kicker 标签做区块标题；卡组标签只用 12.5–13px 灰字。",
+      "Don't 在卡内用「同尺寸卡片网格」搭页面结构；卡是行的容器，不是布局积木。",
+      "Don't 给禁用态做出「还能点」的样子（弱化即可），也不要把禁用态当装饰弱化用在可点元素上。"
+    ]
+  }
+}
