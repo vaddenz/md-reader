@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HOME } from '../app/nav';
 import {
-  clearTrainingData, exportMemory, importMemory, listAttempts, loadSrsMap, summarize,
+  clearTrainingData, exportMemory, getSelection, importMemory, listAttempts, loadSrsMap, summarize,
   type MemoryAttempt,
 } from '../data/memory';
+import { listBanks, type BankMeta } from '../data/qbankIndex';
 import { VERDICT_LABELS, type SrsState, type Verdict } from '../lib/srs';
 import { showToast } from '../lib/toast';
 import '../styles/memory.css';
@@ -15,21 +16,41 @@ function fmtDay(ts: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+/** 展开键：qid + 时间 + 形态，与导入去重口径一致，稳定且唯一（不随排序/筛选变化）。 */
+function recordKey(a: MemoryAttempt): string {
+  return `${a.qid}|${a.ts}|${a.mode}`;
+}
+
+/** 已选题库中已缓存题库的题量和；无已选题库或全部未缓存时返回 null（界面显示「—」）。 */
+function totalCachedQuestions(selected: string[], banks: BankMeta[]): number | null {
+  const cached = banks.filter((b) => selected.includes(b.path) && b.fetched && b.questionCount !== null);
+  return cached.length ? cached.reduce((sum, b) => sum + (b.questionCount ?? 0), 0) : null;
+}
+
 export default function MemoryRecordsPage() {
   const [attempts, setAttempts] = useState<MemoryAttempt[]>([]);
   const [srs, setSrs] = useState<SrsState[]>([]);
+  const [totalQuestions, setTotalQuestions] = useState<number | null>(null);
   const [bankFilter, setBankFilter] = useState('');
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
-    const [att, srsMap] = await Promise.all([listAttempts({ limit: 500 }), loadSrsMap()]);
+    // 全量读取：统计 / 档位分布 / 趋势 / 题库下拉与「已掌握」的全量 srs 口径保持一致；
+    // 显示列表再用 shown 截断到最近 100 条。
+    const [att, srsMap, selection, banks] = await Promise.all([
+      listAttempts(), loadSrsMap(), getSelection(), listBanks(),
+    ]);
     setAttempts(att);
     setSrs([...srsMap.values()]);
+    setTotalQuestions(totalCachedQuestions(selection.banks, banks));
+    setOpenKey(null);
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    void reload().catch(() => showToast('读取训练数据失败', { kind: 'error' }));
+  }, [reload]);
 
   const stats = useMemo(() => summarize(attempts, srs, Date.now()), [attempts, srs]);
   const banks = useMemo(() => [...new Set(attempts.map((a) => a.bankPath))].sort(), [attempts]);
@@ -90,6 +111,7 @@ export default function MemoryRecordsPage() {
       <section className="memory-card" aria-labelledby="records-stats-title">
         <h2 id="records-stats-title" className="memory-card-title">统计</h2>
         <div className="memory-stats">
+          <div className="memory-stat"><b>{totalQuestions ?? '—'}</b><span>总题数</span></div>
           <div className="memory-stat"><b>{stats.practiced}</b><span>已练</span></div>
           <div className="memory-stat"><b>{stats.mastered}</b><span>已掌握</span></div>
           <div className="memory-stat"><b>{stats.avgAiScore ?? '—'}</b><span>平均分</span></div>
@@ -116,7 +138,7 @@ export default function MemoryRecordsPage() {
         {banks.length > 0 && (
           <div className="memory-row">
             <span className="memory-row-label">题库</span>
-            <select value={bankFilter} onChange={(e) => { setBankFilter(e.target.value); setOpenIndex(null); }} aria-label="按题库筛选">
+            <select value={bankFilter} onChange={(e) => { setBankFilter(e.target.value); setOpenKey(null); }} aria-label="按题库筛选">
               <option value="">全部</option>
               {banks.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -126,17 +148,17 @@ export default function MemoryRecordsPage() {
           <p className="memory-note">还没有训练记录。</p>
         ) : (
           <ul className="memory-records">
-            {shown.map((a, i) => (
-              <li key={a.id ?? `${a.qid}-${a.ts}-${i}`}>
+            {shown.map((a) => (
+              <li key={recordKey(a)}>
                 <button
                   type="button"
                   className="memory-record"
-                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                  onClick={() => setOpenKey(openKey === recordKey(a) ? null : recordKey(a))}
                 >
                   <span className="memory-record-label">{a.idLabel} · {a.mode === 'ai' ? `${a.score} 分` : VERDICT_LABELS[a.verdict]}</span>
                   <span className="memory-bank-meta">{new Date(a.ts).toLocaleString('zh-CN', { hour12: false })}</span>
                 </button>
-                {openIndex === i && (
+                {openKey === recordKey(a) && (
                   <div className="memory-record-body">
                     {a.answer && <p className="memory-note">作答：{a.answer}</p>}
                     {a.picked && <p className="memory-note">选择：{a.picked.join('、')}{a.correct ? `（正确：${a.correct.join('、')}）` : ''}</p>}

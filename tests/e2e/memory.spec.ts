@@ -316,6 +316,7 @@ test('记录页：统计与明细、清除训练数据', async ({ page }) => {
   await expect(page.locator('.memory-score')).toContainText('82');
 
   await page.goto('./#/memory/records');
+  await expect(page.locator('.memory-stat').filter({ hasText: '总题数' }).locator('b')).toHaveText('5');
   await expect(page.locator('.memory-stat').filter({ hasText: '平均分' }).locator('b')).toHaveText('82');
   await expect(page.locator('.memory-record')).toContainText('Q1.1');
   await expect(page.locator('.memory-record')).toContainText('82 分');
