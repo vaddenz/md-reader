@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { configureAndSync, writeKv } from './fixtures';
+import { configureAndSync, revealHeader, writeKv } from './fixtures';
 
 /** 当前滚动比例（与实现同口径：scrollY / max(1, scrollHeight - innerHeight)）。 */
 function scrollRatio(page: Page): Promise<number> {
@@ -27,6 +27,7 @@ test('阅读进度：滚到中部退出，重开自动恢复到记录比例（±
   expect(recorded).toBeLessThan(0.6);
 
   // 退出到首页：新历史条目没有 scroll 记忆 → 重开时按已保存进度默认落位（spec §1.4）
+  await revealHeader(page); // 顶栏沉浸隐藏后唤出，避免 click 自动滚到页首污染已记录进度
   await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible();
   await expect(page.locator('.home-recents')).toBeVisible();

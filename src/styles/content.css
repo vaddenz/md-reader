@@ -12,6 +12,13 @@
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
+  transition: transform .18s ease;
+}
+.doc-header--hidden {
+  transform: translateY(-100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-header { transition: none; }
 }
 
 .doc-back,

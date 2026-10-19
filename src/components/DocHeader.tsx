@@ -42,6 +42,29 @@ export default function DocHeader({
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLElement>(null);
 
+  // 沉浸（spec §2.1）：正文下滑隐藏顶栏、上滑/回到顶部显示；⋯ 弹层打开期间不隐藏。
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        const delta = y - lastY;
+        lastY = y;
+        if (y <= 80 || delta < -4) setHidden(false);
+        else if (delta > 4 && y > 120) setHidden(true);
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   // ⋯ 弹层：外部 pointerdown（捕获）或 Escape 关闭；关闭类菜单项由 act() 先关再执行，就地切换类用 actStay()。
   useEffect(() => {
     if (!more) return;
@@ -70,7 +93,7 @@ export default function DocHeader({
   };
 
   return (
-    <header className="doc-header" ref={moreRef}>
+    <header className={hidden && !more ? 'doc-header doc-header--hidden' : 'doc-header'} ref={moreRef}>
       <button
         type="button"
         className="doc-back"

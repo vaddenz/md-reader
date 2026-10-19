@@ -222,6 +222,21 @@ test('目录抽屉：打开时定位到当前章节', async ({ page }) => {
     .toBe(true);
 });
 
+test('顶栏自动隐藏：下滑隐藏、上滑显示', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  const header = page.locator('.doc-header');
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeLessThan(-20);
+
+  await page.evaluate(() => window.scrollBy(0, -60));
+  await expect.poll(async () => (await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+});
+
 test('悬浮目录按钮：点击开目录、拖拽后位置持久化', async ({ page }) => {
   await configureAndSync(page);
   await page.getByRole('link', { name: 'a', exact: true }).click();
