@@ -1,4 +1,180 @@
-/** 记录页占位：Task 9 替换为完整实现（统计 / 记录列表 / 导出导入 / 清除）。 */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HOME } from '../app/nav';
+import {
+  clearTrainingData, exportMemory, importMemory, listAttempts, loadSrsMap, summarize,
+  type MemoryAttempt,
+} from '../data/memory';
+import { VERDICT_LABELS, type SrsState, type Verdict } from '../lib/srs';
+import { showToast } from '../lib/toast';
+import '../styles/memory.css';
+
+const VERDICT_ORDER: Verdict[] = ['excellent', 'good', 'hard', 'again'];
+
+function fmtDay(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export default function MemoryRecordsPage() {
-  return null;
+  const [attempts, setAttempts] = useState<MemoryAttempt[]>([]);
+  const [srs, setSrs] = useState<SrsState[]>([]);
+  const [bankFilter, setBankFilter] = useState('');
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reload = useCallback(async () => {
+    const [att, srsMap] = await Promise.all([listAttempts({ limit: 500 }), loadSrsMap()]);
+    setAttempts(att);
+    setSrs([...srsMap.values()]);
+  }, []);
+
+  useEffect(() => { void reload(); }, [reload]);
+
+  const stats = useMemo(() => summarize(attempts, srs, Date.now()), [attempts, srs]);
+  const banks = useMemo(() => [...new Set(attempts.map((a) => a.bankPath))].sort(), [attempts]);
+  const shown = useMemo(
+    () => (bankFilter ? attempts.filter((a) => a.bankPath === bankFilter) : attempts).slice(0, 100),
+    [attempts, bankFilter],
+  );
+  const trendMax = Math.max(1, ...stats.trend.map((t) => t.count));
+
+  const onExport = async () => {
+    try {
+      const json = await exportMemory();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `md-reader-memory-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast('导出失败', { kind: 'error' });
+    }
+  };
+
+  const onImportFile = async (file: File) => {
+    try {
+      const r = await importMemory(await file.text());
+      showToast(`导入进度 ${r.srs} 条、记录 ${r.attempts} 条`);
+      await reload();
+    } catch (err) {
+      showToast(err instanceof Error ? `导入失败：${err.message}` : '导入失败', { kind: 'error' });
+    }
+  };
+
+  const onClear = async () => {
+    if (clearing) return;
+    if (!window.confirm('确定清除全部训练进度与记录吗？此操作不可恢复（题库缓存与模型配置会保留）。')) return;
+    setClearing(true);
+    try {
+      await clearTrainingData();
+      await reload();
+      showToast('训练数据已清除');
+    } catch {
+      showToast('清除失败，请重试', { kind: 'error' });
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  return (
+    <main className="memory">
+      <a className="memory-back" href={HOME}>← 返回首页</a>
+      <header className="memory-header">
+        <h1 className="memory-title">训练记录</h1>
+        <a className="memory-link" href="#/memory">记忆助手</a>
+      </header>
+
+      <section className="memory-card" aria-labelledby="records-stats-title">
+        <h2 id="records-stats-title" className="memory-card-title">统计</h2>
+        <div className="memory-stats">
+          <div className="memory-stat"><b>{stats.practiced}</b><span>已练</span></div>
+          <div className="memory-stat"><b>{stats.mastered}</b><span>已掌握</span></div>
+          <div className="memory-stat"><b>{stats.avgAiScore ?? '—'}</b><span>平均分</span></div>
+          <div className="memory-stat"><b>{stats.streak}</b><span>连续天数</span></div>
+        </div>
+        <p className="memory-note">到期：今日 {stats.dueToday} · 3 天内 {stats.due3} · 7 天内 {stats.due7}</p>
+        <ul className="memory-verdicts">
+          {VERDICT_ORDER.map((v) => (
+            <li key={v}><span>{VERDICT_LABELS[v]}</span><b>{stats.verdictCounts[v]}</b></li>
+          ))}
+        </ul>
+        <div className="memory-trend" aria-label="近 14 天趋势">
+          {stats.trend.map((t) => (
+            <div key={t.day} className="memory-trend-col" title={`${fmtDay(t.day)}：${t.count} 题`}>
+              <i style={{ height: `${Math.round((t.count / trendMax) * 100)}%` }} />
+              <span>{fmtDay(t.day)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="memory-card" aria-labelledby="records-list-title">
+        <h2 id="records-list-title" className="memory-card-title">记录（最近 100 条）</h2>
+        {banks.length > 0 && (
+          <div className="memory-row">
+            <span className="memory-row-label">题库</span>
+            <select value={bankFilter} onChange={(e) => { setBankFilter(e.target.value); setOpenIndex(null); }} aria-label="按题库筛选">
+              <option value="">全部</option>
+              {banks.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+        )}
+        {shown.length === 0 ? (
+          <p className="memory-note">还没有训练记录。</p>
+        ) : (
+          <ul className="memory-records">
+            {shown.map((a, i) => (
+              <li key={a.id ?? `${a.qid}-${a.ts}-${i}`}>
+                <button
+                  type="button"
+                  className="memory-record"
+                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                >
+                  <span className="memory-record-label">{a.idLabel} · {a.mode === 'ai' ? `${a.score} 分` : VERDICT_LABELS[a.verdict]}</span>
+                  <span className="memory-bank-meta">{new Date(a.ts).toLocaleString('zh-CN', { hour12: false })}</span>
+                </button>
+                {openIndex === i && (
+                  <div className="memory-record-body">
+                    {a.answer && <p className="memory-note">作答：{a.answer}</p>}
+                    {a.picked && <p className="memory-note">选择：{a.picked.join('、')}{a.correct ? `（正确：${a.correct.join('、')}）` : ''}</p>}
+                    {a.hit.length > 0 && <p className="memory-note">命中要点：{a.hit.join('、')}</p>}
+                    {a.missed.length > 0 && <p className="memory-note">遗漏要点：{a.missed.join('、')}</p>}
+                    {a.comment && <p className="memory-note">{a.comment}</p>}
+                    <p className="memory-note">
+                      用时 {Math.round(a.durationMs / 1000)} 秒
+                      {a.hintUsed ? ' · 用过提示' : ''}
+                      {a.revealed ? ' · 看过答案' : ''}
+                    </p>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="memory-card" aria-labelledby="records-data-title">
+        <h2 id="records-data-title" className="memory-card-title">数据</h2>
+        <div className="memory-row">
+          <button type="button" className="memory-chip" onClick={() => void onExport()}>导出 JSON</button>
+          <button type="button" className="memory-chip" onClick={() => fileRef.current?.click()}>导入 JSON</button>
+          <button type="button" className="memory-chip memory-danger" onClick={() => void onClear()} disabled={clearing}>
+            {clearing ? '清除中…' : '清除训练数据'}
+          </button>
+        </div>
+        <input
+          ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="导入训练数据文件"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onImportFile(f);
+            e.target.value = '';
+          }}
+        />
+        <p className="memory-note">导出不含模型 Key；导入按「进度取新、记录去重」合并。</p>
+      </section>
+    </main>
+  );
 }

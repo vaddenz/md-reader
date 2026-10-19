@@ -294,3 +294,38 @@ test('选择题本地判分与追问链：链排序、母题展开、单选错�
   const last = attempts.find((a) => a.mode === 'choice' && a.picked?.includes('A') && (a.correct?.length ?? 0) === 2);
   expect(last).toMatchObject({ verdict: 'hard', correct: ['A', 'B'] });
 });
+
+test('记录页：统计与明细、清除训练数据', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+  await writeKv(page, 'llmConfig', { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' });
+  await page.route('https://llm.example/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ score: 82, hit: ['要点'], missed: [], comment: '不错' }) } }] }),
+    }),
+  );
+
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+  await page.getByLabel('作答').fill('我的回答');
+  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.locator('.memory-score')).toContainText('82');
+
+  await page.goto('./#/memory/records');
+  await expect(page.locator('.memory-stat').filter({ hasText: '平均分' }).locator('b')).toHaveText('82');
+  await expect(page.locator('.memory-record')).toContainText('Q1.1');
+  await expect(page.locator('.memory-record')).toContainText('82 分');
+
+  // 展开明细
+  await page.locator('.memory-record').first().click();
+  await expect(page.getByText('作答：我的回答')).toBeVisible();
+
+  // 清除（确认框接受）
+  page.on('dialog', (d) => void d.accept());
+  await page.getByRole('button', { name: '清除训练数据' }).click();
+  await expect(page.getByText('还没有训练记录。')).toBeVisible();
+});

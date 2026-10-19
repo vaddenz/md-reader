@@ -79,3 +79,18 @@
 .memory-parent { margin-top: 10px; }
 .memory-parent-ref { margin-right: 8px; color: var(--ink2); font-size: 12.5px; }
 .memory-parent-body { margin-top: 8px; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--shell); }
+
+.memory-verdicts { list-style: none; display: flex; gap: 8px; margin: 10px 0 0; padding: 0; }
+.memory-verdicts li { flex: 1; display: flex; justify-content: space-between; padding: 6px 8px; border-radius: var(--r-ctl); background: var(--shell); font-size: 13px; }
+.memory-trend { display: flex; gap: 2px; align-items: flex-end; height: 72px; margin-top: 10px; }
+.memory-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
+.memory-trend-col i { width: 100%; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--acc); }
+.memory-trend-col span { font-size: 9px; color: var(--ink2); white-space: nowrap; transform: rotate(-45deg); }
+.memory-records { list-style: none; margin: 4px 0 0; padding: 0; }
+.memory-records li { border-top: 1px solid var(--line); }
+.memory-records li:first-child { border-top: 0; }
+.memory-record { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 0; border: 0; background: none; font: inherit; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; }
+.memory-record-label { min-width: 0; overflow-wrap: anywhere; }
+.memory-record-body { padding: 4px 0 10px; }
+.memory-danger { color: var(--danger); border-color: var(--danger); }
+.memory-row select { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; }
