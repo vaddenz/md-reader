@@ -12,6 +12,9 @@ interface Props {
   onClose: () => void;
 }
 
+/** 菜单与选区之间的垂直间距（验收微调：8 → 16px）。 */
+const SELECTION_GAP = 16;
+
 /** 阅读正文自定义右键/长按菜单（spec §6.3）：避开选区定位、越界收边、外部/滚动/Esc/选区变化关闭。 */
 export default function SelectionMenu({ x, y, rect = null, selectionSnapshot, actions, onAction, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -26,8 +29,8 @@ export default function SelectionMenu({ x, y, rect = null, selectionSnapshot, ac
     let top: number;
     if (rect) {
       left = rect.left;
-      top = rect.bottom + margin; // 优先选区下方
-      if (top + r.height > window.innerHeight - margin) top = rect.top - r.height - margin; // 下方放不下：翻到上方
+      top = rect.bottom + SELECTION_GAP; // 优先选区下方
+      if (top + r.height > window.innerHeight - margin) top = rect.top - r.height - SELECTION_GAP; // 下方放不下：翻到上方
     } else {
       left = x; // 无选区：触点定位
       top = y;

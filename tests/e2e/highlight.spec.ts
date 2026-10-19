@@ -130,16 +130,22 @@ test('菜单随选区变化自动关闭，且不覆盖选区', async ({ page }) 
   await configureAndSync(page);
   await page.goto('./#/doc/a.md');
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  // 目标段落在文档靠下位置：先滚入视口（居中），保证选区矩形实际可见、菜单定位按 rect 生效。
+  await page.locator('.doc-content p', { hasText: 'MVCC 并发控制' }).first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  // 滚动会关闭菜单（spec §6.3），而 scrollIntoView 的 scroll 事件异步派发（下一渲染帧）：
+  // 等两帧确保其派发完毕后再开菜单，避免「菜单刚挂载就被滚动事件关掉」的竞态。
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)))));
   await selectAndContextMenu(page, 'MVCC 并发控制');
   const menu = page.locator('.selection-menu');
   await expect(menu).toBeVisible();
-  const overlaps = await page.evaluate(() => {
+  // 严格断言：菜单矩形整体在选区矩形之上或之下（竖直方向完全不重叠）。
+  const clearsSelection = await page.evaluate(() => {
     const sel = window.getSelection()!;
     const rect = sel.getRangeAt(0).getBoundingClientRect();
     const m = document.querySelector('.selection-menu')!.getBoundingClientRect();
-    return m.top < rect.bottom && m.bottom > rect.top && m.left < rect.right && m.right > rect.left;
+    return m.top >= rect.bottom || m.bottom <= rect.top;
   });
-  expect(overlaps).toBe(false);
+  expect(clearsSelection).toBe(true);
   // 模拟拖动选择手柄（选区变化）→ 菜单自动关闭
   await page.evaluate(() => {
     const sel = window.getSelection()!;
