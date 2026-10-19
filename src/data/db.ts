@@ -1,4 +1,5 @@
 import { deleteDB, openDB, type IDBPDatabase } from 'idb';
+import { showToast } from '../lib/toast';
 
 export interface FileRecord { path: string; sha: string; size: number; text: string | null; title: string; lastUsedAt: number; updatedAt: number }
 export interface TreeEntry { path: string; sha: string; size: number; type: 'blob' }
@@ -10,6 +11,10 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function open(): Promise<IDBPDatabase> {
   return openDB(DB_NAME, SCHEMA_VER, {
+    blocked() {
+      // 首次升级被其它标签页的旧连接挡住：提示用户关闭旧标签页后刷新。
+      showToast('数据库被其它标签页占用，请关闭后刷新本页', { kind: 'error' });
+    },
     upgrade(db, oldVersion) {
       for (const name of ['files', 'blobs', 'kv'] as const) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
@@ -20,6 +25,14 @@ function open(): Promise<IDBPDatabase> {
         if (!db.objectStoreNames.contains('mem_attempts')) db.createObjectStore('mem_attempts', { autoIncrement: true });
       }
     },
+  }).then((db) => {
+    // 其它标签页请求升级时主动让路，否则本连接会把对方永久 blocked。
+    db.onversionchange = () => {
+      db.close();
+      dbPromise = null;
+      showToast('数据库已在其它标签页升级，请刷新本页', { kind: 'error' });
+    };
+    return db;
   });
 }
 

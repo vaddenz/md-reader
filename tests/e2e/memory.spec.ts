@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { BANK_PATH, BANK_TEXT, configureAndSync, readKv, readStore, writeKv } from './fixtures';
 
 test('记忆助手：入口可见、题库拉取体检、选择持久化', async ({ page }) => {
@@ -230,6 +231,39 @@ const ALL_KINDS_SELECTION = {
   sessionSize: 20, newPerDay: 10,
 };
 
+test('选择题提交前查看参考答案：按不会记录且档位不推进', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', ALL_KINDS_SELECTION);
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+
+  // 直接预置一个只含单选 Q2.1 的会话，免去前几题的作答。
+  const bank = await readStore(page, 'mem_banks', BANK_PATH) as { questions: { qid: string; id: string }[] };
+  const q = bank.questions.find((item) => item.id === 'Q2.1');
+  expect(q).toBeTruthy();
+  await writeKv(page, 'memSession', {
+    createdAt: Date.now(), startedAt: Date.now(), index: 0, answered: 0, scores: [],
+    items: [{ qid: q!.qid, bankPath: BANK_PATH, id: 'Q2.1' }],
+  });
+
+  await page.goto('./#/memory/train');
+  await expect(page.locator('.memory-question')).toContainText('负责事件循环的内置依赖库是？');
+
+  // 不选任何项，直接查看参考答案
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await expect(page.locator('.memory-answer')).toContainText('libuv 提供事件循环与线程池');
+  await expect(page.getByText('已记录（本地判分）')).toBeVisible();
+  // 档位标签配色（spec §11）：不会 = 红（--danger #C0392B）
+  await expect(page.locator('.memory-verdict')).toHaveCSS('color', 'rgb(192, 57, 43)');
+
+  const attempts = await readStore(page, 'mem_attempts') as { mode: string; verdict: string; revealed: boolean }[];
+  expect(attempts).toHaveLength(1);
+  expect(attempts[attempts.length - 1]).toMatchObject({ mode: 'choice', verdict: 'again', revealed: true });
+  const srs = await readStore(page, 'mem_srs') as { qid: string; stage: number }[];
+  expect(srs.find((s) => s.qid === q!.qid)).toMatchObject({ stage: 0 });
+});
+
 test('选择题本地判分与追问链：链排序、母题展开、单选错选、多选漏选', async ({ page }) => {
   await configureAndSync(page);
   await writeKv(page, 'memSelection', ALL_KINDS_SELECTION);
@@ -329,4 +363,47 @@ test('记录页：统计与明细、清除训练数据', async ({ page }) => {
   page.on('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: '清除训练数据' }).click();
   await expect(page.getByText('还没有训练记录。')).toBeVisible();
+});
+
+test('记录页：导出 JSON 可下载，导入同一文件幂等且统计不变', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+  await writeKv(page, 'llmConfig', { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' });
+  await page.route('https://llm.example/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ score: 82, hit: ['要点'], missed: [], comment: '不错' }) } }] }),
+    }),
+  );
+
+  // 先完成一次 AI 评分训练，产生可导出的记录
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+  await page.getByLabel('作答').fill('我的回答');
+  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.locator('.memory-score')).toContainText('82');
+
+  await page.goto('./#/memory/records');
+  // 等异步读库完成再取基准（初次渲染为空统计）
+  await expect(page.locator('.memory-stat').filter({ hasText: '已练' }).locator('b')).toHaveText('1');
+  const statsBefore = await page.locator('.memory-stats').first().innerText();
+
+  // 导出：文件名带日期，内容为记忆训练数据文件
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出 JSON' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^md-reader-memory-\d{8}\.json$/);
+  const filePath = await download.path();
+  expect(filePath).toBeTruthy();
+  const json = await readFile(filePath!, 'utf8');
+  expect(json).toMatch(/"kind":\s*"memory"/);
+
+  // 导入同一文件：toast 提示、记录不重复、统计不变（幂等）
+  await page.getByLabel('导入训练数据文件').setInputFiles(filePath!);
+  await expect(page.locator('.toast').filter({ hasText: '导入进度' })).toBeVisible();
+  expect(await page.locator('.memory-stats').first().innerText()).toBe(statsBefore);
+  await expect.poll(async () => (await readStore(page, 'mem_attempts') as unknown[]).length).toBe(1);
 });

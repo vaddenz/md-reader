@@ -94,3 +94,13 @@
 .memory-record-body { padding: 4px 0 10px; }
 .memory-danger { color: var(--danger); border-color: var(--danger); }
 .memory-row select { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; }
+
+/* 档位标签（spec §11）：纸面对比度 ≥ 4.5:1。 */
+.memory-verdict-excellent,
+.memory-stat span.memory-verdict-excellent { color: #2f7d4f; }
+.memory-verdict-good,
+.memory-stat span.memory-verdict-good { color: var(--acc-text); }
+.memory-verdict-hard,
+.memory-stat span.memory-verdict-hard { color: #9a6b00; }
+.memory-verdict-again,
+.memory-stat span.memory-verdict-again { color: var(--danger); }

@@ -36,6 +36,7 @@
 - 真机验收清单（v1.1）：[`docs/acceptance-2026-10-18-v1.1.md`](docs/acceptance-2026-10-18-v1.1.md)
 - 记忆助手设计：[`docs/specs/2026-10-19-memory-assistant-design.md`](docs/specs/2026-10-19-memory-assistant-design.md)
 - 记忆助手实施计划：[`docs/plans/2026-10-19-md-reader-memory-assistant-implementation.md`](docs/plans/2026-10-19-md-reader-memory-assistant-implementation.md)
+- 记忆助手真机验收清单（v1.3）：[`docs/acceptance-2026-10-19-memory-assistant.md`](docs/acceptance-2026-10-19-memory-assistant.md)
 
 ## 开发与自用
 

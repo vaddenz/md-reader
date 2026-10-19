@@ -225,6 +225,8 @@ export default function MemoryTrainPage() {
       setResult({ score: null, verdict, hit: [], missed: [], comment: '', mode: 'self' });
       setAwaitingSelf(false);
       setError(null);
+    } catch {
+      setError('保存失败，请重试');
     } finally {
       setSaving(false);
     }
@@ -350,11 +352,14 @@ export default function MemoryTrainPage() {
             {(['excellent', 'good', 'hard', 'again'] as Verdict[]).map((v) => (
               <div key={v} className="memory-stat">
                 <b>{(sessionVerdicts ?? EMPTY_VERDICT_COUNTS)[v]}</b>
-                <span>{VERDICT_LABELS[v]}</span>
+                <span className={`memory-verdict-${v}`}>{VERDICT_LABELS[v]}</span>
               </div>
             ))}
           </div>
-          <button type="button" className="memory-primary" onClick={() => navigate(toRouterPath(MEMORY))}>返回概览</button>
+          <div className="memory-row" style={{ marginTop: 12 }}>
+            <button type="button" className="memory-primary" style={{ width: 'auto' }} onClick={() => navigate(toRouterPath(MEMORY))}>返回概览</button>
+            <button type="button" className="memory-chip" onClick={() => navigate(toRouterPath(MEMORY))}>继续训练</button>
+          </div>
         </section>
       </main>
     );
@@ -390,7 +395,7 @@ export default function MemoryTrainPage() {
               <div className="memory-score">
                 {result.mode === 'ai' ? result.score : result.mode === 'choice' ? choiceOutcomeLabel(result.verdict) : VERDICT_LABELS[result.verdict]}
               </div>
-              <p className="memory-verdict">
+              <p className={`memory-verdict memory-verdict-${result.verdict}`}>
                 {result.mode === 'ai' && VERDICT_LABELS[result.verdict]}
                 {result.mode === 'self' && `${VERDICT_LABELS[result.verdict]} · 已记录（自评）`}
                 {result.mode === 'choice' && `${VERDICT_LABELS[result.verdict]} · 已记录（本地判分）`}

@@ -66,6 +66,8 @@ export interface MemoryStats {
   practiced: number;
   mastered: number;
   avgAiScore: number | null;
+  /** 近 7 天（含今日，本地日界起算）AI 评分均分；无记录为 null。 */
+  avgAiScore7d: number | null;
   verdictCounts: Record<Verdict, number>;
   streak: number;
   practicedToday: number;
@@ -296,6 +298,11 @@ export function summarize(attempts: MemoryAttempt[], srs: SrsState[], now: numbe
   const avgAiScore = aiScores.length
     ? Math.round((aiScores.reduce((s, a) => s + a.score, 0) / aiScores.length) * 10) / 10
     : null;
+  const sevenDaysAgo = addDays(dayStart(now), -6);
+  const aiScores7d = aiScores.filter((a) => a.ts >= sevenDaysAgo);
+  const avgAiScore7d = aiScores7d.length
+    ? Math.round((aiScores7d.reduce((s, a) => s + a.score, 0) / aiScores7d.length) * 10) / 10
+    : null;
 
   const today = dayStart(now);
   const practicedToday = attempts.filter((a) => a.ts >= today).length;
@@ -336,6 +343,7 @@ export function summarize(attempts: MemoryAttempt[], srs: SrsState[], now: numbe
     practiced: new Set(attempts.map((a) => a.qid)).size,
     mastered: srs.filter(isMastered).length,
     avgAiScore,
+    avgAiScore7d,
     verdictCounts,
     streak,
     practicedToday,

@@ -167,6 +167,7 @@ describe('summarize', () => {
     expect(st.practiced).toBe(4);
     expect(st.mastered).toBe(1);
     expect(st.avgAiScore).toBe(85);
+    expect(st.avgAiScore7d).toBe(85);
     expect(st.verdictCounts).toEqual({ excellent: 1, good: 1, hard: 1, again: 1 });
     expect(st.streak).toBe(2);
     expect(st.practicedToday).toBe(2);
@@ -175,5 +176,18 @@ describe('summarize', () => {
     expect(st.due7).toBe(3);
     expect(st.trend).toHaveLength(14);
     expect(st.trend[13]).toMatchObject({ count: 2, avgScore: 80 });
+  });
+
+  it('近 7 天均分只算窗口内 AI 记录，7 天外与非 AI 排除；无记录为 null', () => {
+    const attempts = [
+      attempt({ qid: 'a', ts: NOW, mode: 'ai', score: 80 }),
+      attempt({ qid: 'b', ts: NOW - 6 * DAY, mode: 'ai', score: 90 }),
+      attempt({ qid: 'c', ts: NOW - 8 * DAY, mode: 'ai', score: 100 }),
+      attempt({ qid: 'd', ts: NOW - 2 * DAY, mode: 'choice', score: null }),
+    ];
+    const st = summarize(attempts, [], NOW);
+    expect(st.avgAiScore).toBe(90);      // 全部 AI：(80 + 90 + 100) / 3
+    expect(st.avgAiScore7d).toBe(85);    // 仅近 7 天：(80 + 90) / 2
+    expect(summarize([], [], NOW).avgAiScore7d).toBeNull();
   });
 });

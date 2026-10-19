@@ -294,7 +294,7 @@ export default function MemoryPage() {
           <div className="memory-stat"><b>{stats.dueToday}</b><span>待复习</span></div>
           <div className="memory-stat"><b>{stats.practicedToday}</b><span>已练</span></div>
           <div className="memory-stat"><b>{stats.streak}</b><span>连续天数</span></div>
-          <div className="memory-stat"><b>{stats.avgAiScore ?? '—'}</b><span>近 7 天均分</span></div>
+          <div className="memory-stat"><b>{stats.avgAiScore7d ?? '—'}</b><span>近 7 天均分</span></div>
         </div>
         <button type="button" className="memory-primary" onClick={() => void onStart()} disabled={starting}>
           {starting ? '准备中…' : '开始训练'}

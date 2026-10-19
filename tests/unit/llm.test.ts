@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  LlmError, chatCompletionsUrl, extractScoreJson, isLlmConfigured, scoreAnswer, testConnection, toScoreResult,
+  LlmError, chatCompletionsUrl, extractScoreJson, isLlmConfigured, scoreAnswer, testConnection, toScoreResult, truncateText,
 } from '../../src/data/llm';
 
 const CFG = { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' };
@@ -61,6 +61,17 @@ describe('extractScoreJson / toScoreResult', () => {
     expect(r.hit).toEqual(['a']);
     expect(r.missed).toHaveLength(8);
     expect(r.comment.length).toBe(500);
+  });
+});
+
+describe('truncateText', () => {
+  it('2000/4000/6000 边界：恰好等于上限不截断，超出截断并带后缀', () => {
+    for (const limit of [2000, 4000, 6000]) {
+      const exact = 'x'.repeat(limit);
+      expect(truncateText(exact, limit)).toBe(exact);
+      expect(truncateText(`${exact}y`, limit)).toBe(`${exact}…（已截断）`);
+    }
+    expect(truncateText('', 2000)).toBe('');
   });
 });
 
