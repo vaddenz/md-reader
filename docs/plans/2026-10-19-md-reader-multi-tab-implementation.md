@@ -649,8 +649,11 @@ test('多标签：重启恢复与去重', async ({ page }) => {
   await expect(panel.locator('.doc-tab-current')).toContainText('文档 B');
   await page.keyboard.press('Escape');
 
-  // 去重：返回首页 → 重开 B → 仍为两条（聚焦已有，不新开）
+  // 去重：返回首页（v1.2.0 返回语义 = 回来源页：B→A→首页，需两次）→ 重开 B → 仍为两条（聚焦已有，不新开）
   await page.getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page).toHaveURL(/#\/$/);
   await page.getByRole('link', { name: 'b', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
   await page.getByRole('button', { name: '切换标签' }).click();
