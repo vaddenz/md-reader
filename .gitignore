@@ -9,3 +9,4 @@ playwright-report/
 # 样式焕新阶段的临时产物
 .mockups/
 .impeccable/build/
+.worktrees/
