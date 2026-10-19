@@ -70,7 +70,7 @@
 新模块 `src/data/qbankIndex.ts`：
 
 - `listBanks()`：读 kv `tree`（同步产物）→ 过滤 `*.jsonl` 且非 `archive/` → 返回 `{ path, name, sha, size, fetched, questionCount?, issueCount? }[]`；`name` = 文件名去扩展名。
-- `ensureBankLoaded(path)`：
+- `ensureBankLoaded(path, client)`（`client` = 页面传入的 GitHub 客户端，数据层不依赖 React）：
   1. 取 `tree` 中该 path 的 `sha`；
   2. `mem_banks[path].sha === sha` → 直接返回解析结果；
   3. 否则先查 `blobs[sha]`（复用现有 blob 缓存）拿原文；缺失且在线 → `GitHubClient.getBlobText` 拉取并写入 `blobs`；
@@ -102,7 +102,7 @@ interface BankQuestion {
 }
 interface ParseWarning { line: number; kind: string; message: string }
 interface ParseResult { questions: BankQuestion[]; warnings: ParseWarning[] }
-export function parseBankText(text: string, path: string): ParseResult;
+export function parseBankText(text: string): ParseResult;
 ```
 
 - 字符串字段校验：必须为非空 string；`tags` 必须为 string[]（元素为非空 string，非法元素丢弃并告警）；`difficulty`/`source` 为 string。
@@ -163,7 +163,7 @@ kv 新增键：
 
 - 优秀与良好在间隔上暂不做区分（保持可预测），四档标签完整写入记录，便于后续调参。
 - 到期时刻按**本地日界**计算：`dueAt = localDayStart(now + N 天)`；今日到期判定为 `dueAt <= now`。
-- 已掌握（仅用于统计与展示）：`stage >= 6 && lastScore >= 70`；仍按 60 天复习。
+- 已掌握（仅用于统计与展示）：`stage === 6 && 最近一次 verdict ∈ {excellent, good}`（选择题与自评无分数，故按 verdict 判定）；仍按 60 天复习。
 
 ### 7.2 队列组装
 
