@@ -47,6 +47,49 @@ test('不支持时：用户操作给出安装提示', async ({ page }) => {
   await expect(page.getByText(/不支持方向锁定/)).toBeVisible();
 });
 
+test('浏览器标签：锁被拒时自动进入全屏并重试；回竖屏退出全屏且不打扰', async ({ page }) => {
+  // 平台事实：lock 需要全屏上下文——未全屏一律拒绝；requestFullscreen 设置伪 fullscreenElement。
+  await page.addInitScript(() => {
+    const lockCalls: string[] = [];
+    const fsCalls: string[] = [];
+    (window as any).__lockCalls = lockCalls;
+    (window as any).__fsCalls = fsCalls;
+    let fsEl: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fsEl });
+    // init script 执行时 documentElement 尚不存在：在原型上挂 stub。
+    (Element.prototype as any).requestFullscreen = function () {
+      fsCalls.push('request');
+      fsEl = document.documentElement;
+      document.dispatchEvent(new Event('fullscreenchange'));
+      return Promise.resolve();
+    };
+    (Document.prototype as any).exitFullscreen = function () {
+      fsCalls.push('exit');
+      fsEl = null;
+      document.dispatchEvent(new Event('fullscreenchange'));
+      return Promise.resolve();
+    };
+    Object.defineProperty(screen, 'orientation', {
+      value: {
+        lock: (t: string) => { lockCalls.push(t); return fsEl ? Promise.resolve() : Promise.reject(new Error('requires fullscreen')); },
+        unlock: () => Promise.resolve(),
+      },
+    });
+  });
+  await configureAndSync(page);
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  await page.getByRole('button', { name: '横屏' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-primary');
+  await expect.poll(() => page.evaluate(() => (window as any).__fsCalls)).toContain('request');
+  await expect(page.getByText(/不支持方向锁定/)).toHaveCount(0);
+
+  await page.getByRole('button', { name: '横屏' }).click(); // 回竖屏
+  await expect.poll(() => page.evaluate(() => (window as any).__fsCalls)).toContain('exit');
+  await expect(page.getByText(/不支持方向锁定/)).toHaveCount(0);
+});
+
 test('退出全屏后重新应用锁定（静默）', async ({ page }) => {
   await stubOrientation(page);
   await configureAndSync(page);

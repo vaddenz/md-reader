@@ -57,7 +57,8 @@ export function OrientationProvider({ children }: { children: ReactNode }) {
     void (async () => {
       await kvSet(ORIENTATION_KEY, next).catch(() => {});
       const ok = await applyOrientation(next);
-      if (!ok) showToast('当前环境不支持方向锁定：请用主屏幕应用（PWA）打开', { kind: 'error' });
+      // 回竖屏为尽力而为（退出全屏已生效）：失败不提示；横屏/翻转失败仍按安装提示口径。
+      if (!ok && next !== 'portrait') showToast('当前环境不支持方向锁定：请用主屏幕应用（PWA）打开', { kind: 'error' });
     })();
   }, []);
 
