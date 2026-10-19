@@ -221,3 +221,31 @@ test('目录抽屉：打开时定位到当前章节', async ({ page }) => {
     )
     .toBe(true);
 });
+
+test('悬浮目录按钮：点击开目录、拖拽后位置持久化', async ({ page }) => {
+  await configureAndSync(page);
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
+  const fab = page.getByRole('button', { name: '目录' });
+  await expect(fab).toBeVisible();
+
+  // 拖到左侧偏上：down → move → up
+  const box = (await fab.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(40, 200, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await fab.boundingBox())!.x).toBeLessThan(80);
+
+  // 刷新后仍在左侧（持久化）
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect
+    .poll(async () => (await page.getByRole('button', { name: '目录' }).boundingBox())!.x)
+    .toBeLessThan(80);
+
+  // 点击（非拖拽）打开目录
+  await page.getByRole('button', { name: '目录' }).click();
+  await expect(page.getByRole('dialog', { name: '目录' })).toBeVisible();
+});

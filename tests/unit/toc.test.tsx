@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import BottomBar from '../../src/components/BottomBar';
 import DocHeader from '../../src/components/DocHeader';
+import FloatingTocButton from '../../src/components/FloatingTocButton';
 import TocDrawer from '../../src/components/TocDrawer';
 import { useScrollSpy } from '../../src/hooks/useScrollSpy';
 import type { Heading } from '../../src/markdown/render';
@@ -233,24 +233,13 @@ describe('TocDrawer', () => {
 describe('阅读页顶栏与底部工具条入口', () => {
   const future = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
-  it('BottomBar：提供 onOpenToc 时渲染「目录」按钮并回调；否则不渲染', () => {
-    const onOpenToc = vi.fn();
-    const withBtn = mount(
-      <MemoryRouter future={future}>
-        <BottomBar onOpenToc={onOpenToc} remember={() => {}} />
-      </MemoryRouter>,
-    );
-    const btn = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="目录"]');
+  it('FloatingTocButton：渲染「目录」按钮并回调', () => {
+    const onOpen = vi.fn();
+    const view = mount(<FloatingTocButton onOpen={onOpen} />);
+    const btn = view.container.querySelector<HTMLButtonElement>('button[aria-label="目录"]');
     expect(btn).not.toBeNull();
     act(() => { btn!.click(); });
-    expect(onOpenToc).toHaveBeenCalledTimes(1);
-
-    const without = mount(
-      <MemoryRouter future={future}>
-        <BottomBar remember={() => {}} />
-      </MemoryRouter>,
-    );
-    expect(without.container.querySelector('button[aria-label="目录"]')).toBeNull();
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
   it('DocHeader ⋯ 弹层：提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', () => {

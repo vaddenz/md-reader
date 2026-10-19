@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { SETTINGS, searchHref, toRouterPath } from '../app/nav';
 
 interface Props {
-  onOpenToc?: () => void;
   /** 打开阅读内外观面板（spec §2.5）：不离开阅读上下文，不跳设置页。 */
   onOpenAppearance?: () => void;
   favorite?: boolean;
@@ -11,8 +10,8 @@ interface Props {
   remember: () => void;
 }
 
-/** 阅读页底部工具条（spec §3.2）：目录 / 搜索 / 外观 / 收藏 / 设置。 */
-export default function BottomBar({ onOpenToc, onOpenAppearance, favorite = false, onToggleFavorite, remember }: Props) {
+/** 阅读页底部工具条（spec §3.2）：搜索 / 外观 / 收藏 / 设置。 */
+export default function BottomBar({ onOpenAppearance, favorite = false, onToggleFavorite, remember }: Props) {
   const navigate = useNavigate();
   const go = (to: string) => {
     remember();
@@ -20,18 +19,6 @@ export default function BottomBar({ onOpenToc, onOpenAppearance, favorite = fals
   };
   return (
     <nav className="doc-bottombar" aria-label="阅读工具">
-      {onOpenToc && (
-        <button
-          type="button"
-          className="doc-bottombar-item"
-          aria-label="目录"
-          onClick={onOpenToc}
-        >
-          <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true">
-            <path fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" d="M4 7h16M4 12h16M4 17h10" />
-          </svg>
-        </button>
-      )}
       <button
         type="button"
         className="doc-bottombar-item"

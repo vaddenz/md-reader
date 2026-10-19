@@ -6,6 +6,7 @@ import AppearanceSheet from '../components/AppearanceSheet';
 import BackToSource from '../components/BackToSource';
 import BottomBar from '../components/BottomBar';
 import DocHeader from '../components/DocHeader';
+import FloatingTocButton from '../components/FloatingTocButton';
 import PrevNext from '../components/PrevNext';
 import RelatedDocs from '../components/RelatedDocs';
 import SelectionMenu from '../components/SelectionMenu';
@@ -522,9 +523,11 @@ export default function DocPage() {
         onToggleOrientation={toggleLandscape}
         onFlipOrientation={flip}
       />
+      {ready && tocHeadings.length > 0 && !tocOpen && (
+        <FloatingTocButton onOpen={openToc} />
+      )}
       {ready && (
         <BottomBar
-          onOpenToc={tocHeadings.length > 0 ? openToc : undefined}
           onOpenAppearance={() => setAppearanceOpen(true)}
           favorite={favorite === true}
           onToggleFavorite={favorite === null ? undefined : toggleFav}
