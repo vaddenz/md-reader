@@ -568,8 +568,9 @@ Run: `npx playwright test tests/e2e/appearance.spec.ts` → 新用例 FAIL。
 - Modify: `src/styles/offline-banner.css`（壳底 + 橙状态点，对比度复核）
 - Modify: `src/styles/sync-badge.css`（语义色保留、按新底复核；按钮用 `--acc`）
 - Modify: `src/styles/menu.css`（右键菜单白卡圆角 12 软影，行 hover 灰）
-- Modify: `src/styles/content.css`（代码块深底 `#1B1D21` + hljs 配色适配；mermaid 占位虚线框；图片圆角 10；`.doc-state`/`.home-empty` 空态 = 纸面居中 + 主按钮）
-- Test: 既有相关 spec 回归（`reader/highlight/settings/offline/expiry`）
+- Modify: `src/styles/content.css`（代码块深底 `#1B1D21` + hljs 配色适配；mermaid 占位虚线框；图片圆角 10；`.doc-state`/`.home-empty` 空态 = 纸面居中 + 主按钮；**plain `mark` 与 `.search-mark` 按 spec §2.1 落令牌**）
+- Modify: `src/styles/search.css`（搜索页片段标记 → 搜索命中 token）
+- Test: 既有相关 spec 回归（`reader/highlight/settings/offline/expiry/search`）
 
 **Interfaces:**
 - Consumes: T1/T2 令牌；类名/文案/role 全部不变（e2e 按文本断言 toast/横幅/对话框）。
@@ -588,6 +589,17 @@ Run: `npx playwright test tests/e2e/appearance.spec.ts` → 新用例 FAIL。
 pre.code, pre { background: #1B1D21; color: #E9EBEF; border-radius: 10px; }   /* hljs 令牌随之微调，确保 ≥4.5:1 */
 ```
 hljs 具体 token 色以 content.css 现状逐一改到深底可读（关键字/字符串/注释三类至少复核）。
+
+spec §2.1 覆盖关系补录（预检裁定：plain 标记与搜索标记也走令牌）：
+```css
+/* content.css */
+mark { background: var(--hl-yellow); }              /* ==高亮== 与持久高亮黄同值 */
+mark.search-mark { background: rgba(31, 63, 212, .16);
+  text-decoration: underline; text-decoration-color: var(--acc); text-underline-offset: 2px; }
+/* search.css 片段标记同染色 */
+.search-snippet mark { background: rgba(31, 63, 212, .16);
+  text-decoration: underline; text-decoration-color: var(--acc); text-underline-offset: 2px; }
+```
 
 - [ ] **Step 2: 运行** Run: `npm test && npx tsc --noEmit && npm run build && npm run test:e2e` → 全绿（toast/横幅/对话框均按文本断言，不破）。
 - [ ] **Step 3: 提交** `git add src/styles/ && git commit -m "feat: 组件细节层换装（抽屉/toast/横幅/菜单/代码块/空态）"`
