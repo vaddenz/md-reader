@@ -11,3 +11,8 @@
   font-size: 15px; padding: 10px 14px; border-radius: 8px; color: var(--ink); cursor: pointer;
 }
 .selection-menu-item:hover, .selection-menu-item:focus-visible { background: var(--shell); }
+/* 主操作 = 本菜单首项（spec §3.2：复制/清除高亮/全选 各分支首项） */
+.selection-menu .selection-menu-item:first-child {
+  color: var(--acc-text);
+  font-weight: 600;
+}
