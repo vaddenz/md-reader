@@ -6,6 +6,7 @@ import OfflineBanner from '../components/OfflineBanner';
 import { ToastHost } from '../lib/toast';
 import { OrientationProvider } from '../state/OrientationContext';
 import { SyncProvider } from '../state/SyncContext';
+import { TabsProvider } from '../state/TabsContext';
 import { TokenProvider } from '../state/TokenContext';
 
 /**
@@ -44,12 +45,14 @@ export default function Shell() {
     <TokenProvider>
       <SyncProvider>
         <OrientationProvider>
-          <div className="shell">
-            {/* ToastHost 先挂载：页面/同步的早期 effect 触发的提示也能被接收 */}
-            <ToastHost />
-            <OfflineBanner />
-            <Outlet />
-          </div>
+          <TabsProvider>
+            <div className="shell">
+              {/* ToastHost 先挂载：页面/同步的早期 effect 触发的提示也能被接收 */}
+              <ToastHost />
+              <OfflineBanner />
+              <Outlet />
+            </div>
+          </TabsProvider>
         </OrientationProvider>
       </SyncProvider>
     </TokenProvider>

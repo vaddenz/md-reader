@@ -30,6 +30,7 @@ import { renderDoc } from '../markdown/render';
 import { useOrientation } from '../state/OrientationContext';
 import type { RepoConfig } from '../state/SyncContext';
 import { useSync } from '../state/SyncContext';
+import { useTabs } from '../state/TabsContext';
 import { useToken } from '../state/TokenContext';
 
 type PageState =
@@ -80,6 +81,7 @@ export default function DocPage() {
   const { token } = useToken();
   const { lastSyncAt } = useSync();
   const { state: orientation, toggleLandscape, flip } = useOrientation();
+  const { loaded: tabsLoaded, ensureTab, setTitle: setTabTitle } = useTabs();
   const params = useParams();
   const raw = params['*'] ?? '';
   const path = raw.includes('%') ? safeDecode(raw) : raw;
@@ -320,6 +322,18 @@ export default function DocPage() {
 
   // 阅读进度记录：滚动比例节流写入（含 visibilitychange 与卸载补写）。
   useReadingProgress(path, { enabled: ready, container: contentRef });
+
+  // 多标签登记（spec §3.2）：载入完成后确保当前文档在标签中并聚焦。
+  useEffect(() => {
+    if (!tabsLoaded) return;
+    ensureTab(path);
+  }, [tabsLoaded, path, ensureTab]);
+
+  // 就绪后回填标签标题（切换器显示用）；同样等待载入，避免「就绪早于恢复」时回填丢失（无标签可改名）。
+  useEffect(() => {
+    if (!tabsLoaded) return;
+    if (cur.kind === 'ready' && cur.title) setTabTitle(path, cur.title);
+  }, [tabsLoaded, cur, path, setTabTitle]);
 
   // 卸载时清掉复制按钮的回退定时器。
   useEffect(() => () => {
