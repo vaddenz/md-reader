@@ -27,9 +27,9 @@ describe('db', () => {
     expect(await kvGet('lastSyncAt')).toBeUndefined();
   });
   it('openDb 版本冲突时自愈且不挂起、不泄漏连接', async () => {
-    // 造一个更高版本的库，使 SCHEMA_VER=1 的 open 异步失败（VersionError）
+    // 造一个更高版本的库，使 SCHEMA_VER 更低的 open 异步失败（VersionError）
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open('mdreader', 2);
+      const req = indexedDB.open('mdreader', 3);
       req.onsuccess = () => { req.result.close(); resolve(); };
       req.onerror = () => reject(req.error);
     });

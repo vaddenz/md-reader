@@ -4,15 +4,20 @@ export interface FileRecord { path: string; sha: string; size: number; text: str
 export interface TreeEntry { path: string; sha: string; size: number; type: 'blob' }
 
 const DB_NAME = 'mdreader';
-const SCHEMA_VER = 1;
+const SCHEMA_VER = 2;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function open(): Promise<IDBPDatabase> {
   return openDB(DB_NAME, SCHEMA_VER, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       for (const name of ['files', 'blobs', 'kv'] as const) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+      }
+      if (oldVersion < 2) {
+        if (!db.objectStoreNames.contains('mem_banks')) db.createObjectStore('mem_banks');
+        if (!db.objectStoreNames.contains('mem_srs')) db.createObjectStore('mem_srs');
+        if (!db.objectStoreNames.contains('mem_attempts')) db.createObjectStore('mem_attempts', { autoIncrement: true });
       }
     },
   });
