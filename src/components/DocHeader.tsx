@@ -36,7 +36,7 @@ export default function DocHeader({
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLElement>(null);
 
-  // ⋯ 弹层：外部 pointerdown（捕获）或 Escape 关闭；点击菜单项由 act() 先关再执行。
+  // ⋯ 弹层：外部 pointerdown（捕获）或 Escape 关闭；关闭类菜单项由 act() 先关再执行，就地切换类用 actStay()。
   useEffect(() => {
     if (!more) return;
     const onDown = (e: PointerEvent) => {
@@ -55,6 +55,11 @@ export default function DocHeader({
 
   const act = (fn?: () => void) => {
     setMore(false);
+    fn?.();
+  };
+
+  /** 就地切换类菜单项（横屏/旋转/收藏）：不关闭弹层，便于连续操作（spec §1.3 / §2.4）。 */
+  const actStay = (fn?: () => void) => {
     fn?.();
   };
 
@@ -104,13 +109,13 @@ export default function DocHeader({
                 type="button"
                 className="doc-more-item"
                 aria-pressed={orientation !== 'portrait'}
-                onClick={() => act(onToggleOrientation)}
+                onClick={() => actStay(onToggleOrientation)}
               >
                 横屏
               </button>
             )}
             {orientation && orientation !== 'portrait' && onFlipOrientation && (
-              <button type="button" className="doc-more-item" onClick={() => act(onFlipOrientation)}>
+              <button type="button" className="doc-more-item" onClick={() => actStay(onFlipOrientation)}>
                 旋转
               </button>
             )}
