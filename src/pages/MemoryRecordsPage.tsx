@@ -128,10 +128,11 @@ export default function MemoryRecordsPage() {
           ))}
         </ul>
         <div className="memory-trend" aria-label="近 14 天趋势">
-          {stats.trend.map((t) => (
+          {stats.trend.map((t, i) => (
             <div key={t.day} className="memory-trend-col" title={`${fmtDay(t.day)}：${t.count} 题`}>
-              <i style={{ height: `${Math.round((t.count / trendMax) * 100)}%` }} />
-              <span>{fmtDay(t.day)}</span>
+              {t.count > 0 && <i style={{ height: `${Math.round((t.count / trendMax) * 100)}%` }} />}
+              {/* 14 列放不下完整日期：隔列显示（始终保留最后一列），保持可读且不溢出 */}
+              <span>{i % 2 === 0 || i === stats.trend.length - 1 ? fmtDay(t.day) : ''}</span>
             </div>
           ))}
         </div>

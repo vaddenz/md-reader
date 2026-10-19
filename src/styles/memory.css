@@ -4,10 +4,14 @@
   margin: 0 auto;
   padding: 16px 16px calc(40px + env(safe-area-inset-bottom, 0px));
 }
-.memory-back { display: inline-flex; align-items: center; min-height: 32px; color: var(--acc-text); font-size: 14px; text-decoration: none; }
+.memory-back {
+  display: inline-flex; align-items: center; min-height: 32px;
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--acc-text); font: inherit; font-size: 14px; text-decoration: none;
+}
 .memory-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .memory-title { margin: 8px 0 4px; font-size: 24px; }
-.memory-link { color: var(--acc-text); font-size: 14px; }
+.memory-link { display: inline-flex; align-items: center; min-height: 32px; color: var(--acc-text); font-size: 14px; }
 
 .memory-card {
   margin: 18px 0 0; padding: 6px 16px 16px;
@@ -40,7 +44,7 @@
 .memory-row-label { flex: none; width: 76px; color: var(--ink2); font-size: 13px; }
 .memory-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .memory-chip {
-  min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  min-height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
   background: var(--card); color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer;
 }
 .memory-chip-on { border-color: var(--acc); color: var(--acc-text); background: rgba(31, 63, 212, .08); }
@@ -82,10 +86,10 @@
 
 .memory-verdicts { list-style: none; display: flex; gap: 8px; margin: 10px 0 0; padding: 0; }
 .memory-verdicts li { flex: 1; display: flex; justify-content: space-between; padding: 6px 8px; border-radius: var(--r-ctl); background: var(--shell); font-size: 13px; }
-.memory-trend { display: flex; gap: 2px; align-items: flex-end; height: 72px; margin-top: 10px; }
+.memory-trend { display: flex; gap: 2px; align-items: flex-end; height: 84px; margin-top: 10px; overflow: hidden; }
 .memory-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
 .memory-trend-col i { width: 100%; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--acc); }
-.memory-trend-col span { font-size: 9px; color: var(--ink2); white-space: nowrap; transform: rotate(-45deg); }
+.memory-trend-col span { font-size: 12px; color: var(--ink2); white-space: nowrap; }
 .memory-records { list-style: none; margin: 4px 0 0; padding: 0; }
 .memory-records li { border-top: 1px solid var(--line); }
 .memory-records li:first-child { border-top: 0; }
@@ -97,10 +101,10 @@
 
 /* 档位标签（spec §11）：纸面对比度 ≥ 4.5:1。 */
 .memory-verdict-excellent,
-.memory-stat span.memory-verdict-excellent { color: #2f7d4f; }
+.memory-stat span.memory-verdict-excellent { color: #2b6e46; }
 .memory-verdict-good,
 .memory-stat span.memory-verdict-good { color: var(--acc-text); }
 .memory-verdict-hard,
-.memory-stat span.memory-verdict-hard { color: #9a6b00; }
+.memory-stat span.memory-verdict-hard { color: #8a5f00; }
 .memory-verdict-again,
 .memory-stat span.memory-verdict-again { color: var(--danger); }
