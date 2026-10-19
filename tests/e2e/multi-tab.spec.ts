@@ -64,6 +64,7 @@ test('多标签：唤出切换器、切换与位置恢复、关闭行为', async
   await expect(panel).toBeVisible();
   await expect(panel.locator('.doc-tab-row')).toHaveCount(2);
   await expect(panel.locator('.doc-tab-current')).toContainText('文档 B');
+  await expect(panel.locator('.doc-tab-current .doc-tab-open')).toHaveAttribute('aria-current', 'true');
 
   // 切回 A：位置恢复到 ±5%
   await panel.getByRole('button', { name: '文档 A', exact: true }).click();

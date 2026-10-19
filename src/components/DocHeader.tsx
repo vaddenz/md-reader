@@ -163,6 +163,7 @@ export default function DocHeader({
               <button
                 type="button"
                 className="doc-tab-open"
+                aria-current={t.id === tabs.activeId ? 'true' : undefined}
                 onClick={() => {
                   setTabsOpen(false);
                   activateTab(t.id);

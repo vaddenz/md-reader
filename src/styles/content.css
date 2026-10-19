@@ -493,6 +493,8 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
+  /* 标题即切换器入口：触控目标补足 DESIGN.md 的 44px 底线（字号/字重仍由 .doc-title 控制）。 */
+  min-height: 44px;
 }
 .doc-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-title-caret { flex: none; color: var(--ink2); }
@@ -531,8 +533,8 @@
 .doc-tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-tab-close {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
