@@ -65,7 +65,7 @@
 | `CI=1 npm test` | ✅ 32 个测试文件 / 211 个用例全部通过（2.36s；退出码 0） |
 | `npx tsc --noEmit` | ✅ 无类型错误（退出码 0） |
 | `npm run build` | ✅ 构建成功（3.99s；PWA 预缓存 71 项 / 3887.66 KiB；mermaid chunk >500kB 为已知观察项，动态加载不影响使用） |
-| `CI=1 npm run test:e2e` | ✅ 66 个用例全部通过（20.6s；Playwright + mock `api.github.com`，不触网；`CI=1` 强制自建 preview 服务，避免端口复用串味） |
+| `CI=1 npm run test:e2e` | ✅ 67 个用例全部通过（20.6s；Playwright + mock `api.github.com`，不触网；`CI=1` 强制自建 preview 服务，避免端口复用串味） |
 
 ## 备注 / 已知限制（记录用）
 

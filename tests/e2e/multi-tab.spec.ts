@@ -87,6 +87,32 @@ test('多标签：唤出切换器、切换与位置恢复、关闭行为', async
   await expect(page.getByRole('group', { name: '打开的标签' }).locator('.doc-tab-row')).toHaveCount(1);
 });
 
+test('多标签：切换后两边的目录按钮均可见（回归）', async ({ page }) => {
+  await configureAndSync(page);
+
+  // tab1 = A，tab2 = B（抽屉打开 B，二者都有 h1–h4 标题 → 都应显示悬浮目录按钮）
+  await page.getByRole('link', { name: 'a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '目录' })).toBeVisible();
+
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '文件' }).click();
+  await page.getByRole('dialog', { name: '全部文档' }).getByRole('link', { name: 'b', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '目录' })).toBeVisible();
+
+  // 切回 A → 切回 B：两边都保持目录入口（真机验收反馈的回归钉）
+  await page.getByRole('button', { name: '切换标签' }).click();
+  await page.getByRole('button', { name: '文档 A', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '目录' })).toBeVisible();
+
+  await page.getByRole('button', { name: '切换标签' }).click();
+  await page.getByRole('button', { name: '文档 B', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '目录' })).toBeVisible();
+});
+
 test('多标签：重启恢复与去重', async ({ page }) => {
   await configureAndSync(page);
 
