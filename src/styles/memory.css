@@ -52,3 +52,14 @@
 .memory-progress li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
 .memory-progress li:first-child { border-top: 0; }
 .memory-footnote { margin: 16px 0 0; color: var(--ink2); font-size: 12.5px; line-height: 1.6; }
+
+.memory-md { font-size: 15px; line-height: 1.7; }
+.memory-md p { margin: 6px 0; }
+.memory-md pre { overflow-x: auto; }
+.memory-hint { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--r-ctl); background: rgba(31, 63, 212, .08); color: var(--acc-text); font-size: 13px; }
+.memory-input { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; font-size: 15px; line-height: 1.6; resize: vertical; }
+.memory-result { margin-top: 10px; }
+.memory-score { font-size: 32px; font-weight: 600; }
+.memory-verdict { margin: 2px 0 0; color: var(--ink2); font-size: 13px; }
+.memory-answer { margin-top: 12px; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--shell); }
+.memory-self { margin-top: 10px; }

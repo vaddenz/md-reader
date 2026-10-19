@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { BANK_PATH, BANK_TEXT, configureAndSync, readKv, writeKv } from './fixtures';
+import { BANK_PATH, BANK_TEXT, configureAndSync, readKv, readStore, writeKv } from './fixtures';
 
 test('记忆助手：入口可见、题库拉取体检、选择持久化', async ({ page }) => {
   await configureAndSync(page);
@@ -86,4 +86,70 @@ test('记忆助手：自动加载失败静默保留「未获取」，连网后�
   await bank.getByRole('checkbox').uncheck();
   await bank.getByRole('checkbox').check();
   await expect(bank).toContainText('5 题');
+});
+
+/** 只练问答「概念」题：队列被限定为 [Q1.1, Q1.2]（追问题型被筛掉，不受链排序影响）。 */
+const QA_ONLY_SELECTION = {
+  banks: ['题库/示例题库.jsonl'],
+  filters: { kinds: ['qa'], chapters: [], types: ['概念'], tags: [], difficulty: [] },
+  sessionSize: 20, newPerDay: 10,
+};
+
+test('问答训练：AI 评分 → 命中/遗漏与参考答案 → 记录落库 → 下一题', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+  await writeKv(page, 'llmConfig', { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' });
+  await page.route('https://llm.example/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ score: 82, hit: ['事件循环调度'], missed: ['libuv'], comment: '基本正确' }) } }] }),
+    }),
+  );
+
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+
+  await expect(page).toHaveURL(/#\/memory\/train$/);
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+
+  await page.getByLabel('作答').fill('事件循环负责调度异步回调，由 libuv 支持。');
+  await page.getByRole('button', { name: '提交' }).click();
+
+  await expect(page.locator('.memory-score')).toContainText('82');
+  await expect(page.getByText('基本正确')).toBeVisible();
+  await expect(page.locator('.memory-answer')).toContainText('事件循环负责调度异步回调');
+
+  expect(await readStore(page, 'mem_srs')).toMatchObject([{ qid: expect.any(String), stage: 1 }]);
+  expect(await readStore(page, 'mem_attempts')).toMatchObject([{ mode: 'ai', score: 82, verdict: 'good' }]);
+
+  await page.getByRole('button', { name: '下一题' }).click();
+  await expect(page.locator('.memory-question')).toContainText('什么是微任务？');
+});
+
+test('自评降级与提示：hint 优先、刷新恢复、查看答案后自评落库', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+
+  await page.getByRole('button', { name: '提示' }).click();
+  await expect(page.getByText('想 libuv')).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+
+  await page.getByRole('button', { name: '查看参考答案' }).click();
+  await expect(page.locator('.memory-answer')).toContainText('事件循环负责调度异步回调');
+  await page.getByRole('button', { name: '会', exact: true }).click();
+  await expect(page.getByText('已记录（自评）')).toBeVisible();
+
+  expect(await readStore(page, 'mem_attempts')).toMatchObject([{ mode: 'self', verdict: 'good', revealed: true }]);
+  expect(await readStore(page, 'mem_srs')).toMatchObject([{ stage: 1 }]);
 });
