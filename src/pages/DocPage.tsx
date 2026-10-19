@@ -99,8 +99,6 @@ export default function DocPage() {
   const [favorite, setFavorite] = useState<boolean | null>(null);
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  // 续读胶囊（spec §1.3-1）：已保存进度不再自动落位，改以「上次读到 N%」提示呈现；滚动后自动隐藏。
-  const [progressHint, setProgressHint] = useState<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
   // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
@@ -278,13 +276,10 @@ export default function DocPage() {
   }, [locationKey, ready]);
 
   // 历史滚动恢复：回到本条目（浏览器返回/「返回来源」）时优先还原记录的位置；
-  // 新打开时优先级：scroll 记忆 > ?to= 锚点 > ?q= 第 i 处命中（越界回退第一处）> 页首。
-  // 已保存进度不再自动落位（spec §1.3-1）：只设「续读胶囊」提示，点击才跳转（记忆/锚点/搜索分支不动）。
+  // 新打开时优先级：scroll 记忆 > ?to= 锚点 > ?q= 第 i 处命中（越界回退第一处）> 进度比例（spec §1.4）> 页首。
   // 高亮在正文注入 + 懒加载启动（上一个 effect）之后执行：先清理旧命中再重新高亮。
   useEffect(() => {
     if (!ready) return;
-    // 换条目/换参数进入：先清上一篇的胶囊残留（命中记忆/锚点/搜索分支而提前 return 时不会被覆盖）
-    setProgressHint(null);
     const container = contentRef.current;
     if (container) {
       for (const old of container.querySelectorAll('mark.search-mark')) old.replaceWith(...old.childNodes);
@@ -306,23 +301,20 @@ export default function DocPage() {
       if (marks.length) (marks[markIndex] ?? marks[0]).scrollIntoView();
       return;
     }
-    // 无 scroll 记忆、无 ?to/?q（spec §1.3-1）：默认停在页首，已保存进度以「续读胶囊」呈现。
-    // 只 setProgressHint、不滚动；ratio ≤ 5% 视为「已在首屏」，不出胶囊。
+    // 无 scroll 记忆、无 ?to/?q：按已保存进度默认落位（spec §1.4，v1.x 行为）。
+    // ratio ≤ 5% 视为「已在首屏」，不滚动。
     let cancelled = false;
+    let frame = 0;
     void getProgress(path).catch(() => undefined).then((rec) => {
-      if (cancelled) return;
-      setProgressHint(rec && rec.ratio > 0.05 ? rec.ratio : null);
+      if (cancelled || !rec || rec.ratio <= 0.05) return;
+      frame = window.requestAnimationFrame(() => {
+        const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo(0, Math.round(rec.ratio * max));
+        rememberScroll(locationKey, window.scrollY); // 落位写回记忆，下次同条目直接命中记忆分支
+      });
     });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; window.cancelAnimationFrame(frame); };
   }, [ready, to, q, markIndex, locationKey, path]);
-
-  // 续读胶囊自动隐藏：用户开始滚动（> 60px）即收起，避免遮挡正文。
-  useEffect(() => {
-    if (progressHint === null) return;
-    const hide = () => { if (window.scrollY > 60) setProgressHint(null); };
-    window.addEventListener('scroll', hide, { passive: true });
-    return () => window.removeEventListener('scroll', hide);
-  }, [progressHint]);
 
   // 阅读进度记录：滚动比例节流写入（含 visibilitychange 与卸载补写）。
   useReadingProgress(path, { enabled: ready, container: contentRef });
@@ -535,22 +527,6 @@ export default function DocPage() {
           onToggleFavorite={favorite === null ? undefined : toggleFav}
           remember={remember}
         />
-      )}
-      {/* 续读胶囊（spec §1.3-1）：悬浮于底部工具条上方，点击回到上次阅读位置 */}
-      {ready && progressHint !== null && (
-        <button
-          type="button"
-          className="progress-chip"
-          aria-label="回到上次位置"
-          onClick={() => {
-            const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-            window.scrollTo(0, Math.round(progressHint * max));
-            setProgressHint(null);
-          }}
-        >
-          <span className="progress-chip-dot" aria-hidden="true" />
-          上次读到 {Math.round(progressHint * 100)}%
-        </button>
       )}
       {from && <BackToSource />}
       {ready ? (

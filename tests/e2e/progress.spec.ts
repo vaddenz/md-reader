@@ -9,7 +9,7 @@ function scrollRatio(page: Page): Promise<number> {
   });
 }
 
-test('阅读进度：滚到中部退出，重开停在页首，点续读胶囊恢复到记录比例（±5%）', async ({ page }) => {
+test('阅读进度：滚到中部退出，重开自动恢复到记录比例（±5%）', async ({ page }) => {
   await configureAndSync(page);
 
   await page.getByRole('link', { name: 'a', exact: true }).click();
@@ -21,32 +21,28 @@ test('阅读进度：滚到中部退出，重开停在页首，点续读胶囊�
     const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     window.scrollTo(0, Math.round(max * 0.5));
   });
-  // 等一个节流窗口：进度落盘（≥1s），也让可能的位置重置暴露出来
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1200); // 等一个节流窗口：进度落盘（≥1s）
   const recorded = await scrollRatio(page);
   expect(recorded).toBeGreaterThan(0.4);
   expect(recorded).toBeLessThan(0.6);
 
-  // 退出到首页：新历史条目没有 scroll 记忆 → 重开时走进度分支（现在是胶囊而非自动落位）；首页「继续阅读」出现该文档
+  // 退出到首页：新历史条目没有 scroll 记忆 → 重开时按已保存进度默认落位（spec §1.4）
   await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible();
   await expect(page.locator('.home-recents')).toBeVisible();
 
-  // 重开同一篇：默认停在页首（spec §1.3-1），胶囊承载「回到上次位置」
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
-  await expect.poll(() => scrollRatio(page)).toBeLessThan(0.05);
-  await page.getByRole('button', { name: '回到上次位置' }).click();
   await expect
-    .poll(async () => Math.abs((await scrollRatio(page)) - recorded), { message: '点击胶囊后恢复到 ±5% 内' })
+    .poll(async () => Math.abs((await scrollRatio(page)) - recorded), { message: '重开后恢复到 ±5% 内' })
     .toBeLessThan(0.05);
 });
 
-test('无进度的文档不出现续读胶囊', async ({ page }) => {
+test('无进度的文档默认停在页首', async ({ page }) => {
   await configureAndSync(page);
   await page.getByRole('link', { name: 'b', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '回到上次位置' })).toHaveCount(0);
+  await expect.poll(() => scrollRatio(page)).toBeLessThan(0.05);
 });
 
 test('首页壳子：标题顶栏、搜索框、继续阅读卡带进度', async ({ page }) => {
