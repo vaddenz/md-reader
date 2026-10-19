@@ -19,7 +19,7 @@ typography:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', 'Source Han Sans SC', 'Microsoft YaHei', sans-serif"
     fontSize: "17px"
     fontWeight: 400
-    lineHeight: 1.8
+    lineHeight: 1.9
   code:
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
     fontSize: "13px"
@@ -142,21 +142,21 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 ### Hierarchy
 - **页标题**（700, 24px, 默认行高）：设置页 `设置`；首页标题（700, 20px, letter-spacing 0.06em）。
 - **文档标题**（600, 16px）：阅读页吸顶栏单行截断标题。
-- **Markdown 正文**（400, `--r-font-size` 默认 17px, line-height 1.8）：`.doc-content`；h1–h4 行高 1.4、h1/h2 带 1px 下划线。
+- **Markdown 正文**（400, `--r-font-size` 默认 17px, line-height 1.9）：`.doc-content`；h1–h4 行高 1.4、h1/h2 带 1px 下划线。
+- **数字**：全站 `font-variant-numeric: tabular-nums`（在 `body` 声明并继承，列表计数、百分比、元信息一律等宽对齐；CJK 不受影响）。
 - **卡组标签**（500, 12.5–13px, letter-spacing 0.04em, `--ink2`）：设置九区块标签、首页分组标签（「篇数」等计数沿用同一灰）。
 - **行内标签**（400, 11–14px）：底部工具条项 11px、树徽标 11px、toast 13–14px。
 - **代码**（mono, 0.765× 正文, line-height 1.6）。
 
 ### Named Rules
 **The No-Display-Face Rule.** 系统栈是唯一正文面孔；内置的 LXGW / Noto Serif SC 只作为用户可选档位存在，不得用作界面标题的装饰面孔。
-> 注（建成态偏差）：spec §2.2 要求正文行距 1.9 且数字一律 `tabular-nums`；当前构建正文行距保持 1.8、未落 `font-variant-numeric: tabular-nums`。以建成态为准记录，两处偏差留终审裁定（见 `docs/acceptance-2026-10-19-style-refresh.md` 备注）。
 
 ## Layout
 
 移动优先，单列居中，两侧 16px 页槽（`--page-gutter`）；内容列上限 46rem（阅读页）/ 640px（首页、搜索、设置）。触控目标一律 ≥44×44px。
 
 ### 首页（壳子）
-52px 顶栏：左「知识库」标题（20/700）、右 ⚙ 44px 图标直达设置（样张的左 ☰ 无对应功能，不保留——诚实适配）。其下灰底搜索胶囊行（#e8e6e0，圆角 10，44px）；「继续阅读」区 = 组标签 + 软影卡（首行内嵌 3px 进度条：`--line` 轨 + `--acc` 填充）；文件树为分组卡列表（行：标题 + 状态/chevron，未缓存/陈旧行文字退 `--ink2`）；同步徽标为搜索同排/组标签行末端的白卡小控件簇。收藏区与继续阅读共用卡皮。
+52px 顶栏：「知识库」标题（20/700、微字距）**真居中**，右侧 ⚙ 44px 图标以绝对定位固定右缘、直达设置（样张的左 ☰ 无对应功能，不保留——诚实适配）。其下灰底搜索胶囊行（#e8e6e0，圆角 10，44px）；「继续阅读」区 = 组标签 + 软影卡（首行内嵌 3px 进度条：`--line` 轨 + `--acc` 填充）；文件树为分组卡列表（行：标题 + 状态/chevron，未缓存/陈旧行文字退 `--ink2`）；同步徽标为搜索同排/组标签行末端的白卡小控件簇。收藏区与继续阅读共用卡皮。
 
 ### 阅读页
 吸顶 44px 导航（返回 · 标题 · ⋯）：毛玻璃壳底 + 1px 底线；⋯ 弹层 = 白卡圆角 12 + 软影（文件 / 横屏 / 旋转）。正文纸面，底部预留 108px + 安全区防遮挡。固定底部工具条五项（目录 / 搜索 / Aa / 收藏 / 设置）：56px + 安全区、毛玻璃纸面底、顶线；Aa 直接跳设置「阅读外观」，不新增浮层。「回到上次位置」胶囊：深墨底白字 + `--acc` 蓝点，悬浮于工具条上方 72px 处，仅当存在已保存进度且 > 首屏时出现（点击跳转，替代 v1.0 的打开即自动落位）。目录/文件树共用底部抽屉：壳底、顶圆角 16、遮罩 `rgba(23,24,26,.44)`。
@@ -240,4 +240,4 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 - **Don't** 在卡内用「同尺寸卡片网格」搭页面结构；卡是行的容器，不是布局积木。
 - **Don't** 给禁用态做出「还能点」的样子（弱化即可），也不要把禁用态当装饰弱化用在可点元素上。
 
-> 未纳入系统（建成态携带的旧账，不是可继承的规则）：markdown 家具（引用/表格/上下篇/相关文档 chip）与搜索页仍残留 v1.0 的 GitHub 灰阶（`#f6f8fa`/`#d0d7de`/`#d8dee4`/`#57606a`/`#8b949e`）与旧别名 `--c-*`；目录 scroll-spy 当前项底仍为旧蓝 `rgba(31,111,235,.08)`；正文行距 1.8 未随 spec 调至 1.9；`tabular-nums` 未落地。以上为待清偿项，新表面不得沿用。
+> 未纳入系统（建成态携带的旧账，不是可继承的规则）：markdown 家具（引用/表格/上下篇/相关文档 chip）与搜索页仍残留 v1.0 的 GitHub 灰阶（`#f6f8fa`/`#d0d7de`/`#d8dee4`/`#57606a`/`#8b949e`）与旧别名 `--c-*`；目录 scroll-spy 当前项底仍为旧蓝 `rgba(31,111,235,.08)`。以上为待清偿项（已留终审分诊），新表面不得沿用。

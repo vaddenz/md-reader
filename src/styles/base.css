@@ -33,6 +33,7 @@ body {
   color: var(--ink);
   background: var(--shell);
   line-height: 1.6;
+  font-variant-numeric: tabular-nums; /* 数字等宽（spec §2.2；属性继承，CJK 不受影响） */
 }
 
 /* 浏览器表面全部从令牌取色（craft floor） */

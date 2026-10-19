@@ -6,11 +6,12 @@
   padding: 0 16px calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
-/* 顶栏：标题 + 设置入口 */
+/* 顶栏：标题真居中（spec §3.1），设置齿轮绝对定位固定右缘 */
 .home-header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   height: 52px;
 }
 
@@ -23,6 +24,10 @@
 }
 
 .home-settings {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
