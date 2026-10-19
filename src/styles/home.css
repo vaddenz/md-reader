@@ -3,73 +3,83 @@
 .home {
   max-width: 640px;
   margin: 0 auto;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 0 16px calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
-/* 首页顶部行（T21 补）：搜索入口 + 设置入口 */
-.home-top {
+/* 顶栏：标题 + 设置入口 */
+.home-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0;
+  justify-content: space-between;
+  height: 52px;
 }
 
-.home-search {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  background: #f6f8fa;
-  color: #57606a;
-  text-decoration: none;
+.home-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .home-settings {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: none;
   width: 44px;
   height: 44px;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  background: #f6f8fa;
-  color: #57606a;
+  border-radius: var(--r-ctl);
+  color: var(--ink2);
+  text-decoration: none;
 }
-.home-settings:active { background: #eaf2fd; }
+
+/* 搜索入口：灰底胶囊行 */
+.home-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-ctl);
+  background: #e8e6e0;
+  color: #7c7f85;
+  font-size: 14.5px;
+  text-decoration: none;
+}
 
 .home-search-icon {
   flex: none;
-  color: #8b949e;
 }
 
-.home-empty {
-  padding: 24px 0;
-  color: #57606a;
-  text-align: center;
-}
-
-/* 首页区块（T19）：继续阅读 / 收藏 */
+/* 区块：组标签在上、卡片在下（继续阅读 / 收藏共用卡皮） */
 .home-section {
-  margin: 16px 0;
+  margin: 0;
 }
 
 .home-section-title {
-  margin: 0 0 4px;
-  color: #57606a;
+  margin: 16px 4px 8px;
+  color: var(--ink2);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .home-section-list {
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
   list-style: none;
+}
+
+.home-section-list li {
+  border-bottom: 1px solid var(--line);
+}
+
+.home-section-list li:last-child {
+  border-bottom: 0;
 }
 
 .home-doc-link {
@@ -77,9 +87,8 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 10px;
-  border-radius: 6px;
-  color: var(--c-text);
+  padding: 0 12px;
+  color: var(--ink);
   text-decoration: none;
 }
 
@@ -94,8 +103,41 @@
   text-overflow: ellipsis;
 }
 
+/* 首条「继续阅读」的进度条：贴行底、通宽 */
+.home-progress {
+  display: block;
+  position: relative;
+  height: 3px;
+  background: var(--line);
+}
+
+.home-progress i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--acc);
+}
+
+/* 文件树卡：外包一层卡皮（抽屉内复用时自带背景，不显卡） */
+.home-tree-card {
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.home-empty {
+  padding: 40px 0;
+  color: var(--ink2);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+ * 全局文件树（FileTree 组件共用；首页在卡内、抽屉在面板内）
+ * ------------------------------------------------------------------------- */
+
 .file-tree {
-  margin-top: 8px;
+  margin: 0;
 }
 
 .tree-list {
@@ -104,14 +146,17 @@
   list-style: none;
 }
 
+.tree-list > li + li {
+  border-top: 1px solid var(--line);
+}
+
 .tree-item {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 10px;
-  border-radius: 6px;
-  color: var(--c-text);
+  padding: 0 12px;
+  color: var(--ink);
   text-decoration: none;
 }
 
@@ -122,8 +167,8 @@
 }
 
 .tree-current {
-  background: #eaf2fd;
-  color: var(--c-primary);
+  background: rgba(31, 63, 212, 0.08);
+  color: var(--acc-text);
   font-weight: 600;
 }
 
@@ -131,10 +176,10 @@
   flex: none;
   margin-left: auto;
   padding: 1px 6px;
-  border: 1px solid #d0d7de;
-  border-radius: 999px;
-  background: #f6f8fa;
-  color: #8b949e;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--shell);
+  color: var(--ink2);
   font-size: 11px;
   line-height: 1.7;
 }
@@ -145,9 +190,8 @@
   gap: 6px;
   width: 100%;
   min-height: 44px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 6px;
   background: none;
   color: inherit;
   font: inherit;
@@ -158,7 +202,7 @@
 
 .tree-chevron {
   flex: none;
-  color: #8b949e;
+  color: var(--ink2);
   transition: transform 0.15s ease;
 }
 .tree-chevron-open {
@@ -178,12 +222,18 @@
 @media (hover: hover) {
   .tree-item:hover,
   .tree-dir-toggle:hover {
-    background: #f6f8fa;
+    background: var(--shell);
   }
   .tree-item.tree-current:hover {
-    background: #eaf2fd;
+    background: rgba(31, 63, 212, 0.12);
+  }
+  .home-doc-link:hover {
+    background: var(--shell);
   }
   .home-settings:hover {
-    background: #eaf2fd;
+    background: var(--line);
+  }
+  .home-search:hover {
+    background: #dedcd5;
   }
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { configureAndSync } from './fixtures';
+import { configureAndSync, writeKv } from './fixtures';
 
 /** 当前滚动比例（与实现同口径：scrollY / max(1, scrollHeight - innerHeight)）。 */
 function scrollRatio(page: Page): Promise<number> {
@@ -38,6 +38,20 @@ test('阅读进度：滚到中部退出，重开恢复到记录比例（±5%）'
   await expect
     .poll(async () => Math.abs((await scrollRatio(page)) - recorded), { message: '滚动比例应恢复到 ±5% 内' })
     .toBeLessThan(0.05);
+});
+
+test('首页壳子：标题顶栏、搜索框、继续阅读卡带进度', async ({ page }) => {
+  await configureAndSync(page);
+
+  // 预置一篇的阅读进度（壳子用例只关心首页渲染，不经由滚动落盘）
+  await writeKv(page, 'progress', { 'a.md': { ratio: 0.5, updatedAt: Date.now() } });
+  await page.reload();
+  await expect(page.locator('.tree-item')).toHaveCount(3);
+
+  await expect(page.getByRole('heading', { name: '知识库', level: 1 })).toBeVisible();
+  await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible(); // 结构契约：名称不变
+  await expect(page.locator('.home-recents')).toBeVisible();
+  await expect(page.locator('.home-recents .home-progress')).toBeVisible(); // 新增进度条节点
 });
 
 test('收藏：星标后首页出现收藏区块，取消后消失', async ({ page }) => {
