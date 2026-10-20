@@ -208,6 +208,23 @@
   text-align: center;
 }
 
+/* 数据库升级被旧页面连接阻塞：给出可操作的提示与重试入口，避免无限「加载中」 */
+.home-db-error {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 28px 16px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.home-db-error p { margin: 0; line-height: 1.7; }
+.home-db-error button {
+  min-height: 36px; margin-top: 4px; padding: 0 18px;
+  border: 0; border-radius: var(--r-ctl);
+  background: var(--acc-fill); color: #fff; font: inherit; font-size: 14px; cursor: pointer;
+}
+
 /* ---------------------------------------------------------------------------
  * 全局文件树（FileTree 组件共用；首页在卡内、抽屉在面板内）
  * ------------------------------------------------------------------------- */

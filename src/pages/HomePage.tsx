@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MEMORY, SETTINGS, docHref, searchHref } from '../app/nav';
 import FileTree from '../components/FileTree';
 import SyncBadge from '../components/SyncBadge';
-import { listFilesMeta, type FileMeta } from '../data/db';
+import { DbBlockedError, listFilesMeta, type FileMeta } from '../data/db';
 import { loadSrsMap } from '../data/memory';
 import { getFavorites, getProgress, recentDocs, type RecentDoc } from '../data/prefs';
 import { useSync } from '../state/SyncContext';
@@ -57,6 +57,8 @@ export default function HomePage() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentRatios, setRecentRatios] = useState<Record<string, number>>({});
   const [dueCount, setDueCount] = useState<number | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   // 记忆助手入口的「今日待复习」提示（仅本机统计，失败静默）
   useEffect(() => {
@@ -72,15 +74,40 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, [lastSyncAt]);
 
-  // 进入首页读取一次；同步完成（lastSyncAt 变化）后重读，让「更新目录」新增/过期的文档即时反映到树上。
+  // 数据库被旧页面连接阻塞（v1→v2 升级无法完成）时自动重试：旧标签页释放后无需手动刷新。
+  useEffect(() => {
+    if (!dbError) return;
+    const timer = window.setTimeout(() => {
+      setDbError(null);
+      setMetas(null);
+      setReloadTick((v) => v + 1);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [dbError]);
+
+  // 进入首页读取一次；同步完成（lastSyncAt 变化）或手动重试（reloadTick）后重读。
   useEffect(() => {
     let cancelled = false;
     void listFilesMeta().then(
-      (list) => { if (!cancelled) setMetas(list); },
-      () => { if (!cancelled) setMetas([]); },
+      (list) => { if (!cancelled) { setMetas(list); setDbError(null); } },
+      (err) => {
+        if (cancelled) return;
+        if (err instanceof DbBlockedError) {
+          setDbError(err.message);
+          setMetas(null);
+        } else {
+          setMetas([]);
+        }
+      },
     );
     return () => { cancelled = true; };
-  }, [lastSyncAt]);
+  }, [lastSyncAt, reloadTick]);
+
+  const retryDb = () => {
+    setDbError(null);
+    setMetas(null);
+    setReloadTick((v) => v + 1);
+  };
 
   // 继续阅读 / 收藏：同样在进入首页与同步完成后重读（同步可能移除文档，区块随之收敛）。
   useEffect(() => {
@@ -184,7 +211,13 @@ export default function HomePage() {
         </section>
       )}
 
-      {metas === null ? (
+      {dbError ? (
+        <div className="home-empty home-db-error" role="alert">
+          <p>{dbError}</p>
+          <p>请关闭同一站点的其它标签页，或强制退出应用后重开；本页也会自动重试。</p>
+          <button type="button" onClick={retryDb}>重试</button>
+        </div>
+      ) : metas === null ? (
         <p className="home-empty" role="status">加载中…</p>
       ) : metas.length === 0 ? (
         <p className="home-empty">暂无文档，点「更新目录」同步仓库</p>
