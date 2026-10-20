@@ -154,7 +154,7 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 
 **Display/Body Font:** 系统中文无衬线栈 `-apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif`（`--font-sans`）
 **Selectable Stacks:** v1.1 三档可选字体（系统默认 / LXGW Neo XiHei Screen / Noto Serif SC），经 `--r-font-family` 注入；入口两处共享同一偏好（设置页「阅读外观」区与阅读内「外观」面板，控件同源 `AppearanceControls`）
-**Selectable Weights:** 正文字重可调（300–600，默认 400），经 `--r-font-weight` 注入；仅正文生效，标题自带字重不受影响。宋体为可变字体真实生效；霞鹜新晰黑为静态字体，非 400 时由浏览器合成
+**Selectable Weights:** 正文字重可调（300–600，默认 400），经 `--r-font-weight` 注入；仅正文生效，标题 700、`strong`/`b` 700、代码块与行内代码 400 固定。宋体（Noto Serif SC）为可变字体，四档真实生效；系统字体通常原生支持；霞鹜新晰黑为静态字体（单 400 面），300 回退 400 面、500 可能按字体匹配回退 400、600 由浏览器合成加粗
 **Mono Font:** `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`（`--font-mono`；代码块字号 = 正文字号 × 0.765，不随字体选择变化）
 
 **Character:** 不用展示字体、不玩字距——排版的全部个性交给「中文正文的呼吸感」：17px 正文、宽行距、紧行内距。

@@ -52,11 +52,22 @@ test('字体粗细：设置页与阅读页生效、刷新持久化', async ({ pa
   const weight = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontWeight);
   expect(weight).toBe('600');
 
+  // 标题与强调固定 700，不随正文字重漂移
+  await expect(page.locator('.doc-content h1')).toHaveCSS('font-weight', '700');
+  await expect(page.locator('.doc-content strong').first()).toHaveCSS('font-weight', '700');
+
   // 刷新后仍为 600（持久化）
   await page.reload();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
   const weightAfterReload = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontWeight);
   expect(weightAfterReload).toBe('600');
+
+  // 代码块 / 行内代码 / 复制按钮固定 400（b.md 含 js 代码块）
+  await page.goto('./#/doc/深挖/b.md');
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await expect(page.locator('.doc-content pre').first()).toHaveCSS('font-weight', '400');
+  await expect(page.locator('.doc-content pre code').first()).toHaveCSS('font-weight', '400');
+  await expect(page.locator('.code-copy').first()).toHaveCSS('font-weight', '400');
 });
 
 test('设置页调整外观：预览联动、防抖持久化、阅读页生效', async ({ page }) => {

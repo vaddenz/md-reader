@@ -210,6 +210,9 @@
 .doc-content mark.hl-red { background: var(--hl-red); }
 .doc-content s,
 .doc-content del { color: #8b949e; }
+/* 强调与代码字重固定：不随正文字重漂移（spec §2.5：标题 700 / strong 700 / 代码块 400） */
+.doc-content strong,
+.doc-content b { font-weight: 700; }
 
 .doc-content code {
   padding: 0.15em 0.4em;
@@ -218,6 +221,9 @@
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
+.doc-content pre,
+.doc-content code,
+.doc-content .code-copy { font-weight: 400; }
 
 /* 代码块 + 右上角复制按钮（按钮绝对定位，pre 顶部留出空间）；
    深底 #1B1D21 + #E9EBEF 文字（spec §3.4「代码块深底保留」），圆角 10 */

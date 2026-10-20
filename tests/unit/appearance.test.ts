@@ -28,6 +28,7 @@ describe('sanitizeAppearance', () => {
     expect(sanitizeAppearance({ fontWeight: 300 }).fontWeight).toBe(300);
     expect(sanitizeAppearance({ fontWeight: 600 }).fontWeight).toBe(600);
     expect(sanitizeAppearance({ fontWeight: 350 }).fontWeight).toBe(400);
+    expect(sanitizeAppearance({ fontWeight: 400.5 }).fontWeight).toBe(400);
     expect(sanitizeAppearance({ fontWeight: '600' }).fontWeight).toBe(400);
     expect(sanitizeAppearance({}).fontWeight).toBe(400);
   });

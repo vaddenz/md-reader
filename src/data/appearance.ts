@@ -4,19 +4,20 @@ import { serialize } from './serialize';
 
 export type FontChoice = 'system' | 'xihei' | 'serif';
 
+export const FONT_WEIGHTS = [300, 400, 500, 600] as const;
+
+export type ReaderFontWeight = (typeof FONT_WEIGHTS)[number];
+
 export interface ReaderAppearance {
   fontFamily: FontChoice;
   fontSize: number;   // px
-  fontWeight: number; // 300/400/500/600，仅正文
+  fontWeight: ReaderFontWeight; // 300/400/500/600，仅正文
   tableScale: number; // 相对正文比例
   quoteScale: number;
 }
 
 export const FONT_SIZE_RANGE = { min: 12, max: 24 } as const;
 export const SCALE_RANGE = { min: 0.5, max: 1.2 } as const;
-export const FONT_WEIGHTS = [300, 400, 500, 600] as const;
-
-export type ReaderFontWeight = (typeof FONT_WEIGHTS)[number];
 
 export const DEFAULT_APPEARANCE: ReaderAppearance = {
   fontFamily: 'system', fontSize: 17, fontWeight: 400, tableScale: 0.95, quoteScale: 1,
