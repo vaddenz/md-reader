@@ -139,9 +139,9 @@ export function DataSyncProvider({ children }: { children: ReactNode }) {
       }
     };
     const onDirty = () => {
+      schedulePendingRefresh();
       if (!shouldAutoSync(config, online)) {
         dirtySinceRef.current = null;
-        schedulePendingRefresh();
         return;
       }
       scheduleDirtySync();

@@ -39,4 +39,28 @@
 
 ## Concerns
 
-- Auto-trigger timer edge cases are not directly exercised by the provider-level test; the pure gate assertions and full existing suite pass.
+- The initial implementation lacked provider-level auto-trigger timer coverage; this was resolved by the review fixes below.
+
+## Task 9 review fixes
+
+### Changes
+
+- Moved the debounced `schedulePendingRefresh()` call to the start of every `mdreader:sync-dirty` handler. The `shouldAutoSync` gate now controls only sync scheduling; pending-count refresh happens in both auto and manual modes.
+- Expanded `tests/unit/data-sync-context.test.tsx` with fake-timer coverage for 10-second trailing and 60-second max-wait dirty sync, 1-second pending refresh, startup/online/visibility gates, cursor-reset fingerprint behavior, auto-sync cursor preservation, and clear-state/timer cleanup.
+- Added shared mount/unmount helpers and `afterEach` `try/finally` cleanup for roots, timers, global stubs, online state, and visibility state.
+
+### TDD evidence
+
+- RED: before moving the pending refresh ahead of the gate, the new auto-mode dirty test failed: after 1 second `loadRepoState` had not been called.
+- GREEN: after the change, all 12 focused provider tests passed.
+
+### Verification
+
+- `npm run typecheck` — PASS.
+- `npx vitest run tests/unit/data-sync-context.test.tsx` — PASS, 1 file / 12 tests.
+- `npm test` — PASS, 48 files / 383 tests.
+- `git diff --check` — PASS.
+
+### Review
+
+- Both open findings are addressed; no unrelated production behavior changed.
