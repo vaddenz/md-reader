@@ -31,6 +31,31 @@
 }
 .memory-primary:disabled { opacity: .6; cursor: default; }
 
+/* 答题 / 结果页：问题与提示在上，操作区贴近屏幕下方（保留底部安全距离，便于单手操作） */
+.memory-train {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+}
+.memory-train .memory-header { flex: none; }
+.memory-train-card { flex: 1; display: flex; flex-direction: column; }
+.memory-zone-question { min-width: 0; }
+.memory-zone-answer { margin-top: auto; padding-top: 16px; }
+.memory-zone-answer .memory-input,
+.memory-zone-answer .memory-options { margin-top: 0; }
+
+/* 三级操作：文字链接（提示 / 查看参考答案），进一步弱化 */
+.memory-textactions { display: flex; justify-content: center; gap: 28px; }
+.memory-textlink {
+  min-height: 36px; padding: 0 6px; border: 0; background: none;
+  color: var(--ink2); font: inherit; font-size: 13px;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.memory-textlink:hover,
+.memory-textlink:focus-visible { color: var(--acc-text); }
+.memory-textlink:disabled { opacity: .5; cursor: default; text-decoration: none; }
+
 /* 操作区：主操作独立成行，次级操作等宽并列；统一高度与间距，避免「又挤又丑」 */
 .memory-actions { display: grid; gap: 8px; margin-top: 12px; }
 .memory-actions-row { display: flex; gap: 8px; }

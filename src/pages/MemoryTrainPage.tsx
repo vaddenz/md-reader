@@ -349,25 +349,29 @@ export default function MemoryTrainPage() {
     const scores = session?.scores ?? [];
     const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
     return (
-      <main className="memory">
-        <section className="memory-card" aria-labelledby="memory-finished-title">
-          <h2 id="memory-finished-title" className="memory-card-title">本次训练完成</h2>
-          <div className="memory-stats">
-            <div className="memory-stat"><b>{session?.answered ?? 0}</b><span>已练题数</span></div>
-            <div className="memory-stat"><b>{avg ?? '—'}</b><span>平均分（AI）</span></div>
+      <main className="memory memory-train">
+        <section className="memory-card memory-train-card" aria-labelledby="memory-finished-title">
+          <div className="memory-zone-question">
+            <h2 id="memory-finished-title" className="memory-card-title">本次训练完成</h2>
+            <div className="memory-stats">
+              <div className="memory-stat"><b>{session?.answered ?? 0}</b><span>已练题数</span></div>
+              <div className="memory-stat"><b>{avg ?? '—'}</b><span>平均分（AI）</span></div>
+            </div>
+            <h3 className="memory-card-title">档位分布</h3>
+            <div className="memory-stats">
+              {(['excellent', 'good', 'hard', 'again'] as Verdict[]).map((v) => (
+                <div key={v} className="memory-stat">
+                  <b>{(sessionVerdicts ?? EMPTY_VERDICT_COUNTS)[v]}</b>
+                  <span className={`memory-verdict-${v}`}>{VERDICT_LABELS[v]}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <h3 className="memory-card-title">档位分布</h3>
-          <div className="memory-stats">
-            {(['excellent', 'good', 'hard', 'again'] as Verdict[]).map((v) => (
-              <div key={v} className="memory-stat">
-                <b>{(sessionVerdicts ?? EMPTY_VERDICT_COUNTS)[v]}</b>
-                <span className={`memory-verdict-${v}`}>{VERDICT_LABELS[v]}</span>
-              </div>
-            ))}
-          </div>
-          <div className="memory-actions">
-            <button type="button" className="memory-primary" onClick={() => navigate(toRouterPath(MEMORY))}>返回概览</button>
-            <button type="button" className="memory-secondary" onClick={() => navigate(toRouterPath(MEMORY))}>继续训练</button>
+          <div className="memory-zone-answer">
+            <div className="memory-actions">
+              <button type="button" className="memory-primary" onClick={() => navigate(toRouterPath(MEMORY))}>返回概览</button>
+              <button type="button" className="memory-secondary" onClick={() => navigate(toRouterPath(MEMORY))}>继续训练</button>
+            </div>
           </div>
         </section>
       </main>
@@ -389,108 +393,116 @@ export default function MemoryTrainPage() {
 
   if (phase === 'result') {
     return (
-      <main className="memory">
+      <main className="memory memory-train">
         <header className="memory-header">
           <button type="button" className="memory-back" onClick={() => navigate(toRouterPath(MEMORY))}>← 返回概览</button>
         </header>
-        <section className="memory-card" aria-labelledby="memory-result-title">
-          <h2 id="memory-result-title" className="memory-card-title">{current.bankName} · {q.id} · 【{q.type}】</h2>
-          <MarkdownBlock className="memory-question" text={q.question} path={current.bankPath} knownPaths={knownPaths} />
-          {q.followUpOf && <FollowUpPanel followUpOf={q.followUpOf} parent={parentView} knownPaths={knownPaths} />}
-          {error && <p className="memory-note" role="alert">{error}</p>}
+        <section className="memory-card memory-train-card" aria-labelledby="memory-result-title">
+          <div className="memory-zone-question">
+            <h2 id="memory-result-title" className="memory-card-title">{current.bankName} · {q.id} · 【{q.type}】</h2>
+            <MarkdownBlock className="memory-question" text={q.question} path={current.bankPath} knownPaths={knownPaths} />
+            {q.followUpOf && <FollowUpPanel followUpOf={q.followUpOf} parent={parentView} knownPaths={knownPaths} />}
+            {error && <p className="memory-note" role="alert">{error}</p>}
 
-          {result ? (
-            <div className="memory-result">
-              <div className="memory-score">
-                {result.mode === 'ai' ? result.score : result.mode === 'choice' ? choiceOutcomeLabel(result.verdict) : VERDICT_LABELS[result.verdict]}
+            {result && (
+              <div className="memory-result">
+                <div className="memory-score">
+                  {result.mode === 'ai' ? result.score : result.mode === 'choice' ? choiceOutcomeLabel(result.verdict) : VERDICT_LABELS[result.verdict]}
+                </div>
+                <p className={`memory-verdict memory-verdict-${result.verdict}`}>
+                  {result.mode === 'ai' && VERDICT_LABELS[result.verdict]}
+                  {result.mode === 'self' && `${VERDICT_LABELS[result.verdict]} · 已记录（自评）`}
+                  {result.mode === 'choice' && `${VERDICT_LABELS[result.verdict]} · 已记录（本地判分）`}
+                </p>
+                {result.mode === 'choice' && q.options && (
+                  <OptionList q={q} picked={result.picked ?? []} eliminated={result.eliminated} />
+                )}
+                {result.hit.length > 0 && <p className="memory-note">命中要点：{result.hit.join('、')}</p>}
+                {result.missed.length > 0 && <p className="memory-note">遗漏要点：{result.missed.join('、')}</p>}
+                {result.comment && <p className="memory-note">{result.comment}</p>}
               </div>
-              <p className={`memory-verdict memory-verdict-${result.verdict}`}>
-                {result.mode === 'ai' && VERDICT_LABELS[result.verdict]}
-                {result.mode === 'self' && `${VERDICT_LABELS[result.verdict]} · 已记录（自评）`}
-                {result.mode === 'choice' && `${VERDICT_LABELS[result.verdict]} · 已记录（本地判分）`}
-              </p>
-              {result.mode === 'choice' && q.options && (
-                <OptionList q={q} picked={result.picked ?? []} eliminated={result.eliminated} />
-              )}
-              {result.hit.length > 0 && <p className="memory-note">命中要点：{result.hit.join('、')}</p>}
-              {result.missed.length > 0 && <p className="memory-note">遗漏要点：{result.missed.join('、')}</p>}
-              {result.comment && <p className="memory-note">{result.comment}</p>}
-            </div>
-          ) : awaitingSelf ? (
-            <div className="memory-self">
-              <p className="memory-note">{error ? '可重试评分，或对照参考答案自评：' : '对照参考答案，给自己评一档：'}</p>
-              <div className="memory-actions-row memory-grade">
-                <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('good')} disabled={saving}>会</button>
-                <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('hard')} disabled={saving}>模糊</button>
-                <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('again')} disabled={saving}>不会</button>
+            )}
+
+            {q.answer && (
+              <MarkdownBlock className="memory-answer" text={q.answer} path={current.bankPath} knownPaths={knownPaths} />
+            )}
+          </div>
+          <div className="memory-zone-answer">
+            {!result && awaitingSelf && (
+              <div className="memory-self">
+                <p className="memory-note">{error ? '可重试评分，或对照参考答案自评：' : '对照参考答案，给自己评一档：'}</p>
+                <div className="memory-actions-row memory-grade">
+                  <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('good')} disabled={saving}>会</button>
+                  <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('hard')} disabled={saving}>模糊</button>
+                  <button type="button" className="memory-secondary" onClick={() => void onSelfVerdict('again')} disabled={saving}>不会</button>
+                </div>
               </div>
-            </div>
-          ) : null}
-
-          {q.answer && (
-            <MarkdownBlock className="memory-answer" text={q.answer} path={current.bankPath} knownPaths={knownPaths} />
-          )}
-
-          {result && (
-            <div className="memory-actions">
-              <button type="button" className="memory-primary" onClick={() => void onNext()}>下一题</button>
-              <button type="button" className="memory-secondary" onClick={() => void onEnd()}>结束训练</button>
-            </div>
-          )}
+            )}
+            {result && (
+              <div className="memory-actions">
+                <button type="button" className="memory-primary" onClick={() => void onNext()}>下一题</button>
+                <button type="button" className="memory-secondary" onClick={() => void onEnd()}>结束训练</button>
+              </div>
+            )}
+          </div>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="memory">
+    <main className="memory memory-train">
       <header className="memory-header">
         <button type="button" className="memory-back" onClick={() => navigate(toRouterPath(MEMORY))}>← 暂时离开</button>
         <span className="memory-meta memory-bank-meta">第 {(currentIndex ?? 0) + 1} / {session?.items.length ?? 0} 题</span>
       </header>
-      <section className="memory-card" aria-labelledby="memory-question-title">
-        <h2 id="memory-question-title" className="memory-card-title">
-          {current.bankName} · {q.chapter ?? '未分章'} · {q.id} · 【{q.type}】
-        </h2>
-        <MarkdownBlock className="memory-question" text={q.question} path={current.bankPath} knownPaths={knownPaths} />
-        {error && <p className="memory-note" role="alert">{error}</p>}
-        {q.prompt && <MarkdownBlock className="memory-prompt" text={q.prompt} path={current.bankPath} knownPaths={knownPaths} />}
-        {q.followUpOf && <FollowUpPanel followUpOf={q.followUpOf} parent={parentView} knownPaths={knownPaths} />}
-        {hintText && <p className="memory-hint" role="status">提示：{hintText}</p>}
-        {eliminated && <p className="memory-hint" role="status">已排除选项 {eliminated}</p>}
-        {q.kind === 'qa' ? (
-          <textarea
-            className="memory-input"
-            aria-label="作答"
-            rows={5}
-            value={answerText}
-            placeholder="用自己的话作答…"
-            onChange={(e) => setAnswerText(e.target.value)}
-          />
-        ) : (
-          <OptionList
-            q={q}
-            picked={picked}
-            eliminated={eliminated}
-            onPick={(key) => {
-              if (q.kind === 'single') setPicked([key]);
-              else setPicked((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-            }}
-          />
-        )}
+      <section className="memory-card memory-train-card" aria-labelledby="memory-question-title">
+        <div className="memory-zone-question">
+          <h2 id="memory-question-title" className="memory-card-title">
+            {current.bankName} · {q.chapter ?? '未分章'} · {q.id} · 【{q.type}】
+          </h2>
+          <MarkdownBlock className="memory-question" text={q.question} path={current.bankPath} knownPaths={knownPaths} />
+          {error && <p className="memory-note" role="alert">{error}</p>}
+          {q.prompt && <MarkdownBlock className="memory-prompt" text={q.prompt} path={current.bankPath} knownPaths={knownPaths} />}
+          {q.followUpOf && <FollowUpPanel followUpOf={q.followUpOf} parent={parentView} knownPaths={knownPaths} />}
+          {hintText && <p className="memory-hint" role="status">提示：{hintText}</p>}
+          {eliminated && <p className="memory-hint" role="status">已排除选项 {eliminated}</p>}
+        </div>
+        <div className="memory-zone-answer">
+          {q.kind === 'qa' ? (
+            <textarea
+              className="memory-input"
+              aria-label="作答"
+              rows={5}
+              value={answerText}
+              placeholder="用自己的话作答…"
+              onChange={(e) => setAnswerText(e.target.value)}
+            />
+          ) : (
+            <OptionList
+              q={q}
+              picked={picked}
+              eliminated={eliminated}
+              onPick={(key) => {
+                if (q.kind === 'single') setPicked([key]);
+                else setPicked((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+              }}
+            />
+          )}
           <div className="memory-actions">
             <button type="button" className="memory-primary" onClick={() => void onSubmit()} disabled={(q.kind === 'qa' ? !answerText.trim() : picked.length === 0 || saving) || phase === 'scoring'}>
               {phase === 'scoring' ? '评分中…' : '提交'}
             </button>
-            <div className="memory-actions-row">
-              <button type="button" className="memory-secondary" onClick={onHint} disabled={hintLevel >= 2}>
+            <div className="memory-textactions">
+              <button type="button" className="memory-textlink" onClick={onHint} disabled={hintLevel >= 2}>
                 {hintLevel >= 2 ? '已给足提示' : '提示'}
               </button>
-              <button type="button" className="memory-secondary" onClick={onReveal} disabled={q.kind !== 'qa' && saving}>
+              <button type="button" className="memory-textlink" onClick={onReveal} disabled={q.kind !== 'qa' && saving}>
                 查看参考答案
               </button>
             </div>
           </div>
+        </div>
       </section>
     </main>
   );
