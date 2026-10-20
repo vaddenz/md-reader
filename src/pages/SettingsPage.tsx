@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HOME, SETUP, toRouterPath } from '../app/nav';
+import { SETUP, goBackOrHome, toRouterPath } from '../app/nav';
 import AboutSection from '../components/AboutSection';
 import AppearanceSection from '../components/AppearanceSection';
 import HighlightsSection from '../components/HighlightsSection';
@@ -9,6 +9,7 @@ import { clearAllData, kvGet, kvSet, listFilesMeta, storageEstimate, type FileMe
 import { GitHubClient, GitHubError } from '../data/github';
 import { bytesToText } from '../lib/format';
 import { useOrientation } from '../state/OrientationContext';
+import { DATA_CLEARED_EVENT } from '../state/TabsContext';
 import { useSync, type RepoConfig } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/settings.css';
@@ -131,6 +132,7 @@ export default function SettingsPage() {
     try {
       await clearAllData();
       clear();
+      window.dispatchEvent(new Event(DATA_CLEARED_EVENT));
       navigate(toRouterPath(SETUP));
     } catch {
       setClearError('清除失败，请重试');
@@ -144,7 +146,7 @@ export default function SettingsPage() {
 
   return (
     <main className="settings">
-      <a className="settings-back" href={HOME}>← 返回首页</a>
+      <button type="button" className="settings-back" aria-label="返回" onClick={() => goBackOrHome(navigate)}>← 返回</button>
       <h1 className="settings-title">设置</h1>
 
       <section className="settings-section" aria-labelledby="settings-token-title">

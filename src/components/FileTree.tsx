@@ -39,6 +39,10 @@ export default function FileTree({ metas, currentPath }: FileTreeProps) {
           href={docHref(item.path)}
           aria-current={current ? 'page' : undefined}
         >
+          <svg className="tree-file-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" d="M7 3h7l4 4v14H7z" />
+            <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" d="M14 3v4h4" />
+          </svg>
           <span className="tree-name">{item.name}</span>
           {uncached.has(item.path) && <span className="tree-badge">未缓存</span>}
         </a>
@@ -49,7 +53,7 @@ export default function FileTree({ metas, currentPath }: FileTreeProps) {
   return (
     <nav className="file-tree" aria-label="全部文档">
       <ul className="tree-list">
-        {tree.root.map(renderItem)}
+        {tree.dirs.length > 0 && <li className="tree-group-label" aria-hidden="true">文件夹</li>}
         {tree.dirs.map((dir) => {
           const open = !collapsed.has(dir.name);
           return (
@@ -69,12 +73,17 @@ export default function FileTree({ metas, currentPath }: FileTreeProps) {
                 >
                   <path fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
                 </svg>
+                <svg className="tree-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" d="M3 6h6l2 2h10v12H3z" />
+                </svg>
                 <span className="tree-dir-name">{dir.name}</span>
               </button>
               {open && <ul className="tree-list tree-children">{dir.items.map(renderItem)}</ul>}
             </li>
           );
         })}
+        {tree.root.length > 0 && <li className="tree-group-label" aria-hidden="true">文件</li>}
+        {tree.root.map(renderItem)}
       </ul>
     </nav>
   );

@@ -35,8 +35,8 @@ test('头部横屏开关与旋转：调用序列与持久化', async ({ page }) 
   await openMore(page);
   await page.getByRole('button', { name: '横屏' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-primary');
+  await expect(page.getByRole('group', { name: '更多操作' })).toBeVisible(); // 横屏后菜单保持打开（spec §1.3）
 
-  await openMore(page);
   await page.getByRole('button', { name: '旋转' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-secondary');
 
@@ -95,8 +95,7 @@ test('浏览器标签：锁被拒时自动进入全屏并重试；回竖屏退�
   await expect.poll(() => page.evaluate(() => (window as any).__fsCalls)).toContain('request');
   await expect(page.getByText(/不支持方向锁定/)).toHaveCount(0);
 
-  await openMore(page); // 弹层在上一次点击后已关闭，回竖屏前重新展开
-  await page.getByRole('button', { name: '横屏' }).click(); // 回竖屏
+  await page.getByRole('button', { name: '横屏' }).click(); // 回竖屏（菜单保持打开，spec §1.3）
   await expect.poll(() => page.evaluate(() => (window as any).__fsCalls)).toContain('exit');
   await expect(page.getByText(/不支持方向锁定/)).toHaveCount(0);
 });

@@ -18,15 +18,56 @@ test('排版变量：字号与表格/引用比例在阅读页生效', async ({ p
   expect(quoteSize).toBe('16px'); // 20 × 0.8
 });
 
-test('未设置外观时保持现状口径（17px / 0.95 / 1）', async ({ page }) => {
+test('未设置外观时保持现状口径（17px / 400 / 0.95 / 1）', async ({ page }) => {
   await configureAndSync(page);
   expect(await readKv(page, 'appearance')).toBeUndefined();
   await page.goto('./#/doc/长文档.md');
   await expect(page.getByRole('heading', { name: '长文档' })).toBeVisible();
   const fontSize = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontSize);
   expect(fontSize).toBe('17px');
+  const fontWeight = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontWeight);
+  expect(fontWeight).toBe('400');
   const tableSize = await page.locator('.doc-content table').first().evaluate((el) => getComputedStyle(el).fontSize);
   expect(tableSize).toBe('16.15px'); // 17 × 0.95
+});
+
+test('字体粗细：设置页与阅读页生效、刷新持久化', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/settings');
+
+  const section = page.locator('section', { has: page.getByRole('heading', { name: '阅读外观' }) });
+  await expect(section).toBeVisible();
+
+  // 选中「粗体」→ 预览即时生效
+  await section.getByRole('radio', { name: '粗体', exact: true }).check();
+  await expect(section.locator('.appearance-preview')).toHaveCSS('font-weight', '600');
+
+  // 防抖 300ms 后持久化
+  await expect.poll(async () => (await readKv(page, 'appearance')) as Record<string, unknown> | undefined)
+    .toMatchObject({ fontWeight: 600 });
+
+  // 阅读页生效
+  await page.goto('./#/doc/a.md');
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  const weight = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontWeight);
+  expect(weight).toBe('600');
+
+  // 标题与强调固定 700，不随正文字重漂移
+  await expect(page.locator('.doc-content h1')).toHaveCSS('font-weight', '700');
+  await expect(page.locator('.doc-content strong').first()).toHaveCSS('font-weight', '700');
+
+  // 刷新后仍为 600（持久化）
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  const weightAfterReload = await page.locator('.doc-content').evaluate((el) => getComputedStyle(el).fontWeight);
+  expect(weightAfterReload).toBe('600');
+
+  // 代码块 / 行内代码 / 复制按钮固定 400（b.md 含 js 代码块）
+  await page.goto('./#/doc/深挖/b.md');
+  await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
+  await expect(page.locator('.doc-content pre').first()).toHaveCSS('font-weight', '400');
+  await expect(page.locator('.doc-content pre code').first()).toHaveCSS('font-weight', '400');
+  await expect(page.locator('.code-copy').first()).toHaveCSS('font-weight', '400');
 });
 
 test('设置页调整外观：预览联动、防抖持久化、阅读页生效', async ({ page }) => {

@@ -44,7 +44,7 @@ const A_FILLER = Array.from(
 const A_MD = [
   '# 文档 A',
   '',
-  '用于端到端测试的文档 A，包含 ==高亮文本==、~~删除文本~~、页内锚点与站内互链。',
+  '用于端到端测试的文档 A，包含 ==高亮文本==、~~删除文本~~、**加粗文本**、页内锚点与站内互链。',
   '',
   '- [跳到「标题」](#标题)',
   '- [去深挖 b](深挖/b.md)',
@@ -195,6 +195,12 @@ export async function configureAndSync(page: Page, token = 'ghp_e2e_fake_token')
   await page.waitForURL(/#\/$/);
   await expect(page.locator('.tree-item')).toHaveCount(3);
   return mock;
+}
+
+/** 顶栏自动隐藏（spec §2.1）后，用小幅上滑唤出（40px，不破坏相对位置断言）。 */
+export async function revealHeader(page: Page): Promise<void> {
+  await page.evaluate(() => window.scrollBy(0, -40));
+  await page.waitForTimeout(120);
 }
 
 /* ---------------------------------------------------------------------------

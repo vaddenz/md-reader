@@ -137,18 +137,60 @@
   text-overflow: ellipsis;
 }
 
-/* 首条「继续阅读」的进度条：贴行底、通宽 */
-.home-progress {
-  display: block;
-  position: relative;
-  height: 3px;
-  background: var(--line);
+/* 继续阅读：横向卡片（spec §4.1） */
+.home-cards {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  margin: 0;
+  list-style: none;
+  scroll-snap-type: x proximity;
 }
 
-.home-progress i {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--acc);
+.home-card {
+  flex: 0 0 72%;
+  scroll-snap-align: start;
+}
+
+.home-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 92px;
+  padding: 14px;
+  background: var(--card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.home-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.home-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-card-ring { flex: none; }
+
+/* 页脚：同步信息弱化（spec §4.3） */
+.home-footer {
+  margin-top: 18px;
 }
 
 /* 文件树卡：外包一层卡皮（抽屉内复用时自带背景，不显卡） */
@@ -182,6 +224,25 @@
 
 .tree-list > li + li {
   border-top: 1px solid var(--line);
+}
+
+/* 分组标签不带分隔线（其下首行仍带线，保留「标签 / 行」分隔语义）；标签与行内容同列 12px */
+.tree-list > li.tree-group-label {
+  border-top: 0;
+}
+
+/* 文件树：分组标签与图标（spec §4.2） */
+.tree-group-label {
+  padding: 10px 12px 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  color: var(--ink2);
+}
+.tree-file-icon,
+.tree-folder-icon {
+  flex: none;
+  color: var(--ink2);
 }
 
 .tree-item {

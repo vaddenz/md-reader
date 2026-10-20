@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { configureAndSync, writeKv } from './fixtures';
+import { configureAndSync, revealHeader, writeKv } from './fixtures';
 
 /** 当前滚动比例（与实现同口径：scrollY / max(1, scrollHeight - innerHeight)）。 */
 function scrollRatio(page: Page): Promise<number> {
@@ -9,7 +9,7 @@ function scrollRatio(page: Page): Promise<number> {
   });
 }
 
-test('阅读进度：滚到中部退出，重开停在页首，点续读胶囊恢复到记录比例（±5%）', async ({ page }) => {
+test('阅读进度：滚到中部退出，重开自动恢复到记录比例（±5%）', async ({ page }) => {
   await configureAndSync(page);
 
   await page.getByRole('link', { name: 'a', exact: true }).click();
@@ -21,35 +21,32 @@ test('阅读进度：滚到中部退出，重开停在页首，点续读胶囊�
     const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     window.scrollTo(0, Math.round(max * 0.5));
   });
-  // 等一个节流窗口：进度落盘（≥1s），也让可能的位置重置暴露出来
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1200); // 等一个节流窗口：进度落盘（≥1s）
   const recorded = await scrollRatio(page);
   expect(recorded).toBeGreaterThan(0.4);
   expect(recorded).toBeLessThan(0.6);
 
-  // 退出到首页：新历史条目没有 scroll 记忆 → 重开时走进度分支（现在是胶囊而非自动落位）；首页「继续阅读」出现该文档
+  // 退出到首页：新历史条目没有 scroll 记忆 → 重开时按已保存进度默认落位（spec §1.4）
+  await revealHeader(page); // 顶栏沉浸隐藏后唤出，避免 click 自动滚到页首污染已记录进度
   await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible();
   await expect(page.locator('.home-recents')).toBeVisible();
 
-  // 重开同一篇：默认停在页首（spec §1.3-1），胶囊承载「回到上次位置」
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
-  await expect.poll(() => scrollRatio(page)).toBeLessThan(0.05);
-  await page.getByRole('button', { name: '回到上次位置' }).click();
   await expect
-    .poll(async () => Math.abs((await scrollRatio(page)) - recorded), { message: '点击胶囊后恢复到 ±5% 内' })
+    .poll(async () => Math.abs((await scrollRatio(page)) - recorded), { message: '重开后恢复到 ±5% 内' })
     .toBeLessThan(0.05);
 });
 
-test('无进度的文档不出现续读胶囊', async ({ page }) => {
+test('无进度的文档默认停在页首', async ({ page }) => {
   await configureAndSync(page);
   await page.getByRole('link', { name: 'b', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 B' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '回到上次位置' })).toHaveCount(0);
+  await expect.poll(() => scrollRatio(page)).toBeLessThan(0.05);
 });
 
-test('首页壳子：标题顶栏、搜索框、继续阅读卡带进度', async ({ page }) => {
+test('首页壳子：标题顶栏、搜索框、继续阅读卡片与文件分组', async ({ page }) => {
   await configureAndSync(page);
 
   // 预置一篇的阅读进度（壳子用例只关心首页渲染，不经由滚动落盘）
@@ -59,8 +56,18 @@ test('首页壳子：标题顶栏、搜索框、继续阅读卡带进度', async
 
   await expect(page.getByRole('heading', { name: '知识库', level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: '搜索文档' })).toBeVisible(); // 结构契约：名称不变
-  await expect(page.locator('.home-recents')).toBeVisible();
-  await expect(page.locator('.home-recents .home-progress')).toBeVisible(); // 新增进度条节点
+
+  // 继续阅读：横向卡片 + 进度百分比
+  await expect(page.locator('.home-recents .home-card')).toHaveCount(1);
+  await expect(page.locator('.home-recents .home-card-pct')).toHaveText('50%');
+
+  // 文件列表：文件夹组在上、文件组在下，带图标
+  await expect(page.locator('.tree-group-label')).toHaveText(['文件夹', '文件']);
+  await expect(page.locator('.tree-folder-icon')).toHaveCount(1);
+  await expect(page.locator('.tree-file-icon')).toHaveCount(3);
+
+  // 同步信息弱化到页脚（更新目录仍在，可点）
+  await expect(page.locator('.home-footer .sync-refresh')).toBeVisible();
 });
 
 test('收藏：星标后首页出现收藏区块，取消后消失', async ({ page }) => {
@@ -69,25 +76,28 @@ test('收藏：星标后首页出现收藏区块，取消后消失', async ({ pa
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
-  // 未收藏 → 点击星标 → 已收藏（aria-pressed 切换）
+  // 未收藏 → ⋯ 菜单点「收藏」→ 已收藏（aria-pressed 切换；菜单保持打开）
+  await page.getByRole('button', { name: '更多' }).click();
   const star = page.getByRole('button', { name: '收藏', exact: true });
-  await expect(star).toBeVisible();
   await expect(star).toHaveAttribute('aria-pressed', 'false');
   await star.click();
   await expect(page.getByRole('button', { name: '取消收藏', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
   // 首页出现「收藏」区块，直达该文档
+  await page.keyboard.press('Escape'); // 关掉 ⋯ 再点顶栏
   await page.getByRole('button', { name: '返回首页' }).click();
   const favorites = page.locator('.home-favorites');
   await expect(favorites).toBeVisible();
   await expect(favorites.getByRole('link', { name: '文档 A' })).toBeVisible();
 
-  // 从收藏区进入 → 取消收藏 → 首页区块消失
+  // 从收藏区进入 → ⋯ 菜单取消收藏 → 首页区块消失
   await favorites.getByRole('link', { name: '文档 A' }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+  await page.getByRole('button', { name: '更多' }).click();
   await page.getByRole('button', { name: '取消收藏', exact: true }).click();
   await expect(page.getByRole('button', { name: '收藏', exact: true })).toHaveAttribute('aria-pressed', 'false');
 
+  await page.keyboard.press('Escape'); // 关掉 ⋯ 再点顶栏
   await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page.locator('.home-favorites')).toHaveCount(0);
 });

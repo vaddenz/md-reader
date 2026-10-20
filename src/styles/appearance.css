@@ -1,0 +1,7 @@
+/* 阅读外观控件组（T4 从 settings.css 原样抽出，设置页外观区与阅读内面板共用 · 单源）：
+   字体单选 / 字号与比例滑杆。类名与规则不变（设置页「显示方向」区亦复用 appearance-row/radio）。 */
+.appearance-row { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0; }
+.appearance-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
+.appearance-slider { display: block; margin: 12px 0; font-size: 15px; }
+.appearance-slider input[type='range'] { display: block; width: 100%; margin-top: 6px; }
+.appearance-slider output { font-weight: 600; margin-left: 6px; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { HOME, docHref, toRouterPath } from '../app/nav';
+import { docHref, goBackOrHome } from '../app/nav';
 import { DEFAULT_REPO } from '../constants';
 import { kvGet, listFilesMeta, type FileMeta } from '../data/db';
 import { GitHubClient } from '../data/github';
@@ -137,8 +137,7 @@ export default function SearchPage() {
         <button
           type="button"
           className="search-cancel"
-          aria-label="返回首页"
-          onClick={() => navigate(toRouterPath(HOME))}
+          onClick={() => goBackOrHome(navigate)}
         >
           取消
         </button>

@@ -14,6 +14,11 @@
   color: var(--acc-text);
   font-size: 14px;
   text-decoration: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .settings-title {
@@ -174,12 +179,7 @@
 .settings-sync-row button:disabled { color: #8b949e; cursor: default; }
 .settings-sync-row .settings-note { margin: 0; }
 
-/* 阅读外观（T3）：字体 / 字号 / 比例 + 实时预览 */
-.appearance-row { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0; }
-.appearance-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
-.appearance-slider { display: block; margin: 12px 0; font-size: 15px; }
-.appearance-slider input[type='range'] { display: block; width: 100%; margin-top: 6px; }
-.appearance-slider output { font-weight: 600; margin-left: 6px; }
+/* 阅读外观（T3）：实时预览（控件样式 T4 起抽到 appearance.css，随 AppearanceControls 引入） */
 /* settings.css 在构建产物中先于 content.css，等特异性下会被 .doc-content 覆盖，
    故这里带上 .doc-content 提升特异性（布局覆盖必须生效，仅新属性如边框不冲突）。 */
 .doc-content.appearance-preview { max-width: none; margin: 12px 0 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--r-ctl); }

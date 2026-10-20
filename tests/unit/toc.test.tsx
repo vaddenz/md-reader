@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import BottomBar from '../../src/components/BottomBar';
 import DocHeader from '../../src/components/DocHeader';
+import FloatingTocButton from '../../src/components/FloatingTocButton';
 import TocDrawer from '../../src/components/TocDrawer';
 import { useScrollSpy } from '../../src/hooks/useScrollSpy';
 import type { Heading } from '../../src/markdown/render';
+import { TabsProvider } from '../../src/state/TabsContext';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -77,6 +78,13 @@ function mount(el: ReactElement): { container: HTMLElement; root: ReturnType<typ
   };
   cleanup.push(unmount);
   return { container, root, unmount };
+}
+
+/** 挂载后刷新 TabsProvider 的异步恢复 effect（jsdom 无 IndexedDB → 空标签），避免 act 警告。 */
+async function flushTabs(): Promise<void> {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 }
 
 function SpyHarness({ ids, offset }: { ids: string[]; offset?: number }) {
@@ -230,36 +238,28 @@ describe('TocDrawer', () => {
   });
 });
 
-describe('阅读页顶栏与底部工具条入口', () => {
+describe('阅读页顶栏与悬浮目录入口', () => {
   const future = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
-  it('BottomBar：提供 onOpenToc 时渲染「目录」按钮并回调；否则不渲染', () => {
-    const onOpenToc = vi.fn();
-    const withBtn = mount(
-      <MemoryRouter future={future}>
-        <BottomBar onOpenToc={onOpenToc} remember={() => {}} />
-      </MemoryRouter>,
-    );
-    const btn = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="目录"]');
+  it('FloatingTocButton：渲染「目录」按钮并回调', () => {
+    const onOpen = vi.fn();
+    const view = mount(<FloatingTocButton onOpen={onOpen} />);
+    const btn = view.container.querySelector<HTMLButtonElement>('button[aria-label="目录"]');
     expect(btn).not.toBeNull();
     act(() => { btn!.click(); });
-    expect(onOpenToc).toHaveBeenCalledTimes(1);
-
-    const without = mount(
-      <MemoryRouter future={future}>
-        <BottomBar remember={() => {}} />
-      </MemoryRouter>,
-    );
-    expect(without.container.querySelector('button[aria-label="目录"]')).toBeNull();
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it('DocHeader ⋯ 弹层：提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', () => {
+  it('DocHeader ⋯ 弹层：提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', async () => {
     const onOpenTree = vi.fn();
     const withBtn = mount(
       <MemoryRouter future={future}>
-        <DocHeader title="标题" onOpenTree={onOpenTree} />
+        <TabsProvider>
+          <DocHeader title="标题" onOpenTree={onOpenTree} />
+        </TabsProvider>
       </MemoryRouter>,
     );
+    await flushTabs();
     // 默认收起：弹层不渲染
     expect(withBtn.container.querySelector('.doc-more')).toBeNull();
     const more = withBtn.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
@@ -276,11 +276,34 @@ describe('阅读页顶栏与底部工具条入口', () => {
 
     const without = mount(
       <MemoryRouter future={future}>
-        <DocHeader title="标题" />
+        <TabsProvider>
+          <DocHeader title="标题" />
+        </TabsProvider>
       </MemoryRouter>,
     );
+    await flushTabs();
     const moreOnly = without.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
     act(() => { moreOnly!.click(); });
     expect(without.container.textContent).not.toContain('文件');
+  });
+
+  it('DocHeader ⋯：横屏点击后保持打开、搜索点击后关闭', async () => {
+    const view = mount(
+      <MemoryRouter future={future}>
+        <TabsProvider>
+          <DocHeader title="标题" onToggleOrientation={() => {}} />
+        </TabsProvider>
+      </MemoryRouter>,
+    );
+    await flushTabs();
+    const more = view.container.querySelector<HTMLButtonElement>('button[aria-label="更多"]');
+    act(() => { more!.click(); });
+    const item = (text: string) =>
+      Array.from(view.container.querySelectorAll<HTMLButtonElement>('.doc-more button'))
+        .find((b) => b.textContent === text)!;
+    act(() => { item('横屏').click(); });
+    expect(view.container.querySelector('.doc-more')).not.toBeNull();
+    act(() => { item('搜索').click(); });
+    expect(view.container.querySelector('.doc-more')).toBeNull();
   });
 });

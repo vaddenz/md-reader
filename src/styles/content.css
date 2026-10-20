@@ -12,6 +12,13 @@
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
+  transition: transform .18s ease;
+}
+.doc-header--hidden {
+  transform: translateY(-100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-header { transition: none; }
 }
 
 .doc-back,
@@ -72,67 +79,15 @@
   border-radius: 8px;
   color: var(--ink);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
+.doc-more-icon { flex: none; }
+.doc-more-aa { flex: none; width: 18px; text-align: center; font-size: 14px; font-weight: 700; }
 .doc-more-item:hover,
 .doc-more-item:focus-visible { background: var(--shell); }
 .doc-more-item[aria-pressed='true'] { color: var(--acc-text); font-weight: 600; }
-
-/* ========== 底部工具条（spec §3.2：目录/搜索/外观/收藏/设置，毛玻璃 + 安全区） ========== */
-.doc-bottombar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
-  height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  background: rgba(250, 249, 246, 0.96);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--line);
-}
-.doc-bottombar-item {
-  appearance: none;
-  border: 0;
-  background: none;
-  min-width: 56px;
-  min-height: 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--ink2);
-  font-size: 11px;
-  cursor: pointer;
-}
-.doc-bottombar-item[aria-pressed='true'],
-.doc-bottombar-item:hover { color: var(--acc-text); }
-.doc-bottombar-aa { font-size: 17px; font-weight: 700; color: var(--ink); }
-
-/* ========== 续读胶囊（spec §1.3-1：替代自动落位的「上次读到 N%」） ========== */
-.progress-chip {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  z-index: 40;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  cursor: pointer;
-  background: var(--ink);
-  color: #fff;
-  font-size: 13px;
-  padding: 9px 16px;
-  border-radius: var(--r-pill);
-  box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32);
-}
-.progress-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--acc); }
 
 /* ========== 返回来源条（T16） ========== */
 .back-to-source {
@@ -154,16 +109,17 @@
 }
 .back-to-source:active { background: #eaf2fd; }
 
-/* ========== 正文（中文移动端排版；纸面 + 底部工具条留白） ========== */
+/* ========== 正文（中文移动端排版；纸面 + 底部安全区留白） ========== */
 .doc-content {
   max-width: 46rem;
   margin: 0 auto;
-  /* 底部留白与工具条匹配：56px + 安全区 + 余量 */
-  padding: 0 16px calc(108px + env(safe-area-inset-bottom, 0px));
+  /* 底部安全区留白（工具条已移除） */
+  padding: 0 16px calc(32px + env(safe-area-inset-bottom, 0px));
   background: var(--page);
   font-family: var(--r-font-family, var(--font-sans));
   font-size: var(--r-font-size, 17px);
   line-height: 1.9;
+  font-weight: var(--r-font-weight, 400);
   overflow-wrap: break-word;
 }
 
@@ -254,6 +210,9 @@
 .doc-content mark.hl-red { background: var(--hl-red); }
 .doc-content s,
 .doc-content del { color: #8b949e; }
+/* 强调与代码字重固定：不随正文字重漂移（spec §2.5：标题 700 / strong 700 / 代码块 400） */
+.doc-content strong,
+.doc-content b { font-weight: 700; }
 
 .doc-content code {
   padding: 0.15em 0.4em;
@@ -262,6 +221,9 @@
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
+.doc-content pre,
+.doc-content code,
+.doc-content .code-copy { font-weight: 400; }
 
 /* 代码块 + 右上角复制按钮（按钮绝对定位，pre 顶部留出空间）；
    深底 #1B1D21 + #E9EBEF 文字（spec §3.4「代码块深底保留」），圆角 10 */
@@ -476,8 +438,8 @@
   gap: 12px;
   max-width: 46rem;
   margin: 0 auto;
-  /* 避开固定底部工具条（56px + 安全区 + 余量） */
-  padding: 0 16px calc(108px + env(safe-area-inset-bottom, 0px));
+  /* 底部安全区与悬浮按钮留白（工具条已移除） */
+  padding: 0 16px calc(32px + env(safe-area-inset-bottom, 0px));
 }
 .prev-next-item {
   flex: 1 1 0;
@@ -503,3 +465,90 @@
 }
 .prev-next-next { text-align: right; align-items: flex-end; }
 .prev-next-spacer { flex: 1 1 0; }
+
+/* ========== 悬浮目录按钮（spec §2.3） ========== */
+.doc-toc-fab {
+  position: fixed;
+  z-index: 25;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+  cursor: grab;
+  touch-action: none;
+}
+.doc-toc-fab-dragging { opacity: .85; transform: scale(1.06); cursor: grabbing; }
+
+/* ========== 标签切换器（spec §3.3） ========== */
+.doc-title-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  /* 用 font-family 而非 font 简写：字号/字重沿用既有的 .doc-title（DESIGN.md 16/600），
+     font 简写会把它重置为继承值（400）。 */
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* 标题即切换器入口：触控目标补足 DESIGN.md 的 44px 底线（字号/字重仍由 .doc-title 控制）。 */
+  min-height: 44px;
+}
+.doc-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-title-caret { flex: none; color: var(--ink2); }
+.doc-tabs {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 8px;
+  right: 8px;
+  z-index: 60;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.doc-tab-row { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
+.doc-tab-current { background: rgba(31, 63, 212, 0.08); }
+.doc-tab-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 11px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.doc-tab-current .doc-tab-open { color: var(--acc-text); font-weight: 600; }
+.doc-tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-tab-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--ink2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.doc-tab-close:hover { background: var(--shell); color: var(--ink); }
