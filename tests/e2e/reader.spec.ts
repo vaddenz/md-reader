@@ -293,3 +293,78 @@ test('无标题文档：目录入口仍在，打开显示空态', async ({ page 
   await expect(dialog).toContainText('本文暂无标题目录');
   await expect(dialog.locator('.toc-item')).toHaveCount(0);
 });
+
+test('宽内容：页面不横向溢出，代码/表格在各自容器内横向滚动', async ({ page }) => {
+  const mock = await configureAndSync(page);
+  const cols = Array.from({ length: 8 }, (_, i) => `很长的表头列 ${i}`);
+  const cells = Array.from({ length: 8 }, (_, i) => `很长很长的单元格内容 ${i}`);
+  const wide = [
+    '# 宽内容标题',
+    '',
+    '    const indentedCode = "这是一行非常非常长的缩进代码块，用来验证裸 pre 也会在自身容器内横向滚动";',
+    '',
+    '```js',
+    'const fencedCode = "这是一行非常非常长的围栏代码块，用来验证代码块横向滚动时不会撑宽整个页面";',
+    '```',
+    '',
+    `| ${cols.join(' | ')} |`,
+    `| ${cols.map(() => '---').join(' | ')} |`,
+    `| ${cells.join(' | ')} |`,
+    '',
+    '```mermaid',
+    'flowchart LR',
+    ...Array.from({ length: 8 }, (_, i) => `  N${i}[很长的节点名称 ${i}] --> N${i + 1}[很长的节点名称 ${i + 1}]`),
+    '```',
+    '',
+    '正文。',
+  ].join('\n');
+
+  mock.updateDoc('长文档.md', wide);
+  await page.getByRole('button', { name: '更新目录' }).click();
+  await expect.poll(() => mock.syncCalls()).toBe(2);
+  await expect.poll(async () => (await readFileRecord(page, '长文档.md'))?.text ?? '').toContain('宽内容标题');
+  await page.getByRole('link', { name: '长文档', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '宽内容标题' })).toBeVisible();
+  await expect(page.locator('.md-mermaid svg')).toBeVisible();
+
+  const metrics = await page.evaluate(() => ({
+    doc: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+    preOverflow: [...document.querySelectorAll('.doc-content pre')].map((el) => getComputedStyle(el).overflowX),
+  }));
+  expect(metrics.doc).toBe(metrics.viewport); // 页面本身不产生横向滚动
+  expect(metrics.preOverflow.length).toBeGreaterThanOrEqual(2); // 缩进代码 + 围栏代码
+  expect(metrics.preOverflow.every((v) => v === 'auto' || v === 'scroll')).toBe(true);
+
+  // 页面无法横向滚动：手势只会落在代码/表格自己的滚动容器里
+  await page.evaluate(() => window.scrollTo(9999, window.scrollY));
+  expect(await page.evaluate(() => window.scrollX)).toBe(0);
+
+  const scrolled = await page.evaluate(() => {
+    const table = document.querySelector<HTMLElement>('.doc-content table')!;
+    const pre = document.querySelector<HTMLElement>('.doc-content pre')!;
+    table.scrollLeft = 120;
+    pre.scrollLeft = 120;
+    return {
+      table: table.scrollLeft,
+      pre: pre.scrollLeft,
+      tableWide: table.scrollWidth > table.clientWidth,
+      preWide: pre.scrollWidth > pre.clientWidth,
+    };
+  });
+  expect(scrolled.tableWide).toBe(true);
+  expect(scrolled.preWide).toBe(true);
+  expect(scrolled.table).toBeGreaterThan(0);
+  expect(scrolled.pre).toBeGreaterThan(0);
+
+  // 悬浮目录按钮拖到屏幕外也钳制在视口内，不再制造横向溢出
+  const fab = page.getByRole('button', { name: '目录' });
+  const box = (await fab.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(metrics.viewport + 200, 240, { steps: 6 });
+  await page.mouse.up();
+  const after = (await fab.boundingBox())!;
+  expect(after.x + after.width).toBeLessThanOrEqual(metrics.viewport);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(metrics.viewport);
+});

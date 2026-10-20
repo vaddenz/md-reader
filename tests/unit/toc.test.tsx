@@ -250,6 +250,27 @@ describe('阅读页顶栏与悬浮目录入口', () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
+  it('FloatingTocButton：拖拽坐标钳制在视口内（不撑出横向滚动）', () => {
+    const view = mount(<FloatingTocButton onOpen={() => {}} />);
+    const btn = view.container.querySelector<HTMLButtonElement>('button[aria-label="目录"]')!;
+    // jsdom 未实现指针捕获
+    btn.setPointerCapture = () => {};
+    const fire = (type: string, x: number, y: number) => {
+      act(() => {
+        btn.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
+      });
+    };
+    fire('pointerdown', 100, 100);
+    fire('pointermove', window.innerWidth + 500, window.innerHeight + 500);
+
+    const left = parseFloat(btn.style.left);
+    const top = parseFloat(btn.style.top);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(left + 44).toBeLessThanOrEqual(window.innerWidth);
+    expect(top + 44).toBeLessThanOrEqual(window.innerHeight);
+  });
+
   it('DocHeader ⋯ 弹层：提供 onOpenTree 时渲染「文件」按钮并回调；否则不渲染', async () => {
     const onOpenTree = vi.fn();
     const withBtn = mount(

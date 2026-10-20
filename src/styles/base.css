@@ -27,6 +27,12 @@
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* 页面本身绝不横向滚动：宽内容必须落在各自的滚动容器里。
+   `clip`（而非 hidden）不建立滚动容器，吸顶栏/滚动监听都不受影响；
+   否则 iOS Safari 会把整页左右拖动——悬浮目录按钮看起来“超出屏幕”，
+   代码块/表格也会失去横向滑动（手势被页面抢走）。 */
+html,
+body { overflow-x: clip; }
 body {
   margin: 0;
   font-family: var(--font-sans);

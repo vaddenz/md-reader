@@ -228,14 +228,20 @@
 /* 代码块 + 右上角复制按钮（按钮绝对定位，pre 顶部留出空间）；
    深底 #1B1D21 + #E9EBEF 文字（spec §3.4「代码块深底保留」），圆角 10 */
 .code-block { position: relative; }
+/* 所有 pre 都必须自带横向滚动：fenced 代码在 .code-block 内，
+   而缩进代码（4 空格）渲染为裸 <pre>，没有容器兜底会直接撑宽页面。 */
+.doc-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain; /* 滚到边界不把横向手势传给页面 */
+  -webkit-overflow-scrolling: touch;
+}
 .code-block pre {
   padding: 34px 14px 12px;
-  overflow-x: auto;
   background: #1b1d21;
   color: #e9ebef;
   border: 0;
   border-radius: 10px;
-  -webkit-overflow-scrolling: touch;
 }
 .code-block pre code {
   padding: 0;
@@ -305,6 +311,7 @@
   width: max-content;
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   border-collapse: collapse;
   -webkit-overflow-scrolling: touch;
   font-size: calc(1em * var(--r-table-scale, 0.95));
@@ -341,6 +348,7 @@
 .md-mermaid {
   margin: 0 0 1em;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
 .md-mermaid:empty {

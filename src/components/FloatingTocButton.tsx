@@ -23,6 +23,14 @@ function clampY(y: number): number {
   return Math.min(max, Math.max(min, y));
 }
 
+/** 拖拽时的坐标 clamp：按钮本体不得越出视口（iOS 会因此获得横向滚动宽度）。 */
+function clampToViewport(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(0, x), Math.max(0, window.innerWidth - BTN)),
+    y: Math.min(Math.max(0, y), Math.max(0, window.innerHeight - BTN)),
+  };
+}
+
 interface Props { onOpen: () => void }
 
 /** 悬浮目录按钮（spec §2.3）：点击开目录；可拖拽，松手吸附最近边缘，位置按设备持久化。 */
@@ -54,7 +62,8 @@ export default function FloatingTocButton({ onOpen }: Props) {
     if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
     d.moved = true;
     suppressClick.current = true;
-    setDragPos({ x: e.clientX - BTN / 2, y: e.clientY - BTN / 2 });
+    // 指针捕获期间指针可能移出视口：clamp 后再渲染，避免固定定位元素撑出横向滚动。
+    setDragPos(clampToViewport(e.clientX - BTN / 2, e.clientY - BTN / 2));
   };
 
   const onPointerEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -64,9 +73,10 @@ export default function FloatingTocButton({ onOpen }: Props) {
     const moved = d.moved;
     setDragPos(null);
     if (!moved) return;
+    const { x, y } = clampToViewport(e.clientX - BTN / 2, e.clientY - BTN / 2);
     const next: Stored = {
-      side: e.clientX < window.innerWidth / 2 ? 'left' : 'right',
-      y: clampY(e.clientY - BTN / 2),
+      side: x < (window.innerWidth - BTN) / 2 ? 'left' : 'right',
+      y: clampY(y),
     };
     setPos(next);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* 忽略 */ }
