@@ -34,16 +34,20 @@ export default function TocDrawer({ headings, onClose }: TocDrawerProps) {
 
   return (
     <Drawer title="目录" onClose={onClose}>
-      {headings.map((h) => (
-        <button
-          key={h.id}
-          type="button"
-          className={`toc-item toc-h${h.level}${h.id === current ? ' toc-current' : ''}`}
-          onClick={() => jump(h.id)}
-        >
-          {h.text}
-        </button>
-      ))}
+      {headings.length === 0 ? (
+        <p className="toc-empty">本文暂无标题目录</p>
+      ) : (
+        headings.map((h) => (
+          <button
+            key={h.id}
+            type="button"
+            className={`toc-item toc-h${h.level}${h.id === current ? ' toc-current' : ''}`}
+            onClick={() => jump(h.id)}
+          >
+            {h.text}
+          </button>
+        ))
+      )}
     </Drawer>
   );
 }
