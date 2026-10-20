@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearAllData, getFile, kvGet, kvSet, listFilesMeta, markExpired, putFiles, deleteFiles, touchFile, openDb, setRepoDbName } from '../../src/data/db';
+import { clearAllData, getFile, kvGet, kvSet, listFilesMeta, markExpired, putFiles, deleteFiles, touchFile, openDb, setRepoDbName, SCHEMA_VER } from '../../src/data/db';
 
 beforeEach(async () => { await clearAllData(); });
 
@@ -43,7 +43,7 @@ describe('db', () => {
   it('openDb 版本冲突时自愈且不挂起、不泄漏连接', async () => {
     // 造一个更高版本的库，使 SCHEMA_VER 更低的 open 异步失败（VersionError）
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open('mdreader', 3);
+      const req = indexedDB.open('mdreader', SCHEMA_VER + 1);
       req.onsuccess = () => { req.result.close(); resolve(); };
       req.onerror = () => reject(req.error);
     });

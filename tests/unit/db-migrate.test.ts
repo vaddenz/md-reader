@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { kvGet, openDb } from '../../src/data/db';
 
-describe('IndexedDB v1 → v2 升级', () => {
+describe('IndexedDB v1 → v3 升级', () => {
   it('旧数据保留，新 store 可用', async () => {
     await new Promise<void>((resolve, reject) => {
       const req = indexedDB.open('mdreader', 1);
@@ -23,6 +23,7 @@ describe('IndexedDB v1 → v2 升级', () => {
     expect(db.objectStoreNames.contains('mem_banks')).toBe(true);
     expect(db.objectStoreNames.contains('mem_srs')).toBe(true);
     expect(db.objectStoreNames.contains('mem_attempts')).toBe(true);
+    expect(db.objectStoreNames.contains('sync_outbox')).toBe(true);
     expect(await kvGet('legacy')).toBe(42);
   });
 });
