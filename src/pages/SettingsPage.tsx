@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  SETTINGS_ABOUT, SETTINGS_ACCOUNT, SETTINGS_DATA, SETTINGS_MEMORY, SETTINGS_READING, goBackOrHome,
+  SETTINGS_ABOUT, SETTINGS_ACCOUNT, SETTINGS_DATA, SETTINGS_MEMORY, SETTINGS_READING, SETTINGS_SYNC, goBackOrHome,
 } from '../app/nav';
 import SettingsHeader from '../components/SettingsHeader';
 import pkg from '../../package.json';
@@ -12,6 +12,8 @@ import { bytesToText } from '../lib/format';
 import { maskToken } from '../lib/token';
 import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
+import { useDataSync } from '../sync/DataSyncContext';
+import { isSyncConfigured } from '../sync/registry';
 import '../styles/settings.css';
 
 const FONT_LABELS: Record<ReaderAppearance['fontFamily'], string> = {
@@ -59,6 +61,17 @@ function DatabaseIcon() {
   );
 }
 
+function SyncIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+        d="M4 12a8 8 0 0 1 13.7-5.6M20 12a8 8 0 0 1-13.7 5.6M17.5 3.5v4h-4M6.5 20.5v-4h4"
+      />
+    </svg>
+  );
+}
+
 function MemoryIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -97,6 +110,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { token } = useToken();
   const { status, lastSyncAt, syncNow, timeAgo } = useSync();
+  const { config: syncConfig } = useDataSync();
 
   const cfg = activeRepo();
   const repoCount = loadRepoState().repos.length;
@@ -143,6 +157,13 @@ export default function SettingsPage() {
     : storage
       ? `${cachedCount} 篇已缓存 · ${bytesToText(storage.usage)}`
       : `${cachedCount} 篇已缓存`;
+  const syncSummary = !syncConfig.enabled
+    ? '已停用'
+    : !isSyncConfigured(syncConfig)
+      ? '未配置'
+      : syncConfig.autoSync
+        ? '自动同步已开启'
+        : '仅手动同步';
 
   return (
     <main className="settings">
@@ -207,6 +228,16 @@ export default function SettingsPage() {
               <span className="settings-group-text">
                 <span className="settings-group-title">数据管理</span>
                 <span className="settings-group-sub">{dataSummary} · 高亮备份</span>
+              </span>
+              <ChevronIcon />
+            </a>
+          </li>
+          <li>
+            <a className="settings-group-link" href={SETTINGS_SYNC}>
+              <span className="settings-group-icon"><SyncIcon /></span>
+              <span className="settings-group-text">
+                <span className="settings-group-title">跨设备同步</span>
+                <span className="settings-group-sub">{syncSummary}</span>
               </span>
               <ChevronIcon />
             </a>
