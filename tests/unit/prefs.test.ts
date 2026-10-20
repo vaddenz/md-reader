@@ -1,7 +1,13 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearAllData, kvSet } from '../../src/data/db';
+import { clearAllData, kvGet, kvSet, openDb } from '../../src/data/db';
 import { getFavorites, getProgress, recentDocs, saveProgress, toggleFavorite } from '../../src/data/prefs';
+import type { OutboxEntry } from '../../src/sync/outbox';
+
+async function outbox(): Promise<OutboxEntry[]> {
+  const db = await openDb();
+  return db.getAll('sync_outbox') as Promise<OutboxEntry[]>;
+}
 
 beforeEach(async () => { await clearAllData(); });
 
@@ -60,5 +66,28 @@ describe('prefs', () => {
     expect(await getFavorites()).toEqual([]);
     expect(await getProgress('a.md')).toBeUndefined();
     expect(await recentDocs()).toEqual([]);
+  });
+
+  it('saveProgress 原子写 outbox，recordId=path', async () => {
+    await saveProgress('a.md', 0.5);
+    const [entry] = await outbox();
+    expect(entry).toMatchObject({ collection: 'reading.progress', recordId: 'a.md', deleted: false });
+    expect(entry.updatedAt).toBeGreaterThan(0);
+  });
+
+  it('收藏迁移为 favoritesV2，并写 upsert / tombstone', async () => {
+    await kvSet('favorites', ['a.md', 'b.md']);
+    expect(await getFavorites()).toEqual(['a.md', 'b.md']);
+    expect(await kvGet('favoritesV2')).toEqual({ 'a.md': { addedAt: 0 }, 'b.md': { addedAt: 1 } });
+    expect(await kvGet('favorites')).toBeUndefined();
+
+    await toggleFavorite('a.md'); // 删除 → tombstone
+    const entries = await outbox();
+    const a = entries.find((e) => e.recordId === 'a.md')!;
+    expect(a.deleted).toBe(true);
+    await toggleFavorite('a.md'); // 重新收藏 → upsert 覆盖同一条
+    const again = (await outbox()).find((e) => e.recordId === 'a.md')!;
+    expect(again.deleted).toBe(false);
+    expect(again.rev).not.toBe(a.rev);
   });
 });
