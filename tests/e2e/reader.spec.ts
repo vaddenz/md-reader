@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installGitHubMock, type GitHubMock } from './fixtures';
+import { installGitHubMock, readFileRecord, type GitHubMock } from './fixtures';
 
 const TOKEN = 'ghp_e2e_fake_token';
 
@@ -282,7 +282,8 @@ test('无标题文档：目录入口仍在，打开显示空态', async ({ page 
   mock.updateDoc('长文档.md', '这是一篇没有任何标题的纯文本笔记。\n\n只有段落，没有 # 标题。\n');
   await page.getByRole('button', { name: '更新目录' }).click();
   await expect.poll(() => mock.syncCalls()).toBe(2);
-  await expect(page.locator('.sync-badge-text')).not.toContainText('同步中'); // 等正文落库再打开
+  // 正向等待新正文落库（避免同步尚未完成就打开旧版本）
+  await expect.poll(async () => (await readFileRecord(page, '长文档.md'))?.text ?? '').toContain('没有任何标题');
   await page.getByRole('link', { name: '长文档', exact: true }).click();
   await expect(page.locator('.doc-content')).toContainText('没有任何标题');
   await expect(page.getByRole('button', { name: '目录' })).toBeVisible();
@@ -290,4 +291,5 @@ test('无标题文档：目录入口仍在，打开显示空态', async ({ page 
   const dialog = page.getByRole('dialog', { name: '目录' });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('本文暂无标题目录');
+  await expect(dialog.locator('.toc-item')).toHaveCount(0);
 });

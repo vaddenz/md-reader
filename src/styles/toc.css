@@ -33,6 +33,7 @@
 
 /* 无 h1–h4 标题时的目录空态 */
 .toc-empty {
+  margin: 0;
   padding: 28px 12px;
   text-align: center;
   color: var(--ink2);
