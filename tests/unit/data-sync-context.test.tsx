@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   syncNow: vi.fn(),
+  resetRepoSeeds: vi.fn(),
   loadSyncConfig: vi.fn(),
   saveSyncConfig: vi.fn(),
   clearSyncConfig: vi.fn(),
@@ -20,6 +21,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../src/sync/config', () => ({
   clearSyncConfig: mocks.clearSyncConfig,
   loadSyncConfig: mocks.loadSyncConfig,
+  sanitizeSyncConfig: (value: SyncConfig) => ({
+    ...value,
+    values: Object.fromEntries(Object.entries(value.values).map(([key, field]) => [key, field.trim()])),
+  }),
   saveSyncConfig: mocks.saveSyncConfig,
   syncConfigFingerprint: mocks.syncConfigFingerprint,
 }));
@@ -33,7 +38,7 @@ vi.mock('../../src/sync/registry', () => ({
   isSyncConfigured: mocks.isSyncConfigured,
   shouldAutoSync: mocks.shouldAutoSync,
 }));
-vi.mock('../../src/sync/engine', () => ({ syncNow: mocks.syncNow }));
+vi.mock('../../src/sync/engine', () => ({ syncNow: mocks.syncNow, resetRepoSeeds: mocks.resetRepoSeeds }));
 vi.mock('../../src/data/repos', () => ({
   loadRepoState: mocks.loadRepoState,
   repoDbName: (id: string) => id,
@@ -111,6 +116,7 @@ beforeEach(() => {
     value.values.token ?? '',
   ].join('\n'));
   mocks.loadSyncState.mockReturnValue({ lastError: null });
+  mocks.resetRepoSeeds.mockResolvedValue(undefined);
   mocks.isSyncConfigured.mockReturnValue(true);
   mocks.shouldAutoSync.mockImplementation((value: SyncConfig, online: boolean) => (
     online && value.enabled && value.autoSync && mocks.isSyncConfigured(value)
@@ -184,6 +190,46 @@ describe('DataSyncProvider', () => {
     expect(mocks.syncNow).toHaveBeenCalledOnce();
   });
 
+  it('does not schedule a visible-refocus sync within five minutes, then does afterward', async () => {
+    mocks.loadSyncConfig.mockReturnValue(config(true));
+    mocks.syncNow.mockImplementation(async () => ({
+      startedAt: Date.now(), finishedAt: Date.now(), repos: [], pulled: 0, applied: 0, pushed: 0,
+    }));
+    mocks.loadSyncState.mockReturnValue({ lastSyncAt: Date.now(), lastError: null });
+    await mountProvider();
+    await advance(3000); // startup sync updates the throttle timestamp
+    expect(mocks.syncNow).toHaveBeenCalledOnce();
+
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await advance(3000);
+    expect(mocks.syncNow).toHaveBeenCalledOnce();
+
+    await advance(5 * 60_000 + 1);
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await advance(2999);
+    expect(mocks.syncNow).toHaveBeenCalledOnce();
+    await advance(1);
+    expect(mocks.syncNow).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs one follow-up sync when dirty data arrives during an active sync', async () => {
+    mocks.loadSyncConfig.mockReturnValue(config(true));
+    let resolveFirst!: (value: Awaited<ReturnType<typeof mocks.syncNow>>) => void;
+    const deferred = new Promise<Awaited<ReturnType<typeof mocks.syncNow>>>((resolve) => { resolveFirst = resolve; });
+    mocks.syncNow.mockReturnValueOnce(deferred);
+    await mountProvider();
+    await advance(3000);
+    expect(mocks.syncNow).toHaveBeenCalledOnce();
+
+    await dirty();
+    await act(async () => {
+      resolveFirst({ startedAt: 1, finishedAt: 2, repos: [], pulled: 0, applied: 0, pushed: 0 });
+      await Promise.resolve();
+    });
+    await advance(0);
+    expect(mocks.syncNow).toHaveBeenCalledTimes(2);
+  });
+
   it('refreshes pending count after 1 second but does not sync on dirty when autoSync is off', async () => {
     await mountProvider();
     await dirty();
@@ -247,14 +293,16 @@ describe('DataSyncProvider', () => {
     const next = config();
     if (field === 'backend') next.backend = 'other';
     else next.values[field] = `changed-${field}`;
-    await act(async () => context().saveConfig(next));
+    await act(async () => { await context().saveConfig(next); });
     expect(mocks.resetSyncCursors).toHaveBeenCalledOnce();
+    expect(mocks.resetRepoSeeds).toHaveBeenCalledOnce();
   });
 
   it('does not reset cursors for unchanged identity or autoSync changes', async () => {
     await mountProvider();
-    await act(async () => context().saveConfig({ ...config(), autoSync: true }));
+    await act(async () => { await context().saveConfig({ ...config(), autoSync: true }); });
     expect(mocks.resetSyncCursors).not.toHaveBeenCalled();
+    expect(mocks.resetRepoSeeds).not.toHaveBeenCalled();
     await act(async () => context().setAutoSync(false));
     expect(mocks.resetSyncCursors).not.toHaveBeenCalled();
   });

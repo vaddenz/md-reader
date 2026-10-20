@@ -62,7 +62,7 @@ export default function SettingsSyncPage() {
     }
   };
 
-  const onSave = (e: FormEvent) => {
+  const onSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!canConfigure) {
       setMsg({ kind: 'err', text: '请填写接口地址与 JWT' });
@@ -73,11 +73,15 @@ export default function SettingsSyncPage() {
       enabled: true,
       values: { ...config.values, endpoint: endpoint.trim(), token: effectiveToken },
     };
-    saveConfig(next);
-    setToken('');
-    setTokenEditing(false);
-    setMsg({ kind: 'ok', text: '已保存；自动同步默认关闭，点击「立即同步」开始首次同步' });
-    if (next.autoSync) showToast('自动同步已开启');
+    try {
+      await saveConfig(next);
+      setToken('');
+      setTokenEditing(false);
+      setMsg({ kind: 'ok', text: '已保存；自动同步默认关闭，点击「立即同步」开始首次同步' });
+      if (next.autoSync) showToast('自动同步已开启');
+    } catch {
+      setMsg({ kind: 'err', text: '切换同步后端失败，请稍后重试' });
+    }
   };
 
   const statusText = status === 'syncing'

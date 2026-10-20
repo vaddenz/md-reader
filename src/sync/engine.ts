@@ -8,7 +8,7 @@ import { readOutbox, deleteOutboxIfRev, removeOutboxAtOrBefore, seedCollectionOu
 import { getDeviceId, repoScope } from './device';
 import { createSyncBackend } from './registry';
 import { loadSyncConfig } from './config';
-import type { RemoteRecord, SyncBackend, SyncRecord } from './types';
+import type { LocalRecord, RemoteRecord, SyncBackend, SyncRecord } from './types';
 import { SyncError } from './types';
 
 export interface RepoResult {
@@ -81,15 +81,17 @@ async function applyRemote(db: RepoDb, remote: RemoteRecord[], resets: Record<st
   return applied;
 }
 
-async function materialize(db: RepoDb, entry: OutboxEntry): Promise<SyncRecord> {
+function materialize(
+  entry: OutboxEntry,
+  localByCollection: Map<string, Map<string, LocalRecord>>,
+): SyncRecord {
   if (entry.recordId === RESET_RECORD_ID) {
     return {
       scope: '', collection: entry.collection, recordId: entry.recordId, payload: entry.payload ?? null,
       updatedAt: entry.updatedAt, deleted: true, deviceId: getDeviceId(),
     };
   }
-  const collection = collectionFor(entry.collection);
-  const local = collection ? await collection.getLocal(db, entry.recordId) : undefined;
+  const local = localByCollection.get(entry.collection)?.get(entry.recordId);
   if (!local) {
     return {
       scope: '', collection: entry.collection, recordId: entry.recordId, payload: null,
@@ -109,10 +111,21 @@ async function pushOutbox(
   signal?: AbortSignal,
 ): Promise<number> {
   const entries = await readOutbox(db);
+  const collectionNames = new Set(
+    entries.filter((entry) => entry.recordId !== RESET_RECORD_ID).map((entry) => entry.collection),
+  );
+  const localByCollection = new Map<string, Map<string, LocalRecord>>();
+  for (const name of collectionNames) {
+    const collection = collectionFor(name);
+    if (!collection) continue;
+    const locals = await collection.listLocal(db);
+    localByCollection.set(name, new Map(locals.map((local) => [local.recordId, local])));
+  }
+
   let pushed = 0;
   for (let i = 0; i < entries.length; i += 200) {
     const batch = entries.slice(i, i + 200);
-    const records = await Promise.all(batch.map((entry) => materialize(db, entry)));
+    const records = batch.map((entry) => materialize(entry, localByCollection));
     for (const record of records) record.scope = scope;
     await backend.push(records, signal);
     for (const entry of batch) await deleteOutboxIfRev(db, entry.id, entry.rev);
@@ -135,7 +148,10 @@ export async function syncRepo(
   const resets = await applyResets(db, remote);
   await seedCollections(db, resets, scopeChanged);
   const applied = await applyRemote(db, remote, resets);
-  const nextCursor = Math.max(cursor, ...remote.map((record) => record.serverUpdatedAt), 0);
+  const nextCursor = remote.reduce(
+    (max, record) => Math.max(max, record.serverUpdatedAt),
+    Math.max(cursor, 0),
+  );
 
   // Commit the successfully applied pull before pushing, so a push failure won't replay it.
   updateRepoState(scope, { cursor: nextCursor });
@@ -144,6 +160,21 @@ export async function syncRepo(
   const pushed = await pushOutbox(db, scope, backend, opts?.signal);
   updateRepoState(scope, { cursor: nextCursor, lastSyncAt: Date.now() });
   return { repoId: repo.id, scope, pulled: remote.length, applied, pushed };
+}
+
+/** 切换同步身份后清除各仓库的 seed/scope 标记，使本地数据在新后端重新 seed；保留本地数据与墓碑。 */
+export async function resetRepoSeeds(): Promise<void> {
+  const state = loadRepoState();
+  for (const repo of state.repos) {
+    let db: RepoDb | undefined;
+    try {
+      db = await openRepoDb(repoDbName(repo.id));
+      await db.db.delete('kv', 'syncSeededCollections');
+      await db.db.delete('kv', 'syncScope');
+    } finally {
+      db?.close();
+    }
+  }
 }
 
 async function syncOne(
@@ -165,8 +196,8 @@ function safeErrorMessage(error: unknown): string {
   if (!(error instanceof SyncError)) return '同步失败，请稍后重试';
   switch (error.kind) {
     case 'config': return '同步配置无效，请检查配置';
-    case 'auth': return '同步认证失败，请检查配置';
-    case 'notfound': return '同步目标不存在，请检查配置';
+    case 'auth': return 'JWT 无效、已过期或没有权限';
+    case 'notfound': return '同步表不存在，请先执行初始化 SQL';
     case 'network': return '网络连接失败，请稍后重试';
     case 'server': return '同步服务异常，请稍后重试';
     case 'parse': return '同步数据格式异常，请检查后端数据';

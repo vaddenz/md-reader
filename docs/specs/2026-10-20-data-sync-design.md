@@ -592,7 +592,7 @@ interface SyncConfig {
 
 - 保存配置时：
   - 校验必填字段；`endpoint` 去尾部 `/`；
-  - 若 `backend` / `endpoint` / `token` 任一变化，清空 `syncState.repos` 的 cursor（下次全量拉取），保留 outbox；
+  - 若 `backend` / `endpoint` / `token` 任一变化，清空 `syncState.repos` 的 cursor，并清除每个仓库库中的 `kv.syncSeededCollections` 与 `kv.syncScope`，使本地数据在新身份下重新 seed；保留 outbox、`syncTombstones` 与本地数据；
   - `enabled = true`；`autoSync` 保持用户当前选择，缺省 false；
   - 切换 `autoSync` 单独保存，不重置 cursor、不影响 outbox；从关到开且 `enabled && configured` 时延迟 3 秒触发一次同步。
 - 清除配置：删除 `syncConfig` 与 `syncState`，保留各仓库 outbox；下次重新配置后仍可补推。
@@ -666,7 +666,7 @@ interface DataSyncContextValue {
   warning: string | null;       // JWT 临近过期等
   syncNow(): Promise<void>;
   testConnection(values: Readonly<Record<string, string>>): Promise<TestResult>;
-  saveConfig(next: SyncConfig): void;
+  saveConfig(next: SyncConfig): Promise<void>;
   setAutoSync(on: boolean): void;
   disable(): void;
   clearConfig(): void;

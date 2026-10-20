@@ -11,12 +11,13 @@ import {
 import {
   clearSyncConfig,
   loadSyncConfig,
+  sanitizeSyncConfig,
   saveSyncConfig,
   syncConfigFingerprint,
 } from './config';
 import { clearSyncState, loadSyncState, resetSyncCursors } from './state';
 import { createSyncBackend, isSyncConfigured, shouldAutoSync } from './registry';
-import { syncNow as runEngineSync, type SyncSummary } from './engine';
+import { resetRepoSeeds, syncNow as runEngineSync, type SyncSummary } from './engine';
 import { countOutbox } from './outbox';
 import { openRepoDb } from './repoDb';
 import { loadRepoState, repoDbName } from '../data/repos';
@@ -32,7 +33,7 @@ interface DataSyncContextValue {
   warning: string | null;
   syncNow(): Promise<void>;
   testConnection(values: Readonly<Record<string, string>>): Promise<TestResult>;
-  saveConfig(next: SyncConfig): void;
+  saveConfig(next: SyncConfig): Promise<void>;
   setAutoSync(on: boolean): void;
   disable(): void;
   clearConfig(): void;
@@ -56,6 +57,9 @@ export function DataSyncProvider({ children }: { children: ReactNode }) {
   const timerRef = useRef<number | null>(null);
   const pendingTimerRef = useRef<number | null>(null);
   const dirtySinceRef = useRef<number | null>(null);
+  const lastSyncAtRef = useRef<number | null>(loadSyncState().lastSyncAt);
+  const syncingRef = useRef(false);
+  const dirtyDuringSyncRef = useRef(false);
 
   const refreshPendingCount = useCallback(async () => {
     const state = loadRepoState();
@@ -84,10 +88,12 @@ export function DataSyncProvider({ children }: { children: ReactNode }) {
 
   const runSync = useCallback(async () => {
     if (!config.enabled || !isSyncConfigured(config) || !onlineRef.current) return;
+    syncingRef.current = true;
     setStatus('syncing');
     setError(null);
     try {
       const result = await runEngineSync();
+      lastSyncAtRef.current = result.finishedAt;
       dirtySinceRef.current = null;
       setSummary(result);
       setStatus('idle');
@@ -96,6 +102,18 @@ export function DataSyncProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setStatus('error');
       setError(err instanceof SyncError ? err.message : '同步失败，请稍后重试');
+    } finally {
+      syncingRef.current = false;
+      if (dirtyDuringSyncRef.current) {
+        dirtyDuringSyncRef.current = false;
+        if (shouldAutoSync(config, onlineRef.current)) {
+          if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+          timerRef.current = window.setTimeout(() => {
+            timerRef.current = null;
+            void runSync();
+          }, 0);
+        }
+      }
     }
   }, [config, refreshPendingCount]);
 
@@ -134,12 +152,16 @@ export function DataSyncProvider({ children }: { children: ReactNode }) {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         if (shouldAutoSync(config, online)) void runSync();
-      } else if (shouldAutoSync(config, online)) {
+      } else if (
+        shouldAutoSync(config, online)
+        && Date.now() - (lastSyncAtRef.current ?? 0) > 5 * 60_000
+      ) {
         schedule(3000);
       }
     };
     const onDirty = () => {
       schedulePendingRefresh();
+      if (syncingRef.current) dirtyDuringSyncRef.current = true;
       if (!shouldAutoSync(config, online)) {
         dirtySinceRef.current = null;
         return;
@@ -161,9 +183,13 @@ export function DataSyncProvider({ children }: { children: ReactNode }) {
     };
   }, [config, online, runSync, schedule, scheduleDirtySync, schedulePendingRefresh]);
 
-  const saveConfig = useCallback((next: SyncConfig) => {
-    const saved = saveSyncConfig({ ...next, enabled: true });
-    if (syncConfigFingerprint(config) !== syncConfigFingerprint(saved)) resetSyncCursors();
+  const saveConfig = useCallback(async (next: SyncConfig) => {
+    const candidate = sanitizeSyncConfig({ ...next, enabled: true });
+    if (syncConfigFingerprint(config) !== syncConfigFingerprint(candidate)) {
+      resetSyncCursors();
+      await resetRepoSeeds();
+    }
+    const saved = saveSyncConfig(candidate);
     setConfig(saved);
     setError(null);
     setStatus(isSyncConfigured(saved) ? 'idle' : 'unconfigured');

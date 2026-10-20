@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAllData, DbBlockedError, kvGet, kvSet } from '../../src/data/db';
 import { saveProgress } from '../../src/data/prefs';
-import { syncAll, syncNow, type SyncSummary } from '../../src/sync/engine';
+import { resetRepoSeeds, syncAll, syncNow, type SyncSummary } from '../../src/sync/engine';
 import { SYNC_COLLECTIONS } from '../../src/sync/collections';
 import { readOutbox, enqueueChange } from '../../src/sync/outbox';
 import { openRepoDb } from '../../src/sync/repoDb';
@@ -149,7 +149,13 @@ describe('sync engine', () => {
   });
 
   it('推送 outbox 时每批最多 200 条', async () => {
+    const progress = SYNC_COLLECTIONS.find((collection) => collection.name === 'reading.progress')!;
+    const listLocal = vi.spyOn(progress, 'listLocal');
+    const getLocal = vi.spyOn(progress, 'getLocal');
     const db = await openRepoDb('mdreader');
+    // 预先标记完成 seed，避免 seed 阶段的 listLocal 干扰「推送只扫描一次」的断言。
+    await kvSet('syncSeededCollections', SYNC_COLLECTIONS.map((collection) => collection.name));
+    await kvSet('syncScope', 'your-name/your-notes@main');
     const tx = db.db.transaction('sync_outbox', 'readwrite');
     for (let i = 0; i < 405; i += 1) {
       enqueueChange(tx, {
@@ -162,6 +168,45 @@ describe('sync engine', () => {
     const summary = await syncAll(backend);
     expect(pushed.map((batch) => batch.length)).toEqual([200, 200, 5]);
     expect(summary.pushed).toBe(405);
+    expect(listLocal).toHaveBeenCalledOnce();
+    expect(getLocal).not.toHaveBeenCalled();
+    expect(pushed.flat().find((record) => record.recordId === 'missing-0')).toMatchObject({
+      deleted: true, updatedAt: 1, payload: null,
+    });
+    listLocal.mockRestore();
+    getLocal.mockRestore();
+  });
+
+  it('切换同步身份时清除每仓库 seed/scope 标记并保留本地队列与墓碑', async () => {
+    saveRepoState({
+      version: 1,
+      owner: 'test-owner',
+      activeRepoId: 'default',
+      repos: [
+        { id: 'default', repo: 'active-repo', branch: 'main' },
+        { id: 'identity-secondary', repo: 'secondary-repo', branch: 'main' },
+      ],
+    });
+    const activeDb = await openRepoDb('mdreader');
+    const secondaryDb = await openRepoDb('mdreader-identity-secondary');
+    for (const db of [activeDb, secondaryDb]) {
+      await db.kvSet('syncSeededCollections', ['reading.progress']);
+      await db.kvSet('syncScope', 'old/scope@main');
+      await db.kvSet('syncTombstones', { 'reading.progress': { 'deleted.md': 42 } });
+      const tx = db.db.transaction('sync_outbox', 'readwrite');
+      enqueueChange(tx, { collection: 'reading.progress', recordId: 'queued.md', updatedAt: 1, deleted: false });
+      await tx.done;
+    }
+
+    await resetRepoSeeds();
+
+    for (const db of [activeDb, secondaryDb]) {
+      expect(await db.kvGet('syncSeededCollections')).toBeUndefined();
+      expect(await db.kvGet('syncScope')).toBeUndefined();
+      expect(await db.kvGet('syncTombstones')).toEqual({ 'reading.progress': { 'deleted.md': 42 } });
+      expect(await readOutbox(db)).toHaveLength(1);
+    }
+    secondaryDb.close();
   });
 
   it('reset outbox 推送时保留 reset payload', async () => {

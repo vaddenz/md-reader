@@ -345,11 +345,9 @@ export async function clearTrainingData(): Promise<void> {
   const attStore = tx.objectStore('mem_attempts');
   const kv = tx.objectStore('kv');
   const [srsRows, attRows] = await Promise.all([srsStore.getAll(), attStore.getAll()]);
-  const maxTs = Math.max(
-    0,
-    ...(srsRows as SrsState[]).map((s) => s.lastAt),
-    ...(attRows as MemoryAttempt[]).map((a) => a.ts),
-  );
+  let maxTs = 0;
+  for (const row of srsRows as SrsState[]) maxTs = Math.max(maxTs, row.lastAt);
+  for (const row of attRows as MemoryAttempt[]) maxTs = Math.max(maxTs, row.ts);
   await srsStore.clear();
   await attStore.clear();
   await kv.delete(SESSION_KEY);
