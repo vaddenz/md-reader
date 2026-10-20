@@ -1,10 +1,10 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAllData } from '../../src/data/db';
 import { openRepoDb } from '../../src/sync/repoDb';
 import {
-  countOutbox, deleteOutboxIfRev, enqueueChange, readOutbox, removeOutboxAtOrBefore, seedCollectionOutbox,
+  commitWithNotify, countOutbox, deleteOutboxIfRev, enqueueChange, readOutbox, removeOutboxAtOrBefore, seedCollectionOutbox,
 } from '../../src/sync/outbox';
 import type { SyncCollection } from '../../src/sync/types';
 
@@ -73,5 +73,28 @@ describe('outbox', () => {
     expect(entries.map((e) => e.recordId).sort()).toEqual(['deleted', 'legacy']);
     expect(entries.every((e) => !('payload' in e))).toBe(true);
     repo.close();
+  });
+
+  it('commitWithNotify 仅在事务提交后派发 sync-dirty；提交失败不派发', async () => {
+    const dispatch = vi.fn();
+    vi.stubGlobal('window', { dispatchEvent: dispatch, addEventListener: vi.fn() });
+    try {
+      let resolveDone!: () => void;
+      const done = new Promise<void>((resolve) => { resolveDone = resolve; });
+      const pending = commitWithNotify({ done });
+      await Promise.resolve();
+      expect(dispatch).not.toHaveBeenCalled();
+      resolveDone();
+      await pending;
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect((dispatch.mock.calls[0][0] as Event).type).toBe('mdreader:sync-dirty');
+
+      const failed = vi.fn();
+      vi.stubGlobal('window', { dispatchEvent: failed, addEventListener: vi.fn() });
+      await expect(commitWithNotify({ done: Promise.reject(new Error('abort')) })).rejects.toThrow('abort');
+      expect(failed).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

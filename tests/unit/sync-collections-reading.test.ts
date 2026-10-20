@@ -2,10 +2,11 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAllData } from '../../src/data/db';
-import { getProgress, saveProgress } from '../../src/data/prefs';
+import { getFavorites, getProgress, saveProgress, toggleFavorite } from '../../src/data/prefs';
 import { openRepoDb } from '../../src/sync/repoDb';
 import { progressCollection } from '../../src/sync/collections/progress';
 import { favoritesCollection } from '../../src/sync/collections/favorites';
+import { clearTombstone, readTombstones, setTombstone, tombstoneAt } from '../../src/sync/tombstones';
 
 beforeEach(async () => { await clearAllData(); });
 
@@ -41,6 +42,31 @@ describe('progress collection', () => {
     expect(await repo.kvGet('progress')).toEqual({ fresh: { ratio: 0.2, updatedAt: 6 } });
     repo.close();
   });
+
+  it('本地墓碑阻止陈旧远端 upsert 复活；更新的 upsert 复活并清墓碑', async () => {
+    const repo = await openRepoDb('mdreader');
+    await repo.kvSet('progress', { 'a.md': { ratio: 0.4, updatedAt: 10 } });
+    await setTombstone(repo, 'reading.progress', 'a.md', 20);
+    await repo.kvSet('progress', {}); // 本地删除：记录已移除，只剩墓碑
+
+    const stale = await progressCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.progress', recordId: 'a.md',
+      payload: { ratio: 0.6, updatedAt: 20 }, updatedAt: 20, deleted: false,
+      deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(stale).toBe(false);
+    expect(await getProgress('a.md')).toBeUndefined();
+
+    const fresh = await progressCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.progress', recordId: 'a.md',
+      payload: { ratio: 0.8, updatedAt: 30 }, updatedAt: 30, deleted: false,
+      deviceId: 'd', serverUpdatedAt: 2,
+    });
+    expect(fresh).toBe(true);
+    expect((await getProgress('a.md'))?.ratio).toBe(0.8);
+    expect(await tombstoneAt(repo, 'reading.progress', 'a.md')).toBeUndefined();
+    repo.close();
+  });
 });
 
 describe('favorites collection', () => {
@@ -62,6 +88,52 @@ describe('favorites collection', () => {
     await repo.kvSet('favoritesV2', { old: { addedAt: 5 }, fresh: { addedAt: 6 } });
     await favoritesCollection.clearBefore!(repo, 5);
     expect(await repo.kvGet('favoritesV2')).toEqual({ fresh: { addedAt: 6 } });
+    repo.close();
+  });
+
+  it('本地取消收藏后陈旧远端 upsert 不复活；更新的 upsert 复活并清墓碑', async () => {
+    const repo = await openRepoDb('mdreader');
+    await toggleFavorite('a.md');
+    const addedAt = (await repo.kvGet<Record<string, { addedAt: number }>>('favoritesV2'))!['a.md'].addedAt;
+    await toggleFavorite('a.md'); // 本地删除
+    const deletedAt = (await tombstoneAt(repo, 'reading.favorites', 'a.md'))!;
+    expect(deletedAt).toBeGreaterThan(addedAt);
+
+    const stale = await favoritesCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.favorites', recordId: 'a.md',
+      payload: { addedAt }, updatedAt: addedAt, deleted: false,
+      deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(stale).toBe(false);
+    expect(await repo.kvGet('favoritesV2')).toEqual({});
+    expect(await getFavorites()).toEqual([]);
+
+    const fresh = await favoritesCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.favorites', recordId: 'a.md',
+      payload: { addedAt: deletedAt + 1 }, updatedAt: deletedAt + 1, deleted: false,
+      deviceId: 'd', serverUpdatedAt: 2,
+    });
+    expect(fresh).toBe(true);
+    expect(await repo.kvGet('favoritesV2')).toEqual({ 'a.md': { addedAt: deletedAt + 1 } });
+    expect(await getFavorites()).toEqual(['a.md']);
+    expect(await tombstoneAt(repo, 'reading.favorites', 'a.md')).toBeUndefined();
+    repo.close();
+  });
+});
+
+describe('tombstones', () => {
+  it('set / read / clear 记录按 collection + recordId 隔离', async () => {
+    const repo = await openRepoDb('mdreader');
+    await setTombstone(repo, 'reading.progress', 'a.md', 12);
+    await setTombstone(repo, 'reading.favorites', 'a.md', 13);
+    expect(await readTombstones(repo)).toEqual({
+      'reading.progress': { 'a.md': 12 },
+      'reading.favorites': { 'a.md': 13 },
+    });
+    expect(await tombstoneAt(repo, 'reading.progress', 'a.md')).toBe(12);
+    await clearTombstone(repo, 'reading.progress', 'a.md');
+    expect(await tombstoneAt(repo, 'reading.progress', 'a.md')).toBeUndefined();
+    expect(await tombstoneAt(repo, 'reading.favorites', 'a.md')).toBe(13);
     repo.close();
   });
 });

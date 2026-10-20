@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAllData, kvGet, kvSet, openDb } from '../../src/data/db';
 import { getFavorites, getProgress, recentDocs, saveProgress, toggleFavorite } from '../../src/data/prefs';
 import type { OutboxEntry } from '../../src/sync/outbox';
@@ -10,6 +10,7 @@ async function outbox(): Promise<OutboxEntry[]> {
 }
 
 beforeEach(async () => { await clearAllData(); });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('prefs', () => {
   it('收藏开关幂等', async () => {
@@ -85,9 +86,28 @@ describe('prefs', () => {
     const entries = await outbox();
     const a = entries.find((e) => e.recordId === 'a.md')!;
     expect(a.deleted).toBe(true);
+    expect(await kvGet('syncTombstones')).toEqual({ 'reading.favorites': { 'a.md': a.updatedAt } });
     await toggleFavorite('a.md'); // 重新收藏 → upsert 覆盖同一条
     const again = (await outbox()).find((e) => e.recordId === 'a.md')!;
     expect(again.deleted).toBe(false);
     expect(again.rev).not.toBe(a.rev);
+    expect(await kvGet('syncTombstones')).toEqual({});
+  });
+
+  it('saveProgress 清除同路径本地墓碑', async () => {
+    await kvSet('syncTombstones', { 'reading.progress': { 'a.md': 10 } });
+    await saveProgress('a.md', 0.3);
+    expect(await kvGet('syncTombstones')).toEqual({});
+    expect((await getProgress('a.md'))?.ratio).toBe(0.3);
+  });
+
+  it('saveProgress / toggleFavorite 提交后才派发 sync-dirty', async () => {
+    const dispatch = vi.fn();
+    vi.stubGlobal('window', { dispatchEvent: dispatch, addEventListener: vi.fn() });
+    await saveProgress('a.md', 0.5);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect((dispatch.mock.calls[0][0] as Event).type).toBe('mdreader:sync-dirty');
+    await toggleFavorite('a.md');
+    expect(dispatch).toHaveBeenCalledTimes(2);
   });
 });

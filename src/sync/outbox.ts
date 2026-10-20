@@ -51,6 +51,18 @@ export function enqueueChange(tx: OutboxTx, change: OutboxChange): void {
   void tx.objectStore(OUTBOX_STORE).put(entry);
 }
 
+/** 本地数据 + outbox 提交完成后通知同步调度；事件不携带敏感数据。 */
+export function notifySyncDirty(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('mdreader:sync-dirty'));
+}
+
+/** 事务提交成功后才派发 dirty 事件，避免同步抢在写入落盘之前。 */
+export async function commitWithNotify(tx: { done: Promise<unknown> }): Promise<void> {
+  await tx.done;
+  notifySyncDirty();
+}
+
 export async function readOutbox(db: RepoDb): Promise<OutboxEntry[]> {
   return db.getAll<OutboxEntry>(OUTBOX_STORE);
 }

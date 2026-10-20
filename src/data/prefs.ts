@@ -1,7 +1,8 @@
 import { openDb } from './db';
 import { serialize } from './serialize';
 import { nextUpdatedAt } from '../sync/device';
-import { enqueueChange } from '../sync/outbox';
+import { commitWithNotify, enqueueChange } from '../sync/outbox';
+import { clearTombstoneTx, putTombstone } from '../sync/tombstones';
 import { COLLECTIONS } from '../sync/collections/names';
 
 /**
@@ -118,13 +119,15 @@ export function toggleFavorite(path: string): Promise<string[]> {
     const at = nextUpdatedAt(Date.now(), current?.addedAt ?? 0);
     if (current) {
       delete map[path];
+      await putTombstone(tx, COLLECTIONS.favorites, path, at);
       enqueueChange(tx, { collection: COLLECTIONS.favorites, recordId: path, updatedAt: at, deleted: true });
     } else {
       map[path] = { addedAt: at };
+      await clearTombstoneTx(tx, COLLECTIONS.favorites, path);
       enqueueChange(tx, { collection: COLLECTIONS.favorites, recordId: path, updatedAt: at, deleted: false });
     }
     await kv.put(map, FAVORITES_V2_KEY);
-    await tx.done;
+    await commitWithNotify(tx);
     return sortFavorites(map);
   });
 }
@@ -140,8 +143,9 @@ export function saveProgress(path: string, ratio: number, headingId?: string): P
     const clamped = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;
     all[path] = { ratio: clamped, ...(headingId ? { headingId } : {}), updatedAt: at };
     await kv.put(all, PROGRESS_KEY);
+    await clearTombstoneTx(tx, COLLECTIONS.progress, path);
     enqueueChange(tx, { collection: COLLECTIONS.progress, recordId: path, updatedAt: at, deleted: false });
-    await tx.done;
+    await commitWithNotify(tx);
   });
 }
 

@@ -1,5 +1,6 @@
 import { favoritesMapFrom } from '../../data/prefs';
 import { remoteWins } from '../merge';
+import { clearTombstone, setTombstone, tombstoneAt } from '../tombstones';
 import type { RepoDb } from '../repoDb';
 import type { SyncCollection } from '../types';
 import { COLLECTIONS } from './names';
@@ -32,19 +33,26 @@ export const favoritesCollection: SyncCollection = {
     return rec ? { recordId, updatedAt: rec.addedAt, deleted: false, payload: rec } : undefined;
   },
   async applyRemote(db, record) {
+    const deletedAt = await tombstoneAt(db, COLLECTIONS.favorites, record.recordId);
+    if (deletedAt !== undefined && record.updatedAt <= deletedAt) return false;
     const map = await readMap(db);
     const current = map[record.recordId];
     if (!remoteWins(record.updatedAt, current?.addedAt)) return false;
     if (record.deleted) {
-      if (!current) return false;
-      delete map[record.recordId];
-      await db.kvSet(V2, map);
-      return true;
+      if (current) {
+        delete map[record.recordId];
+        await db.kvSet(V2, map);
+      }
+      if (deletedAt === undefined || record.updatedAt > deletedAt) {
+        await setTombstone(db, COLLECTIONS.favorites, record.recordId, record.updatedAt);
+      }
+      return Boolean(current);
     }
     if (!record.payload || typeof record.payload !== 'object') return false;
     const addedAt = Number((record.payload as { addedAt?: unknown }).addedAt);
     map[record.recordId] = { addedAt: Number.isFinite(addedAt) ? addedAt : record.updatedAt };
     await db.kvSet(V2, map);
+    if (deletedAt !== undefined) await clearTombstone(db, COLLECTIONS.favorites, record.recordId);
     return true;
   },
   async clearBefore(db, before) {
