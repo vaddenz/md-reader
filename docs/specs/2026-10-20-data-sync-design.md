@@ -252,6 +252,17 @@ export function nextUpdatedAt(now = Date.now(), atLeast = 0): number {
 
 tombstone 永远保留在远端（个人数据量小），保证新设备首次同步也能学到删除。未来可加清理策略，不在本期。
 
+除远端 tombstone 外，每个仓库库还在本地维护删除标记：
+
+```
+kv.syncTombstones = Record<collection, Record<recordId, deletedAt>>
+```
+
+- 本地删除（删除高亮、取消收藏）在写数据 + outbox 的**同一事务**里写入 `syncTombstones`；应用远端 tombstone 时也记录其 `updatedAt`。
+- 应用可能复活已删记录的远端 upsert 前先查本地墓碑（进度 / 高亮 / 收藏 / SRS / 训练记录）：`record.updatedAt <= deletedAt` 的 upsert 直接忽略，避免「本机刚删除、尚未推送」时被拉取到的陈旧远端记录复活。题库偏好没有删除语义，不写墓碑。
+- 本地重新编辑同一记录（新增高亮、重新收藏、写进度、重新作答、导入）时清除对应墓碑。
+- 墓碑只存在本机 IndexedDB（`kv.syncTombstones`，按仓库独立），不上传、不参与 LWW；远端仍以 `deleted=true` 的普通记录表达删除。
+
 ### 5.3 集合级 reset（清除训练数据）
 
 `clearTrainingData()` 清空本机 `mem_srs` / `mem_attempts` 后，同时更新本机 `kv.syncReset` 并写入两个特殊记录。`now` 用 `nextUpdatedAt(Date.now(), max(被清记录的 lastAt / ts))` 生成，确保 reset 时间不早于任何旧记录：
@@ -327,7 +338,7 @@ interface OutboxEntry {
 
 - 写数据成功后立即入队；同一记录多次写入只保留一条（按 `id` upsert），`updatedAt` 取最新。
 - 远端应用写入**不入队**（否则会把刚拉下来的数据再推回去）。
-- 入队后派发 `window` 事件 `mdreader:sync-dirty`；`DataSyncProvider` 监听并做延迟合并同步。事件不携带敏感数据。
+- 入队所在事务**提交成功后**才派发 `window` 事件 `mdreader:sync-dirty`：写入口统一用 `commitWithNotify(tx)`，即 `await tx.done` 后再派发。这样同步不会抢在数据/outbox 落盘之前读取旧状态。`DataSyncProvider` 监听并做延迟合并同步；事件不携带敏感数据。
 - 同步关闭时仍然入队，保证重新启用后能补推。
 
 ## 7. 集合适配器
@@ -565,6 +576,7 @@ Neon Data API 默认允许所有来源；建议在 Data API Settings → CORS al
 | `kv.syncSeededCollections` | 每个仓库 IndexedDB | 已 seed 的 collection 列表；新增 collection 只补 seed 自己 |
 | `kv.syncScope` | 每个仓库 IndexedDB | 该库上次同步的 scope；不一致时回退 cursor 并全量拉取 |
 | `kv.syncReset` | 每个仓库 IndexedDB | `Record<collection, maxResetBefore>` |
+| `kv.syncTombstones` | 每个仓库 IndexedDB | `Record<collection, Record<recordId, deletedAt>>`；本地删除标记，阻止陈旧远端记录复活 |
 
 `SyncConfig`：
 
