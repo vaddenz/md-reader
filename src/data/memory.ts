@@ -5,6 +5,10 @@
 import { kvGet, kvSet, openDb } from './db';
 import { serialize } from './serialize';
 import { addDays, dayStart, isMastered, MAX_STAGE, type SrsState, type Verdict } from '../lib/srs';
+import { nextUpdatedAt } from '../sync/device';
+import { commitWithNotify, enqueueChange } from '../sync/outbox';
+import { clearTombstoneTx } from '../sync/tombstones';
+import { COLLECTIONS, RESET_RECORD_ID } from '../sync/collections/names';
 
 export interface LlmConfig { baseUrl: string; apiKey: string; model: string }
 
@@ -22,6 +26,8 @@ export interface MemorySelection {
   /** 0 = 不限。 */
   sessionSize: number;
   newPerDay: number;
+  /** 题库/筛选的同步版本；仅 banks/filters 变化时刷新，训练设置变化不刷新。 */
+  updatedAt?: number;
 }
 
 export const SESSION_SIZE_CHOICES = [0, 10, 20, 50];
@@ -148,6 +154,7 @@ export function sanitizeSelection(raw: unknown): MemorySelection {
     },
     sessionSize,
     newPerDay,
+    ...(typeof r.updatedAt === 'number' && Number.isFinite(r.updatedAt) ? { updatedAt: r.updatedAt } : {}),
   };
 }
 
@@ -162,8 +169,26 @@ export async function getSelection(): Promise<MemorySelection> {
 
 export function saveSelection(sel: MemorySelection): Promise<void> {
   const clean = sanitizeSelection(sel);
-  writeGlobalJson(GLOBAL_TRAINING_KEY, { sessionSize: clean.sessionSize, newPerDay: clean.newPerDay });
-  return serialize(() => kvSet(SELECTION_KEY, clean));
+  return serialize(async () => {
+    writeGlobalJson(GLOBAL_TRAINING_KEY, { sessionSize: clean.sessionSize, newPerDay: clean.newPerDay });
+    const db = await openDb();
+    const tx = db.transaction(['kv', 'sync_outbox'], 'readwrite');
+    const kv = tx.objectStore('kv');
+    const prev = sanitizeSelection(await kv.get(SELECTION_KEY));
+    // 训练设置（sessionSize/newPerDay）跨仓库共享但不参与同步：只有题库/筛选变化才刷新版本。
+    const changed = JSON.stringify(prev.banks) !== JSON.stringify(clean.banks)
+      || JSON.stringify(prev.filters) !== JSON.stringify(clean.filters);
+    const updatedAt = changed ? nextUpdatedAt(Date.now(), prev.updatedAt ?? 0) : prev.updatedAt;
+    const next: MemorySelection = { ...clean, ...(updatedAt !== undefined ? { updatedAt } : {}) };
+    await kv.put(next, SELECTION_KEY);
+    if (changed) {
+      enqueueChange(tx, {
+        collection: COLLECTIONS.memorySelection, recordId: 'selection',
+        updatedAt: updatedAt ?? nextUpdatedAt(), deleted: false,
+      });
+    }
+    await commitWithNotify(tx);
+  });
 }
 
 export function sanitizeLlmConfig(raw: unknown): LlmConfig | undefined {
@@ -270,11 +295,23 @@ export async function loadSrsMap(): Promise<Map<string, SrsState>> {
 }
 
 export async function putSrs(state: SrsState): Promise<void> {
-  await (await openDb()).put('mem_srs', state, state.qid);
+  const db = await openDb();
+  const tx = db.transaction(['mem_srs', 'sync_outbox'], 'readwrite');
+  await tx.objectStore('mem_srs').put(state, state.qid);
+  enqueueChange(tx, {
+    collection: COLLECTIONS.memorySrs, recordId: state.qid, updatedAt: state.lastAt, deleted: false,
+  });
+  await commitWithNotify(tx);
 }
 
 export async function appendAttempt(a: Omit<MemoryAttempt, 'id'>): Promise<void> {
-  await (await openDb()).add('mem_attempts', a);
+  const db = await openDb();
+  const tx = db.transaction(['mem_attempts', 'sync_outbox'], 'readwrite');
+  await tx.objectStore('mem_attempts').add(a);
+  enqueueChange(tx, {
+    collection: COLLECTIONS.memoryAttempts, recordId: attemptKey(a), updatedAt: a.ts, deleted: false,
+  });
+  await commitWithNotify(tx);
 }
 
 export async function listAttempts(opts: { limit?: number; bankPath?: string } = {}): Promise<MemoryAttempt[]> {
@@ -303,13 +340,41 @@ export async function clearSession(): Promise<void> {
 /** 清除训练进度与记录、会话；保留题库缓存、模型配置与范围选择。 */
 export async function clearTrainingData(): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction(['mem_srs', 'mem_attempts', 'kv'], 'readwrite');
-  await Promise.all([
-    tx.objectStore('mem_srs').clear(),
-    tx.objectStore('mem_attempts').clear(),
-    tx.objectStore('kv').delete(SESSION_KEY),
-    tx.done,
-  ]);
+  const tx = db.transaction(['mem_srs', 'mem_attempts', 'kv', 'sync_outbox'], 'readwrite');
+  const srsStore = tx.objectStore('mem_srs');
+  const attStore = tx.objectStore('mem_attempts');
+  const kv = tx.objectStore('kv');
+  const [srsRows, attRows] = await Promise.all([srsStore.getAll(), attStore.getAll()]);
+  const maxTs = Math.max(
+    0,
+    ...(srsRows as SrsState[]).map((s) => s.lastAt),
+    ...(attRows as MemoryAttempt[]).map((a) => a.ts),
+  );
+  await srsStore.clear();
+  await attStore.clear();
+  await kv.delete(SESSION_KEY);
+
+  const before = nextUpdatedAt(Date.now(), maxTs);
+  // 同一个事务里清掉旧的训练 outbox，避免残留条目在 reset 之后继续推送。
+  const outboxStore = tx.objectStore('sync_outbox');
+  const oldEntries = await outboxStore.getAll() as { id: string; collection: string; recordId: string; updatedAt: number }[];
+  for (const entry of oldEntries) {
+    const isMemory = entry.collection === COLLECTIONS.memorySrs || entry.collection === COLLECTIONS.memoryAttempts;
+    if (isMemory && entry.recordId !== RESET_RECORD_ID && entry.updatedAt <= before) {
+      await outboxStore.delete(entry.id);
+    }
+  }
+
+  const reset = await kv.get('syncReset');
+  const map = reset && typeof reset === 'object' ? { ...(reset as Record<string, number>) } : {};
+  for (const collection of [COLLECTIONS.memorySrs, COLLECTIONS.memoryAttempts]) {
+    map[collection] = Math.max(map[collection] ?? 0, before);
+    enqueueChange(tx, {
+      collection, recordId: RESET_RECORD_ID, updatedAt: before, deleted: true, payload: { before },
+    });
+  }
+  await kv.put(map, 'syncReset');
+  await commitWithNotify(tx);
 }
 
 export async function exportMemory(): Promise<string> {
@@ -328,7 +393,7 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
   const rawAttempts = Array.isArray((data as { attempts?: unknown }).attempts) ? (data as { attempts: unknown[] }).attempts : [];
 
   const db = await openDb();
-  const tx = db.transaction(['mem_srs', 'mem_attempts'], 'readwrite');
+  const tx = db.transaction(['mem_srs', 'mem_attempts', 'kv', 'sync_outbox'], 'readwrite');
   const srsStore = tx.objectStore('mem_srs');
   const attStore = tx.objectStore('mem_attempts');
   let srsImported = 0;
@@ -341,6 +406,8 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
     const cur = existingSrs.get(s.qid);
     if (cur && cur.lastAt >= s.lastAt) continue;
     await srsStore.put(s, s.qid);
+    await clearTombstoneTx(tx, COLLECTIONS.memorySrs, s.qid);
+    enqueueChange(tx, { collection: COLLECTIONS.memorySrs, recordId: s.qid, updatedAt: s.lastAt, deleted: false });
     srsImported += 1;
   }
 
@@ -352,10 +419,12 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
     if (existingKeys.has(key)) continue;
     const { id: _ignored, ...rest } = a;
     await attStore.add(rest);
+    await clearTombstoneTx(tx, COLLECTIONS.memoryAttempts, key);
+    enqueueChange(tx, { collection: COLLECTIONS.memoryAttempts, recordId: key, updatedAt: a.ts, deleted: false });
     existingKeys.add(key);
     attemptsImported += 1;
   }
-  await tx.done;
+  await commitWithNotify(tx);
   return { srs: srsImported, attempts: attemptsImported };
 }
 

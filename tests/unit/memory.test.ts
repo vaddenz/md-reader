@@ -9,6 +9,11 @@ import {
   type MemoryAttempt,
 } from '../../src/data/memory';
 import type { SrsState } from '../../src/lib/srs';
+import type { OutboxEntry } from '../../src/sync/outbox';
+
+async function outbox(): Promise<OutboxEntry[]> {
+  return (await openDb()).getAll('sync_outbox') as Promise<OutboxEntry[]>;
+}
 
 const NOW = new Date(2026, 9, 19, 15, 30).getTime();
 const DAY = 24 * 60 * 60 * 1000;
@@ -140,6 +145,52 @@ describe('进度与记录', () => {
     expect(await getLlmConfig()).toBeDefined();
     expect((await getSelection()).banks).toEqual(['b.jsonl']);
     expect((await openDb()).get('mem_banks', 'b.jsonl')).toBeDefined();
+  });
+});
+
+describe('同步 outbox 与 reset', () => {
+  it('putSrs / appendAttempt 写 outbox；attempt 用稳定键', async () => {
+    await putSrs(srs('q1'));
+    await appendAttempt(attempt());
+    const entries = await outbox();
+    expect(entries.find((e) => e.collection === 'memory.srs')).toMatchObject({ recordId: 'q1', deleted: false });
+    expect(entries.find((e) => e.collection === 'memory.attempts')).toMatchObject({
+      recordId: `q1|${NOW}|ai`, updatedAt: NOW, deleted: false,
+    });
+  });
+
+  it('saveSelection 只在 banks/filters 变化时入队', async () => {
+    await saveSelection({ ...DEFAULT_SELECTION, banks: ['b.jsonl'] });
+    const first = (await outbox()).filter((e) => e.collection === 'memory.selection');
+    expect(first).toHaveLength(1);
+    const updatedAt = first[0].updatedAt;
+    await saveSelection({ ...DEFAULT_SELECTION, banks: ['b.jsonl'], sessionSize: 50 });
+    const second = (await outbox()).filter((e) => e.collection === 'memory.selection');
+    expect(second[0].updatedAt).toBe(updatedAt); // 训练设置变化不刷新
+  });
+
+  it('clearTrainingData 写 reset 标记并更新 syncReset', async () => {
+    await putSrs(srs('q1'));
+    await appendAttempt(attempt());
+    await clearTrainingData();
+    const entries = await outbox();
+    const resets = entries.filter((e) => e.recordId === '__reset__');
+    expect(resets).toHaveLength(2);
+    expect(entries.filter((e) => e.recordId !== '__reset__')).toHaveLength(0);
+    expect(resets.every((e) => e.deleted && e.payload)).toBe(true);
+    expect(await kvGet('syncReset')).toMatchObject({ 'memory.srs': expect.any(Number), 'memory.attempts': expect.any(Number) });
+  });
+
+  it('importMemory 只入队导入/更新的记录并清除墓碑', async () => {
+    await kvSet('syncTombstones', {
+      'memory.srs': { q1: 1 },
+      'memory.attempts': { [`q1|${NOW}|ai`]: 1 },
+    });
+    const json = JSON.stringify({ kind: 'memory', srs: [srs('q1')], attempts: [attempt()] });
+    expect(await importMemory(json)).toEqual({ srs: 1, attempts: 1 });
+    expect(await kvGet('syncTombstones')).toEqual({});
+    const entries = await outbox();
+    expect(entries.map((e) => e.collection).sort()).toEqual(['memory.attempts', 'memory.srs']);
   });
 });
 
