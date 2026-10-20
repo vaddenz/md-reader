@@ -59,6 +59,14 @@ export default function HomePage() {
   const [dueCount, setDueCount] = useState<number | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [syncTick, setSyncTick] = useState(0);
+
+  // 跨设备同步应用了远端数据：重读首页上可能被远端更新/删除的区块。
+  useEffect(() => {
+    const onApplied = () => setSyncTick((v) => v + 1);
+    window.addEventListener('mdreader:sync-applied', onApplied);
+    return () => window.removeEventListener('mdreader:sync-applied', onApplied);
+  }, []);
 
   // 记忆助手入口的「今日待复习」提示（仅本机统计，失败静默）
   useEffect(() => {
@@ -72,7 +80,7 @@ export default function HomePage() {
       () => {},
     );
     return () => { cancelled = true; };
-  }, [lastSyncAt]);
+  }, [lastSyncAt, syncTick]);
 
   // 数据库被旧页面连接阻塞（v1→v2 升级无法完成）时自动重试：旧标签页释放后无需手动刷新。
   useEffect(() => {
@@ -117,7 +125,7 @@ export default function HomePage() {
       () => {},
     );
     return () => { cancelled = true; };
-  }, [lastSyncAt]);
+  }, [lastSyncAt, syncTick]);
 
   // 只展示目录树里仍存在的文档（收藏/进度可能指向已从仓库移除的路径）。
   const known = useMemo(() => new Map((metas ?? []).map((m) => [m.path, m])), [metas]);
@@ -134,7 +142,7 @@ export default function HomePage() {
       () => {},
     );
     return () => { cancelled = true; };
-  }, [recentShown, lastSyncAt]);
+  }, [recentShown, lastSyncAt, syncTick]);
 
   return (
     <main className="home">
