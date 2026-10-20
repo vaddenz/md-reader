@@ -2,10 +2,12 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAllData } from '../../src/data/db';
+import { getDocHighlights, addHighlight, removeHighlights } from '../../src/data/highlights';
 import { getFavorites, getProgress, saveProgress, toggleFavorite } from '../../src/data/prefs';
 import { openRepoDb } from '../../src/sync/repoDb';
 import { progressCollection } from '../../src/sync/collections/progress';
 import { favoritesCollection } from '../../src/sync/collections/favorites';
+import { highlightsCollection } from '../../src/sync/collections/highlights';
 import { clearTombstone, readTombstones, setTombstone, tombstoneAt } from '../../src/sync/tombstones';
 
 beforeEach(async () => { await clearAllData(); });
@@ -117,6 +119,78 @@ describe('favorites collection', () => {
     expect(await repo.kvGet('favoritesV2')).toEqual({ 'a.md': { addedAt: deletedAt + 1 } });
     expect(await getFavorites()).toEqual(['a.md']);
     expect(await tombstoneAt(repo, 'reading.favorites', 'a.md')).toBeUndefined();
+    repo.close();
+  });
+});
+
+describe('highlights collection', () => {
+  const hl = (id: string, exact: string, createdAt: number) => ({
+    id, exact, prefix: '', suffix: '', decorations: [{ kind: 'bg', color: 'yellow' }], createdAt,
+  });
+
+  it('highlights：list 带 path，apply 删除 tombstone', async () => {
+    const repo = await openRepoDb('mdreader');
+    await addHighlight('a.md', hl('h1', '甲', 1000));
+    const [local] = await highlightsCollection.listLocal(repo);
+    expect(local.payload).toMatchObject({ path: 'a.md', record: { id: 'h1' } });
+
+    await highlightsCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.highlights', recordId: 'h1', payload: null,
+      updatedAt: 2000, deleted: true, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(await repo.kvGet('highlights')).toEqual({});
+    repo.close();
+  });
+
+  it('本地删除写墓碑；陈旧远端 upsert 不复活，更新的 upsert 复活并清墓碑', async () => {
+    const repo = await openRepoDb('mdreader');
+    await addHighlight('a.md', hl('h1', '甲', 1000));
+    await removeHighlights('a.md', ['h1']);
+    const deletedAt = (await tombstoneAt(repo, 'reading.highlights', 'h1'))!;
+    expect(deletedAt).toBeGreaterThan(1000);
+
+    const stale = await highlightsCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.highlights', recordId: 'h1',
+      payload: { path: 'a.md', record: hl('h1', '甲', 1000) },
+      updatedAt: 1000, deleted: false, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(stale).toBe(false);
+    expect(await repo.kvGet('highlights')).toEqual({});
+    expect(await getDocHighlights('a.md')).toEqual([]);
+
+    const fresh = await highlightsCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.highlights', recordId: 'h1',
+      payload: { path: 'a.md', record: hl('h1', '甲', deletedAt + 1) },
+      updatedAt: deletedAt + 1, deleted: false, deviceId: 'd', serverUpdatedAt: 2,
+    });
+    expect(fresh).toBe(true);
+    expect((await getDocHighlights('a.md')).map((r) => r.id)).toEqual(['h1']);
+    expect(await tombstoneAt(repo, 'reading.highlights', 'h1')).toBeUndefined();
+    repo.close();
+  });
+
+  it('远端 tombstone 删除记录并写本地墓碑', async () => {
+    const repo = await openRepoDb('mdreader');
+    await addHighlight('b.md', hl('h2', '乙', 1000));
+
+    const applied = await highlightsCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.highlights', recordId: 'h2', payload: null,
+      updatedAt: 2000, deleted: true, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(applied).toBe(true);
+    expect(await getDocHighlights('b.md')).toEqual([]);
+    expect(await tombstoneAt(repo, 'reading.highlights', 'h2')).toBe(2000);
+    repo.close();
+  });
+
+  it('clearBefore 删除 <= 边界，保留更新的高亮', async () => {
+    const repo = await openRepoDb('mdreader');
+    await repo.kvSet('highlights', {
+      'a.md': [hl('old', '旧', 5)],
+      'b.md': [hl('fresh', '新', 6)],
+    });
+    await highlightsCollection.clearBefore!(repo, 5);
+    expect(await repo.kvGet('highlights')).toEqual({ 'b.md': [hl('fresh', '新', 6)] });
     repo.close();
   });
 });

@@ -102,6 +102,8 @@ export default function DocPage() {
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  // 同步应用后自增，触发高亮重锚（正文 DOM 不变，只增删 mark）。
+  const [syncTick, setSyncTick] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
   // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
@@ -236,6 +238,20 @@ export default function DocPage() {
     };
   }, [html, path, fetchBlob]);
 
+  // 同步应用后重锚高亮：先移除现有 mark（DOM 结构不变、不滚动），再由下方 effect 重新读取应用。
+  useEffect(() => {
+    const onApplied = () => {
+      const el = contentRef.current;
+      if (el && appliedRef.current.size) {
+        removeMarks(el, [...appliedRef.current.keys()]);
+        appliedRef.current = new Map();
+      }
+      setSyncTick((v) => v + 1);
+    };
+    window.addEventListener('mdreader:sync-applied', onApplied);
+    return () => window.removeEventListener('mdreader:sync-applied', onApplied);
+  }, []);
+
   // 高亮重锚：每次正文注入（打开/同步更新）后，异步读记录并锚定；DOM 已被替换为干净正文。
   useEffect(() => {
     const container = contentRef.current;
@@ -253,7 +269,7 @@ export default function DocPage() {
       },
     );
     return () => { cancelled = true; };
-  }, [html, path]);
+  }, [html, path, syncTick]);
 
   // 持续记录当前历史条目的滚动位置（rAF 节流）。仅在正文就绪时记录：
   // 切换文档的加载间隙页面会变矮，浏览器把 scrollY 钳制到新高度，

@@ -1,15 +1,20 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearAllData, kvSet } from '../../src/data/db';
+import { clearAllData, kvSet, openDb } from '../../src/data/db';
 import {
   addHighlight, exportHighlights, getDocHighlights, importHighlights, removeHighlights,
   sanitizeHighlights, type HighlightRecord,
 } from '../../src/data/highlights';
+import type { OutboxEntry } from '../../src/sync/outbox';
 
 const rec = (id: string, exact: string, color = 'yellow'): HighlightRecord => ({
   id, exact, prefix: '前文', suffix: '后文',
   decorations: [{ kind: 'bg', color }], createdAt: 1000,
 });
+
+async function outbox(): Promise<OutboxEntry[]> {
+  return (await openDb()).getAll('sync_outbox') as Promise<OutboxEntry[]>;
+}
 
 beforeEach(async () => { await clearAllData(); });
 
@@ -52,6 +57,39 @@ describe('add / remove / 读回', () => {
   it('kv 脏数据读取时被清洗', async () => {
     await kvSet('highlights', 'oops');
     expect(await getDocHighlights('a.md')).toEqual([]);
+  });
+});
+
+describe('高亮 outbox', () => {
+  it('addHighlight 入队 upsert；removeHighlights 入队 tombstone 且时间更新', async () => {
+    await addHighlight('a.md', rec('h1', '甲'));
+    const [added] = await outbox();
+    expect(added).toMatchObject({
+      collection: 'reading.highlights', recordId: 'h1', deleted: false, updatedAt: 1000,
+    });
+
+    await removeHighlights('a.md', ['h1']);
+    const removed = (await outbox()).find((e) => e.recordId === 'h1')!;
+    expect(removed.deleted).toBe(true);
+    expect(removed.updatedAt).toBeGreaterThan(1000);
+  });
+
+  it('importHighlights 入队导入记录', async () => {
+    const json = JSON.stringify({
+      formatVersion: 1,
+      highlights: { 'a.md': [rec('h9', '导入')] },
+    });
+    await importHighlights(json);
+    const entries = await outbox();
+    expect(entries.some((e) => e.recordId === 'h9' && !e.deleted)).toBe(true);
+  });
+
+  it('重复导入已存在的记录不再入队', async () => {
+    const json = JSON.stringify({ formatVersion: 1, highlights: { 'a.md': [rec('h9', '导入')] } });
+    await importHighlights(json);
+    const before = (await outbox()).length;
+    expect(await importHighlights(json)).toEqual({ imported: 0, skipped: 1 });
+    expect(await outbox()).toHaveLength(before);
   });
 });
 

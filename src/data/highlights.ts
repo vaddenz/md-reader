@@ -1,5 +1,9 @@
-import { kvGet, kvSet } from './db';
+import { kvGet, openDb } from './db';
 import { serialize } from './serialize';
+import { nextUpdatedAt } from '../sync/device';
+import { commitWithNotify, enqueueChange } from '../sync/outbox';
+import { clearTombstoneTx, putTombstone } from '../sync/tombstones';
+import { COLLECTIONS } from '../sync/collections/names';
 
 export interface Decoration {
   kind: string;           // v1 仅渲染 'bg'；未知 kind 保留数据
@@ -61,20 +65,44 @@ export async function getDocHighlights(path: string): Promise<HighlightRecord[]>
   return (await readAll())[path] ?? [];
 }
 
+/** 追加高亮：记录与 outbox 同事务提交（并清掉同 id 的本地墓碑）。 */
 export function addHighlight(path: string, rec: HighlightRecord): Promise<void> {
   return serialize(async () => {
-    const all = await readAll();
+    const db = await openDb();
+    const tx = db.transaction(['kv', 'sync_outbox'], 'readwrite');
+    const kv = tx.objectStore('kv');
+    const all = sanitizeHighlights(await kv.get(HIGHLIGHTS_KEY));
     all[path] = [...(all[path] ?? []), rec];
-    await kvSet(HIGHLIGHTS_KEY, all);
+    await kv.put(all, HIGHLIGHTS_KEY);
+    await clearTombstoneTx(tx, COLLECTIONS.highlights, rec.id);
+    enqueueChange(tx, {
+      collection: COLLECTIONS.highlights, recordId: rec.id, updatedAt: rec.createdAt, deleted: false,
+    });
+    await commitWithNotify(tx);
   });
 }
 
+/** 按 id 删除高亮：仅对本地实际存在的记录写墓碑并入队 tombstone，时间戳单调递增。 */
 export function removeHighlights(path: string, ids: string[]): Promise<void> {
   return serialize(async () => {
-    const all = await readAll();
-    const rest = (all[path] ?? []).filter((r) => !ids.includes(r.id));
+    const db = await openDb();
+    const tx = db.transaction(['kv', 'sync_outbox'], 'readwrite');
+    const kv = tx.objectStore('kv');
+    const all = sanitizeHighlights(await kv.get(HIGHLIGHTS_KEY));
+    const list = all[path] ?? [];
+    const found = list.filter((r) => ids.includes(r.id));
+    const rest = list.filter((r) => !ids.includes(r.id));
     if (rest.length) all[path] = rest; else delete all[path];
-    await kvSet(HIGHLIGHTS_KEY, all);
+    await kv.put(all, HIGHLIGHTS_KEY);
+    const now = Date.now();
+    for (const rec of found) {
+      const at = nextUpdatedAt(now, rec.createdAt);
+      await putTombstone(tx, COLLECTIONS.highlights, rec.id, at);
+      enqueueChange(tx, {
+        collection: COLLECTIONS.highlights, recordId: rec.id, updatedAt: at, deleted: true,
+      });
+    }
+    await commitWithNotify(tx);
   });
 }
 
@@ -83,13 +111,16 @@ export async function exportHighlights(): Promise<string> {
   return JSON.stringify({ formatVersion: HIGHLIGHT_FORMAT_VERSION, exportedAt: Date.now(), highlights: await readAll() }, null, 2);
 }
 
-/** 导入合并：键 = path + exact + decorations；重复跳过、不覆盖本地已有。 */
+/** 导入合并：键 = path + exact + decorations；重复跳过、不覆盖本地已有；新记录入队并清墓碑。 */
 export function importHighlights(json: string): Promise<{ imported: number; skipped: number }> {
   return serialize(async () => {
     const parsed = JSON.parse(json) as { formatVersion?: unknown; highlights?: unknown };
     if (parsed?.formatVersion !== HIGHLIGHT_FORMAT_VERSION) throw new Error('不支持的格式版本');
     const incoming = sanitizeHighlights(parsed.highlights);
-    const all = await readAll();
+    const db = await openDb();
+    const tx = db.transaction(['kv', 'sync_outbox'], 'readwrite');
+    const kv = tx.objectStore('kv');
+    const all = sanitizeHighlights(await kv.get(HIGHLIGHTS_KEY));
     let imported = 0; let skipped = 0;
     const key = (p: string, r: HighlightRecord) => `${p}\u0000${r.exact}\u0000${JSON.stringify(r.decorations)}`;
     for (const [path, list] of Object.entries(incoming)) {
@@ -98,10 +129,15 @@ export function importHighlights(json: string): Promise<{ imported: number; skip
         if (existing.has(key(path, r))) { skipped += 1; continue; }
         existing.add(key(path, r));
         all[path] = [...(all[path] ?? []), r];
+        await clearTombstoneTx(tx, COLLECTIONS.highlights, r.id);
+        enqueueChange(tx, {
+          collection: COLLECTIONS.highlights, recordId: r.id, updatedAt: r.createdAt, deleted: false,
+        });
         imported += 1;
       }
     }
-    await kvSet(HIGHLIGHTS_KEY, all);
+    await kv.put(all, HIGHLIGHTS_KEY);
+    await commitWithNotify(tx);
     return { imported, skipped };
   });
 }
