@@ -119,6 +119,7 @@
   font-family: var(--r-font-family, var(--font-sans));
   font-size: var(--r-font-size, 17px);
   line-height: 1.9;
+  font-weight: var(--r-font-weight, 400);
   overflow-wrap: break-word;
 }
 
