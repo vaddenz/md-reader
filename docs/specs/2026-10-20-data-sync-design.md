@@ -27,7 +27,7 @@
 | 4 | 多仓库全部同步（自动或手动）；各仓库数据独立，scope = `owner/repo@branch` |
 | 5 | 同步分「自动同步」与「手动同步」两种模式；**自动同步默认关闭**，可随时开启；关闭时只有点击「立即同步」才会发起同步（用于控制请求 / 流量成本） |
 | 6 | 远端采用通用记录表，不为每种数据类型建表；加数据类型不改远端 schema |
-| 7 | 冲突策略：逐记录 LWW（最后写入获胜），时间戳相同时用 `deviceId` 确定性裁决；同一设备同一毫秒视为同一条 |
+| 7 | 冲突策略：逐记录 LWW（最后写入获胜）；服务端用 `(updatedAt, deviceId)` 条件写，客户端拉取时远端时间戳 `>=` 本地即应用（平局由远端/服务端获胜） |
 | 8 | 删除使用 tombstone；「清除训练数据」使用集合级 reset 标记，避免另一台设备把旧记录推回来 |
 | 9 | 后端实现使用原生 `fetch`，不新增运行时依赖 |
 | 10 | 同步配置与 JWT 存 localStorage（与现有 GitHub Token 同级）；outbox 存每个仓库自己的 IndexedDB |
@@ -220,11 +220,11 @@ with check (auth.user_id() = user_id);
 | `memory.selection` | 固定 `selection` | 新增 `MemorySelection.updatedAt` |
 | `notes`（预留） | 以后定义 | 以后定义 |
 
-比较规则（客户端与服务端一致）：
+比较规则：
 
-1. `updatedAt` 大者胜；
-2. 相同则 `deviceId` 字典序大者胜；
-3. 仍相同（同一设备同一毫秒）→ 视为同一条，保持本地 / 远端现有值，不做覆盖。
+- **服务端**（条件 upsert）：`(updatedAt, deviceId)` 字典序大者胜；相同则保持远端不变。
+- **客户端**（拉取合并）：`remote.updatedAt > local.updatedAt` 时应用远端；`===` 时也应用远端（平局由服务端获胜），从而与远端最终状态收敛；`<` 时保留本地。客户端不需要在本地保存 `deviceId`。
+- 同一设备同一毫秒的两次写：用 `nextUpdatedAt()` 保证严格递增，不会走平局分支。
 
 为避免同一设备同一毫秒内的两次写互相覆盖，进度、收藏、题库偏好、删除 tombstone、reset 标记等使用 `nextUpdatedAt()` 生成**单调递增**时间戳：
 
@@ -727,7 +727,7 @@ class SyncError extends Error {
 ### 14.1 单元测试
 
 - `syncConfig`：缺字段、URL 规范化、未知后端、password 字段、保存重置 cursor；`autoSync` 缺省 false、关闭后持久化、切换不重置 cursor。
-- `syncMerge`：LWW、deviceId 平局、同设备同毫秒 no-op、tombstone、reset 过滤。
+- `syncMerge`：LWW、远端时间戳相等时远端获胜、本地较新时保留、tombstone、reset 过滤。
 - `syncOutbox`：入队 upsert 去重、rev 更新、推送后 rev 安全删除、reset 清理、按 collection seed 不重复、新增 collection 只补 seed 自己。
 - `syncCollections`：六个适配器的 list/get/apply/clearBefore；收藏 V2 迁移；attemptKey；selection 只同步 banks/filters。
 - `syncNeon`：mock fetch 的 test / pull 分页 / push body / 401 / 404 / 5xx / network / 超时；断言 Authorization 头、URL 不含 token。
