@@ -35,6 +35,30 @@ test('PWA：manifest 存在且可 200 获取；robots noindex 防收录', async 
   expect(manifest.name).toBe('知识库');
   expect(manifest.display).toBe('standalone');
 
+  // 图标：any + maskable 都要有，且实际可获取
+  const icons: Array<{ src: string; sizes: string; purpose?: string }> = manifest.icons;
+  expect(icons.some((icon) => icon.sizes === '192x192')).toBe(true);
+  expect(icons.some((icon) => icon.sizes === '512x512')).toBe(true);
+  const maskable = icons.find((icon) => (icon.purpose ?? '').split(/\s+/).includes('maskable'));
+  expect(maskable).toBeTruthy();
+  if (!maskable) throw new Error('manifest 缺少 maskable 图标');
+  const maskableRes = await page.request.get(new URL(maskable.src, page.url()).href);
+  expect(maskableRes.status()).toBe(200);
+
+  // iOS 主屏图标
+  const apple = page.locator('link[rel="apple-touch-icon"]');
+  await expect(apple).toHaveCount(1);
+  const appleHref = (await apple.getAttribute('href')) ?? '';
+  const appleRes = await page.request.get(new URL(appleHref, page.url()).href);
+  expect(appleRes.status()).toBe(200);
+
+  // 浏览器标签页 favicon
+  const favicon = page.locator('link[rel="icon"][type="image/svg+xml"]');
+  await expect(favicon).toHaveCount(1);
+  const faviconHref = (await favicon.getAttribute('href')) ?? '';
+  const faviconRes = await page.request.get(new URL(faviconHref, page.url()).href);
+  expect(faviconRes.status()).toBe(200);
+
   await expect(page.locator('meta[name=robots]')).toHaveAttribute('content', /noindex/);
 });
 

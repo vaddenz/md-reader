@@ -109,6 +109,14 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 - 设置页 iOS 式分组卡：组标签在上、软影白卡承载行
 - 深色只出现在两处：代码块 #1B1D21 与深墨胶囊（toast），作为纸面上的「墨块」
 
+## Brand Mark
+
+**开卷**：暖纸底（#F2EFE7，图标专用的纸面档）上一本摊开的蓝书，书脊与两侧短句留白。图形只用一个蓝，语义是「把 Markdown 当纸读」：摊开的书页、装订线、两行字。
+
+- 主图标（192/512）保留六行短句；favicon 用简化版（只保留两侧各一行、加粗书脊、主体放大 8%），保证 16px 仍能读出书形。
+- 源文件 `scripts/assets/icon.svg`；`npm run icons` 生成 `public/` 下的 192/512、maskable 192/512 与 `apple-touch-icon.png`。`public/favicon.svg` 单独维护为简化版。
+- maskable 版本只把书本主体缩到 90%，背景仍铺满画布；manifest 与 `<meta name="theme-color">` 的蓝色同为 `#1F3FD4`，`background_color` 为纸面 `#FAF9F6`。
+
 ## Colors
 
 调板策略：暖白纸面 + 暖灰壳底 + 一个浅蓝强调色。强调蓝极度节制——一屏之内只出现在进度、选中、链接、主按钮上；其稀有性就是它的力量。
