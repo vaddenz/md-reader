@@ -1,4 +1,6 @@
 import { createHashRouter, RouterProvider } from 'react-router-dom';
+import { DataSyncProvider } from './sync/DataSyncContext';
+import './sync/backends';
 import Shell from './app/Shell';
 import HomePage from './pages/HomePage';
 import DocPage from './pages/DocPage';
@@ -35,5 +37,9 @@ const router = createHashRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <DataSyncProvider>
+      <RouterProvider router={router} />
+    </DataSyncProvider>
+  );
 }

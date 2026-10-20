@@ -113,6 +113,7 @@ describe('registry', () => {
     expect(() => createSyncBackend({ ...cfg, values: {} })).toThrow('缺少 token');
     expect(shouldAutoSync(cfg, true)).toBe(false);
     expect(shouldAutoSync({ ...cfg, autoSync: true }, true)).toBe(true);
+    expect(shouldAutoSync({ ...cfg, autoSync: true, enabled: false }, true)).toBe(false);
     expect(shouldAutoSync({ ...cfg, autoSync: true }, false)).toBe(false);
   });
 
