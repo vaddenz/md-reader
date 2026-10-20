@@ -134,6 +134,7 @@ kv 新增键：
 - 记录不设上限（个人使用量级可控）；提供导出 / 导入 / 清除训练数据（仅清 `mem_*`，不动题库缓存与阅读数据）。
 - 选择题记录：`mode: 'choice'`、`score: null`、`answer` 为空字符串、`hit`/`missed`/`comment` 为空，结果由 `picked` / `correct` 快照推导；统计口径不变（平均分只统计 `mode: 'ai'`）。
 - 导出格式：`{ app: 'md-reader', kind: 'memory', version: 1, exportedAt, srs: [...], attempts: [...] }`，**不含** `llmConfig`。导入合并：`mem_srs` 以 `lastAt` 较新者为准；`mem_attempts` 按 `(qid, ts, mode)` 去重追加。
+- **升级阻塞兜底**：打开 / 删除数据库均有 6s 超时（`DbBlockedError`）；被旧页面连接阻塞时不删库，首页显示可重试提示并每 4s 自动重试；`pagehide` 与 `onversionchange` 主动关闭连接，降低后续升级被旧实例阻塞的概率。
 
 ## 7. 艾宾浩斯调度 `src/lib/srs.ts`（纯函数）
 

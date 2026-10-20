@@ -213,11 +213,8 @@ export async function initRepoState(): Promise<RepoState> {
   memoryState = state;
   const active = activeRepo(state);
   await setRepoDbName(repoDbName(active.id));
-  try {
-    await kvSet(LEGACY_CONFIG_KEY, { owner: active.owner, repo: active.repo, branch: active.branch });
-  } catch {
-    // 镜像写入失败不影响启动（localStorage 才是事实源）
-  }
+  // 镜像写入不阻塞启动（localStorage 才是事实源；DB 被旧连接阻塞时也能先渲染）
+  void kvSet(LEGACY_CONFIG_KEY, { owner: active.owner, repo: active.repo, branch: active.branch }).catch(() => {});
   return state;
 }
 

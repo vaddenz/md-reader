@@ -7,34 +7,101 @@ export interface TreeEntry { path: string; sha: string; size: number; type: 'blo
 /** 默认库沿用旧名 `mdreader`（单仓库时代的数据原地保留）；多仓库各自使用独立库。 */
 const DEFAULT_DB_NAME = 'mdreader';
 const SCHEMA_VER = 2;
+/** 打开 / 删除数据库的等待上限：被旧页面连接阻塞时不能无限等待。 */
+const DB_TIMEOUT_MS = 6000;
+
+/** 数据库被其它页面/旧实例的 IndexedDB 连接阻塞（升级无法完成）。 */
+export class DbBlockedError extends Error {
+  constructor() {
+    super('本地数据库被其它页面占用，暂时无法加载');
+    this.name = 'DbBlockedError';
+  }
+}
 
 let dbName = DEFAULT_DB_NAME;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function open(): Promise<IDBPDatabase> {
-  return openDB(dbName, SCHEMA_VER, {
-    blocked() {
-      // 首次升级被其它标签页的旧连接挡住：提示用户关闭旧标签页后刷新。
-      showToast('数据库被其它标签页占用，请关闭后刷新本页', { kind: 'error' });
-    },
-    upgrade(db, oldVersion) {
-      for (const name of ['files', 'blobs', 'kv'] as const) {
-        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new DbBlockedError());
+    }, DB_TIMEOUT_MS);
+
+    void openDB(dbName, SCHEMA_VER, {
+      blocked() {
+        // 首次升级被其它标签页 / 后台 PWA 实例的旧连接挡住：提示用户释放。
+        showToast('本地数据库被其它页面占用，正在等待其它页面释放…', { kind: 'error' });
+      },
+      upgrade(db, oldVersion) {
+        for (const name of ['files', 'blobs', 'kv'] as const) {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+        }
+        if (oldVersion < 2) {
+          if (!db.objectStoreNames.contains('mem_banks')) db.createObjectStore('mem_banks');
+          if (!db.objectStoreNames.contains('mem_srs')) db.createObjectStore('mem_srs');
+          if (!db.objectStoreNames.contains('mem_attempts')) db.createObjectStore('mem_attempts', { autoIncrement: true });
+        }
+      },
+      terminated() {
+        dbPromise = null;
+        showToast('本地数据库连接已断开，请刷新页面', { kind: 'error' });
+      },
+    }).then((db) => {
+      if (settled) {
+        // 已超时：丢弃迟到的连接，避免它反过来阻塞其它页面升级。
+        db.close();
+        return;
       }
-      if (oldVersion < 2) {
-        if (!db.objectStoreNames.contains('mem_banks')) db.createObjectStore('mem_banks');
-        if (!db.objectStoreNames.contains('mem_srs')) db.createObjectStore('mem_srs');
-        if (!db.objectStoreNames.contains('mem_attempts')) db.createObjectStore('mem_attempts', { autoIncrement: true });
-      }
-    },
-  }).then((db) => {
-    // 其它标签页请求升级时主动让路，否则本连接会把对方永久 blocked。
-    db.onversionchange = () => {
-      db.close();
-      dbPromise = null;
-      showToast('数据库已在其它标签页升级，请刷新本页', { kind: 'error' });
-    };
-    return db;
+      settled = true;
+      clearTimeout(timer);
+      const release = () => {
+        try { db.close(); } catch { /* 已关闭 */ }
+        dbPromise = null;
+      };
+      // 手机 PWA 切后台 / 关闭页面时主动释放连接，降低后续升级被旧连接阻塞的概率。
+      if (typeof window !== 'undefined') window.addEventListener('pagehide', release, { once: true });
+      // 其它标签页请求升级时主动让路，否则本连接会把对方永久 blocked。
+      db.onversionchange = () => {
+        release();
+        showToast('数据库已在其它标签页升级，请刷新本页', { kind: 'error' });
+      };
+      resolve(db);
+    }, (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+/** 删库（自愈/清空用）：同样限时，避免被旧连接阻塞后永久挂起。 */
+function deleteDb(name: string = dbName): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new DbBlockedError());
+    }, DB_TIMEOUT_MS);
+    void deleteDB(name, {
+      blocked() {
+        showToast('旧页面仍占用数据库，请关闭其它标签页后重试', { kind: 'error' });
+      },
+    }).then(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    }, (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -50,14 +117,16 @@ function signalCacheRebuilt(): void {
 
 export function openDb(): Promise<IDBPDatabase> {
   if (!dbPromise) {
-    dbPromise = open().catch(async () => {
+    dbPromise = open().catch(async (err) => {
       // 自愈：结构损坏/版本冲突 → 删库重建
       // 不能调用 clearAllData()：它会 await 本函数正在构造的 dbPromise，导致死锁
       dbPromise = null;
-      await deleteDB(dbName);
-      const retry = open().catch((err) => {
+      // 被旧连接阻塞：不删库（删库同样会被阻塞且会丢数据），交给 UI 提示 / 重试。
+      if (err instanceof DbBlockedError) throw err;
+      await deleteDb();
+      const retry = open().catch((e) => {
         dbPromise = null;
-        throw err;
+        throw e;
       });
       dbPromise = retry;
       // 重建成功后才派发一次性信号（失败时提示「已重建」会误导）
@@ -148,5 +217,5 @@ export async function setRepoDbName(name: string): Promise<void> {
 export async function clearAllData(): Promise<void> {
   const name = dbName;
   await closeDb();
-  await deleteDB(name);
+  await deleteDb(name);
 }
