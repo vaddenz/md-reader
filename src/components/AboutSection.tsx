@@ -30,7 +30,8 @@ export default function AboutSection() {
       <p className="settings-about-statement">隐私说明：</p>
       <ul className="settings-about-list">
         <li>GitHub Token 仅保存在本机浏览器（localStorage），不会上传到任何第三方，也不会写入 URL 或日志；</li>
-        <li>应用仅访问 <code>api.github.com</code>，无任何第三方脚本 / 字体 / 图片 / CDN 请求；</li>
+        <li>跨设备同步默认关闭；启用后阅读进度、高亮、收藏与记忆数据会发送到你自备的 Neon 端点，正文、GitHub Token 与 AI Key 永不上传；</li>
+        <li>应用仅访问 <code>api.github.com</code>、你配置的模型地址与你启用的同步端点，无任何第三方脚本 / 字体 / 图片 / CDN 请求；</li>
         <li>所有文档内容仅存于本机浏览器缓存，不经过任何托管平台。</li>
       </ul>
     </section>

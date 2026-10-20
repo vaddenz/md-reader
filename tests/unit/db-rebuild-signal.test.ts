@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import { openDb } from '../../src/data/db';
+import { openDb, SCHEMA_VER } from '../../src/data/db';
 
 describe('db 自愈信号（T22）', () => {
   it('版本冲突自愈重建成功后派发一次 mdreader:cache-rebuilt', async () => {
     // 造一个更高版本的库，使 SCHEMA_VER 更低的 open 异步失败（VersionError）→ 走自愈路径
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open('mdreader', 3);
+      const req = indexedDB.open('mdreader', SCHEMA_VER + 1);
       req.onsuccess = () => { req.result.close(); resolve(); };
       req.onerror = () => reject(req.error);
     });

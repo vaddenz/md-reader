@@ -10,3 +10,6 @@ playwright-report/
 .mockups/
 .impeccable/build/
 .worktrees/
+
+# 本地 JWT 私钥（scripts/sync-jwt.mjs 生成，绝不提交）
+.sync-jwt/

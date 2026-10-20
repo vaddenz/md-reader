@@ -6,9 +6,27 @@ export interface TreeEntry { path: string; sha: string; size: number; type: 'blo
 
 /** 默认库沿用旧名 `mdreader`（单仓库时代的数据原地保留）；多仓库各自使用独立库。 */
 const DEFAULT_DB_NAME = 'mdreader';
-const SCHEMA_VER = 2;
+export const SCHEMA_VER = 3;
 /** 打开 / 删除数据库的等待上限：被旧页面连接阻塞时不能无限等待。 */
 const DB_TIMEOUT_MS = 6000;
+
+/** 建库 / 升级：v2 增加记忆训练 store，v3 仅增加同步 outbox，旧数据不动。 */
+export function upgradeDb(db: IDBPDatabase, oldVersion: number): void {
+  for (const name of ['files', 'blobs', 'kv'] as const) {
+    if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+  }
+  if (oldVersion < 2) {
+    if (!db.objectStoreNames.contains('mem_banks')) db.createObjectStore('mem_banks');
+    if (!db.objectStoreNames.contains('mem_srs')) db.createObjectStore('mem_srs');
+    if (!db.objectStoreNames.contains('mem_attempts')) db.createObjectStore('mem_attempts', { autoIncrement: true });
+  }
+  if (oldVersion < 3) {
+    if (!db.objectStoreNames.contains('sync_outbox')) {
+      const store = db.createObjectStore('sync_outbox', { keyPath: 'id' });
+      store.createIndex('collection', 'collection');
+    }
+  }
+}
 
 /** 数据库被其它页面/旧实例的 IndexedDB 连接阻塞（升级无法完成）。 */
 export class DbBlockedError extends Error {
@@ -35,16 +53,7 @@ function open(): Promise<IDBPDatabase> {
         // 首次升级被其它标签页 / 后台 PWA 实例的旧连接挡住：提示用户释放。
         showToast('本地数据库被其它页面占用，正在等待其它页面释放…', { kind: 'error' });
       },
-      upgrade(db, oldVersion) {
-        for (const name of ['files', 'blobs', 'kv'] as const) {
-          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
-        }
-        if (oldVersion < 2) {
-          if (!db.objectStoreNames.contains('mem_banks')) db.createObjectStore('mem_banks');
-          if (!db.objectStoreNames.contains('mem_srs')) db.createObjectStore('mem_srs');
-          if (!db.objectStoreNames.contains('mem_attempts')) db.createObjectStore('mem_attempts', { autoIncrement: true });
-        }
-      },
+      upgrade: upgradeDb,
       terminated() {
         dbPromise = null;
         showToast('本地数据库连接已断开，请刷新页面', { kind: 'error' });
@@ -135,6 +144,38 @@ export function openDb(): Promise<IDBPDatabase> {
     });
   }
   return dbPromise;
+}
+
+/** 打开指定仓库库（用于同步非当前仓库）；不做删库自愈，调用方负责 close。 */
+export function openNamedDb(name: string): Promise<IDBPDatabase> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new DbBlockedError());
+    }, DB_TIMEOUT_MS);
+
+    void openDB(name, SCHEMA_VER, {
+      upgrade: upgradeDb,
+      blocked() {
+        // 同步引擎把该仓库标记为 blocked；这里不弹 toast，避免后台同步打扰阅读。
+      },
+      terminated() {
+        // 调用方会在 finally 关闭临时连接。
+      },
+    }).then((db) => {
+      if (settled) { db.close(); return; }
+      settled = true;
+      clearTimeout(timer);
+      resolve(db);
+    }, (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
 
 export async function getFile(path: string): Promise<FileRecord | undefined> {

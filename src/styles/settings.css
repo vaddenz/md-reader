@@ -655,3 +655,13 @@
 @media (prefers-reduced-motion: reduce) {
   .settings-dot-syncing { animation: none; }
 }
+
+.settings-warn { margin: 6px 0 0; color: #9a6700; font-size: 13px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #7d868f; display: inline-block; }
+.sync-dot-syncing { background: var(--acc); }
+.sync-dot-error { background: var(--danger); }
+.sync-dot-offline { background: #b87200; }
+.sync-setup summary { cursor: pointer; color: var(--acc-text); font-size: 14px; }
+.sync-setup-steps { margin: 10px 0; padding-left: 20px; color: var(--ink2); font-size: 13px; line-height: 1.7; }
+.sync-sql-head { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--ink2); }
+.sync-sql { max-height: 320px; overflow: auto; padding: 12px; border-radius: var(--r-ctl); background: var(--shell); font-size: 12px; line-height: 1.55; }

@@ -13,7 +13,8 @@
 
 手机优先的 PWA：良好的中文排版、mermaid 流程图、图片、删除线 / 高亮、灵活的目录跳转、
 全文搜索与离线缓存。所有内容数据仅存于你自己的浏览器本地，经由你自己的只读 Token
-直接访问 GitHub API，不经过任何第三方服务。
+直接访问 GitHub API，不经过任何第三方服务；跨设备同步为可选功能，只在你主动配置后
+把指定阅读数据发送到你自备的 Neon 端点。
 
 功能：
 
@@ -26,6 +27,7 @@
 - mermaid 流程图、图片、删除线 / `==高亮==` 语法标记；
 - 灵活的目录跳转、全文搜索；
 - 记忆助手：从仓库 JSONL 题库（问答 / 单选 / 多选 / 追问）按艾宾浩斯间隔训练，AI 评分（可配 OpenAI 兼容接口）或离线自评，本地训练记录与统计（`#/memory`）；训练题量与模型设置在「设置 › 记忆助手」，跨仓库共享；
+- 跨设备同步（可选，Neon；自动同步默认关闭，需手动开启）：阅读进度、高亮、收藏、记忆 SRS、训练记录与题库偏好在多台设备间同步；正文、GitHub Token、AI Key 永不上传；
 - 离线缓存。
 
 ## 文档
@@ -38,6 +40,9 @@
 - 记忆助手设计：[`docs/specs/2026-10-19-memory-assistant-design.md`](docs/specs/2026-10-19-memory-assistant-design.md)
 - 记忆助手实施计划：[`docs/plans/2026-10-19-md-reader-memory-assistant-implementation.md`](docs/plans/2026-10-19-md-reader-memory-assistant-implementation.md)
 - 记忆助手真机验收清单（v1.3）：[`docs/acceptance-2026-10-19-memory-assistant.md`](docs/acceptance-2026-10-19-memory-assistant.md)
+- 跨设备同步设计（v1.7）：[`docs/specs/2026-10-20-data-sync-design.md`](docs/specs/2026-10-20-data-sync-design.md)
+- 跨设备同步配置指南（Neon / JWT / SQL / CORS）：[`docs/sync-neon-setup.md`](docs/sync-neon-setup.md)
+- 跨设备同步验收清单（v1.7）：[`docs/acceptance-2026-10-20-data-sync.md`](docs/acceptance-2026-10-20-data-sync.md)
 
 ## 开发与自用
 
@@ -85,9 +90,18 @@ npm run preview  # 预览生产构建
 
 ### 高亮数据
 
-- 高亮记录仅存本机浏览器（IndexedDB kv 键 `highlights`，按文档路径分组），不写回仓库；
+- 高亮记录默认仅存本机浏览器（IndexedDB kv 键 `highlights`，按文档路径分组），不写回仓库；
 - 设置页「数据管理」区可**导出 / 导入 JSON** 备份（导入按 `路径 + 原文 + 装饰` 合并去重，不覆盖本地已有）；**清除站点数据会丢失本机高亮，建议定期导出**；高亮按仓库独立存放；
 - 仓库改动后无法模糊命中的高亮成为「孤儿」：记录保留、暂不渲染，原文恢复后自动重现（导出时一并导出）。
+
+### 跨设备同步（可选）
+
+- 默认关闭，也默认不发起任何同步请求；在「设置 › 跨设备同步」配置后启用。
+- 后端是**你自备的 Neon Data API**（Postgres + JWT），不经过作者的任何服务器；配置步骤、完整 SQL、CORS、JWT/JWKS 与轮换见 [`docs/sync-neon-setup.md`](docs/sync-neon-setup.md)。
+- 只同步阅读进度、高亮、收藏、记忆 SRS、训练记录、题库偏好；**正文、GitHub Token、AI Key / 模型配置、训练会话、标签页、阅读外观不上传**。
+- 自动同步**默认关闭**：首次保存后只能手动点「立即同步」；需要自动触发时在同步页打开开关。关闭状态下，启动、联网、页面隐藏与数据变更都不会发请求，变更留在本机队列，点击「立即同步」时补推。
+- 数据在 Neon 中为明文存储；JWT 是 bearer token，仅存本机 localStorage，界面掩码显示，不写入 URL 或日志。泄露后按 setup 文档轮换密钥与 JWT。
+- 多设备（或两个浏览器 profile）需填写同一接口地址与同一 JWT；多仓库按 `owner/repo@branch` 分别同步。
 
 ### 手机更新后一直「加载中」
 

@@ -11,6 +11,8 @@ import { bytesToText } from '../lib/format';
 import { DATA_CLEARED_EVENT } from '../state/TabsContext';
 import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
+import { useDataSync } from '../sync/DataSyncContext';
+import { clearDeviceId } from '../sync/device';
 import '../styles/settings.css';
 
 /** 设置 · 数据管理：高亮备份 / 存储统计 / 危险区。 */
@@ -18,6 +20,7 @@ export default function SettingsDataPage() {
   const navigate = useNavigate();
   const { clear } = useToken();
   const { lastSyncAt } = useSync();
+  const { clearConfig: clearSyncConfigState } = useDataSync();
 
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null);
   const [metas, setMetas] = useState<FileMeta[] | null>(null);
@@ -41,13 +44,15 @@ export default function SettingsDataPage() {
 
   async function onClearAll() {
     if (clearing) return;
-    if (!window.confirm('确定清除全部数据吗？将删除本机所有仓库的缓存、收藏、阅读进度、记忆训练数据与 Token，且不可恢复。')) return;
+    if (!window.confirm('确定清除全部数据吗？将删除本机所有仓库的缓存、收藏、阅读进度、记忆训练数据、Token 与跨设备同步配置，且不可恢复。Neon 上已同步的数据不会被删除。')) return;
     setClearing(true);
     setClearError(null);
     try {
       await clearAllLibraries();
       clearGlobalAppearance();
       clearGlobalMemorySettings();
+      clearSyncConfigState(); // 同时清 config/state 并同步 Provider 内存状态
+      clearDeviceId();
       clear();
       window.dispatchEvent(new Event(DATA_CLEARED_EVENT));
       navigate(toRouterPath(SETUP));

@@ -7,6 +7,7 @@ export const SETTINGS = '#/settings';
 export const SETTINGS_ACCOUNT = '#/settings/account';
 export const SETTINGS_READING = '#/settings/reading';
 export const SETTINGS_DATA = '#/settings/data';
+export const SETTINGS_SYNC = '#/settings/sync';
 export const SETTINGS_MEMORY = '#/settings/memory';
 export const SETTINGS_ABOUT = '#/settings/about';
 export const MEMORY = '#/memory';

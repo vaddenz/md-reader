@@ -1,4 +1,6 @@
 import { createHashRouter, RouterProvider } from 'react-router-dom';
+import { DataSyncProvider } from './sync/DataSyncContext';
+import './sync/backends';
 import Shell from './app/Shell';
 import HomePage from './pages/HomePage';
 import DocPage from './pages/DocPage';
@@ -13,6 +15,7 @@ import SettingsDataPage from './pages/SettingsDataPage';
 import SettingsMemoryPage from './pages/SettingsMemoryPage';
 import SettingsPage from './pages/SettingsPage';
 import SettingsReadingPage from './pages/SettingsReadingPage';
+import SettingsSyncPage from './pages/SettingsSyncPage';
 import SetupPage from './pages/SetupPage';
 
 const router = createHashRouter([
@@ -24,6 +27,7 @@ const router = createHashRouter([
     { path: 'settings/account', element: <SettingsAccountPage /> },
     { path: 'settings/reading', element: <SettingsReadingPage /> },
     { path: 'settings/data', element: <SettingsDataPage /> },
+    { path: 'settings/sync', element: <SettingsSyncPage /> },
     { path: 'settings/memory', element: <SettingsMemoryPage /> },
     { path: 'settings/about', element: <SettingsAboutPage /> },
     { path: 'font-preview', element: <FontPreviewPage /> },
@@ -35,5 +39,9 @@ const router = createHashRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <DataSyncProvider>
+      <RouterProvider router={router} />
+    </DataSyncProvider>
+  );
 }
