@@ -52,11 +52,14 @@ export function sanitizeSyncState(raw: unknown): SyncState {
 }
 
 export function loadSyncState(): SyncState {
+  // 内存态优先：setItem 失败（配额/隐私模式）时写入只存在于内存，
+  // 若先读 storage 会把旧值读回来，导致 cursor 静默回滚。
+  if (memoryState) return memoryState;
   const storage = safeStorage();
   if (storage) {
     try {
       const raw = storage.getItem(STATE_KEY);
-      if (raw) return sanitizeSyncState(JSON.parse(raw));
+      if (raw) memoryState = sanitizeSyncState(JSON.parse(raw));
     } catch {
       // 损坏数据回退内存/空状态
     }
