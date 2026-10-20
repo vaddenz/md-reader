@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 function usage() {
@@ -12,6 +12,12 @@ function usage() {
   --out-dir <dir>    私钥目录，默认 .sync-jwt
   --jwks <file>      公钥 JWKS 输出，默认 public/sync-jwks.json
   --help             显示帮助`);
+}
+
+function fail(message) {
+  console.error(`错误：${message}`);
+  usage();
+  process.exit(1);
 }
 
 function parseArgs(argv) {
@@ -34,8 +40,20 @@ function b64url(input) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const sub = String(args.sub ?? 'md-reader');
-const days = Number(args.days ?? 3650);
+
+// 参数校验必须在创建目录 / 密钥之前：非法值绝不能生成无过期时间的 token 或私钥。
+const rawSub = args.sub === undefined ? 'md-reader' : args.sub;
+if (typeof rawSub !== 'string' || rawSub.trim() === '') {
+  fail('--sub 需要非空字符串');
+}
+const sub = rawSub;
+
+const rawDays = args.days === undefined ? '3650' : args.days;
+if (typeof rawDays !== 'string' || !/^[1-9]\d*$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
+  fail('--days 需要正整数');
+}
+const days = Number(rawDays);
+
 const aud = typeof args.aud === 'string' ? args.aud : '';
 const keyDir = resolve(String(args['out-dir'] ?? '.sync-jwt'));
 const jwksPath = resolve(String(args.jwks ?? 'public/sync-jwks.json'));
@@ -49,6 +67,9 @@ if (!existsSync(privatePath)) {
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   });
   writeFileSync(privatePath, pair.privateKey, { mode: 0o600 });
+} else {
+  // 旧文件可能因 umask / 复制而权限过宽；每次复用前收紧到仅本人可读写。
+  chmodSync(privatePath, 0o600);
 }
 
 const privatePem = readFileSync(privatePath, 'utf8');

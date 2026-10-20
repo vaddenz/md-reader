@@ -57,12 +57,14 @@ node scripts/sync-jwt.mjs --help   # 退出码 0
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
-| `--sub <id>` | `md-reader` | JWT 的 `sub`，也是 Neon 中的用户标识 |
-| `--days <n>` | `3650` | 有效期天数（10 年） |
+| `--sub <id>` | `md-reader` | JWT 的 `sub`，也是 Neon 中的用户标识；必须为非空字符串 |
+| `--days <n>` | `3650` | 有效期天数（10 年）；必须为正整数 |
 | `--aud <value>` | 无 | 可选 `aud`；若 Neon 侧校验 audience，填一致的值 |
 | `--out-dir <dir>` | `.sync-jwt` | 私钥目录 |
 | `--jwks <file>` | `public/sync-jwks.json` | 公钥 JWKS 输出路径 |
 | `--help` | — | 显示用法并退出 |
+
+`--sub` / `--days` 非法（含裸参数、`abc`、`0`、负数、小数）时，脚本打印错误与用法到 stderr，以退出码 1 结束，并在创建任何目录或密钥之前退出。
 
 产物与边界：
 
