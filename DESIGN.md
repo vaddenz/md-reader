@@ -154,6 +154,7 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 
 **Display/Body Font:** 系统中文无衬线栈 `-apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif`（`--font-sans`）
 **Selectable Stacks:** v1.1 三档可选字体（系统默认 / LXGW Neo XiHei Screen / Noto Serif SC），经 `--r-font-family` 注入；入口两处共享同一偏好（设置页「阅读外观」区与阅读内「外观」面板，控件同源 `AppearanceControls`）
+**Selectable Weights:** 正文字重可调（300–600，默认 400），经 `--r-font-weight` 注入；仅正文生效，标题 700、`strong`/`b` 700、代码块与行内代码 400 固定。宋体（Noto Serif SC）为可变字体，四档真实生效；系统字体通常原生支持；霞鹜新晰黑为静态字体（单 400 面），300 回退 400 面、500 可能按字体匹配回退 400、600 由浏览器合成加粗
 **Mono Font:** `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`（`--font-mono`；代码块字号 = 正文字号 × 0.765，不随字体选择变化）
 
 **Character:** 不用展示字体、不玩字距——排版的全部个性交给「中文正文的呼吸感」：17px 正文、宽行距、紧行内距。
@@ -161,7 +162,7 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 ### Hierarchy
 - **页标题**（700, 24px, 默认行高）：设置页 `设置`；首页标题（700, 20px, letter-spacing 0.06em）。
 - **文档标题**（600, 16px）：阅读页吸顶栏单行截断标题。
-- **Markdown 正文**（400, `--r-font-size` 默认 17px, line-height 1.9）：`.doc-content`；h1–h4 行高 1.4、h1/h2 带 1px 下划线。
+- **Markdown 正文**（默认 400、可调 300–600，`--r-font-size` 默认 17px, line-height 1.9）：`.doc-content`；h1–h4 行高 1.4、h1/h2 带 1px 下划线。
 - **数字**：全站 `font-variant-numeric: tabular-nums`（在 `body` 声明并继承，列表计数、百分比、元信息一律等宽对齐；CJK 不受影响）。
 - **卡组标签**（500, 12.5–13px, letter-spacing 0.04em, `--ink2`）：设置九区块标签、首页文件树分组标签（「文件夹」/「文件」）。
 - **行内标签**（400, 11–14px）：树徽标 11px、页脚同步小字 12px、toast 13–14px、菜单行与卡片标题 15px。
@@ -233,7 +234,7 @@ md-reader 是一个把 GitHub 仓库当书读的移动端 PWA。本次样式焕�
 - **悬浮目录按钮:** 44px 白卡圆钮（`--card` + `--shadow-card` + ☰ 线性图标），默认距右 12px、垂直 55%；可拖拽（拖动中 `opacity .85` + `scale(1.06)`），松手水平吸附最近边缘（左/右 12px）、垂直 clamp 于 64px–视口高−132px；位置按设备持久化；正文就绪即渲染（始终显示，无标题时抽屉呈现空态「本文暂无标题目录」），目录抽屉打开期间隐藏。
 - **⋯ 菜单:** 白卡圆角 12 + `--shadow-card`，宽 ≥132px，行 15px、圆角 8、hover/焦点壳底；七项：搜索 / 收藏 / 外观 / 文件 / 横屏 / 旋转 / 设置；每项带 18px 前导线性图标（外观为「Aa」文字徽，图标 `aria-hidden`、文字可访问名不变，行内 flex + 10px 间距）；收藏、横屏、旋转为就地切换（`aria-pressed` 时 `--acc-text` + 600，实心星随 `currentColor` 变色），点击后菜单保持打开，其余项点击后关闭；外部 pointerdown 或 Esc 关闭；文件/横屏/旋转按可用性条件渲染。
 - **标签切换器:** 顶栏标题为按钮（`aria-label="切换标签"` + `aria-expanded`，触控高 44px；**始终可唤出**，单标签时用于关闭最后一个），标签 ≥2 时标题右侧 14px `--ink2` ▾。弹层 = 白卡圆角 12 + `--shadow-card`，贴顶栏下 6px、左右 8px、内衬 6px、最高 60vh 内滚，与 ⋯ 菜单互斥，外部 pointerdown / Esc / 选中行关闭；行 = 标题 15px 单行截断 + 44×44 关闭 ×，当前行 `rgba(31,63,212,.08)` 染底 + `--acc-text` 600（`aria-current="true"`）。点击行按进度落位语义（§1.4：滚动记忆 → 进度比例）恢复目标标签位置；关闭当前标签切相邻（优先右、次左），关最后一个回首页。
-- **外观面板:** 半屏底部 sheet（白卡、顶圆角 14、`--shadow-card`；遮罩 `rgba(23,24,26,.32)`）：字体 / 正文字号 / 表格与引用比例；与设置页「阅读外观」共享控件（单源），调整实时生效、300ms 防抖落盘；点遮罩或 Esc 关闭。
+- **外观面板:** 半屏底部 sheet（白卡、顶圆角 14、`--shadow-card`；遮罩 `rgba(23,24,26,.32)`）：字体 / 正文字号 / 字体粗细 / 表格与引用比例；与设置页「阅读外观」共享控件（单源），调整实时生效、300ms 防抖落盘；点遮罩或 Esc 关闭。
 - **弹层与菜单:** 右键/长按菜单与 ⋯ 菜单同族——白卡圆角 12 + `--shadow-card` + 6px 内衬；行 15px、圆角 8，hover/焦点壳底；**首项（主操作）用 `--acc-text` + 600**（复制/清除高亮/全选各分支同规则）。
 - **抽屉:** 壳底面板、顶圆角 16、上翻影、60vh 上限；内部滚动区带安全区 padding；动画 0.16s 淡入 / 0.2s 上滑（`no-preference` 才播）。
 
