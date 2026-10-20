@@ -7,7 +7,8 @@ test('记忆助手：入口可见、题库拉取体检、选择持久化', async
 
   await page.getByRole('link', { name: '记忆助手' }).click();
   await expect(page.getByRole('heading', { name: '记忆助手', level: 1 })).toBeVisible();
-  await expect(page.getByText('未配置模型，将使用「对照参考答案 + 自评」模式。')).toBeVisible();
+  await expect(page.getByText(/未配置模型，将使用「对照参考答案 \+ 自评」模式/)).toBeVisible();
+  await expect(page.getByRole('link', { name: '设置', exact: true })).toBeVisible();
 
   const bank = page.locator('.memory-bank').filter({ hasText: '示例题库' });
   await expect(bank).toContainText('未获取');
@@ -27,6 +28,36 @@ test('记忆助手：入口可见、题库拉取体检、选择持久化', async
   await page.reload();
   await expect(bank.getByRole('checkbox')).toBeChecked();
   await expect(bank).toContainText('5 题');
+});
+
+test('设置页 › 记忆助手：训练题量与模型设置持久化', async ({ page }) => {
+  await configureAndSync(page);
+
+  // 设置首页 → 记忆助手分组
+  await page.goto('./#/settings');
+  await page.getByRole('link', { name: /记忆助手/ }).click();
+  await expect(page).toHaveURL(/#\/settings\/memory$/);
+  await expect(page.getByRole('heading', { name: '记忆助手', level: 1 })).toBeVisible();
+
+  const training = page.locator('section', { has: page.getByRole('heading', { name: '训练设置' }) });
+  await training.getByRole('radio', { name: '10', exact: true }).click();
+  await training.getByLabel('每日新题上限').fill('7');
+  await expect.poll(async () => (await readKv(page, 'memSelection')) as Record<string, unknown> | undefined)
+    .toMatchObject({ sessionSize: 10, newPerDay: 7 });
+
+  // 模型设置：填写并保存（只落本机）
+  await page.getByLabel('Base URL').fill('https://api.example.com/v1');
+  await page.getByLabel('API Key').fill('sk-local-test');
+  await page.getByLabel('模型名').fill('deepseek-chat');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('已保存');
+  await expect.poll(async () => (await readKv(page, 'llmConfig')) as Record<string, unknown> | undefined)
+    .toMatchObject({ baseUrl: 'https://api.example.com/v1', apiKey: 'sk-local-test', model: 'deepseek-chat' });
+
+  // 记忆助手的「设置」入口回到同一页
+  await page.goto('./#/memory');
+  await page.getByRole('link', { name: '设置', exact: true }).click();
+  await expect(page).toHaveURL(/#\/settings\/memory$/);
 });
 
 /** 只选示例题库的选择配置（T7/T9 用例同样先预置选择，再直接进概览页）。 */

@@ -10,7 +10,8 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : '连接失败';
 }
 
-/** 模型设置（spec §9）：保存只在通过校验后进行；测试连接复用同一配置。
+/** 模型设置字段（spec §9）：由设置 › 记忆助手页包进分组卡。
+ *  保存只在通过校验后进行；测试连接复用同一配置。
  *  cfg 异步到达时不覆盖用户正在输入的草稿（dirty 后仅「保存」会重置）。 */
 export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onChange: (cfg: LlmConfig) => void }) {
   const [draft, setDraft] = useState<LlmConfig>(props.cfg ?? EMPTY);
@@ -45,8 +46,7 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
   };
 
   return (
-    <section className="memory-card" aria-labelledby="memory-llm-title">
-      <h2 id="memory-llm-title" className="memory-card-title">模型设置（AI 评分）</h2>
+    <div className="memory-llm-form">
       <label className="memory-field">
         <span>Base URL</span>
         <input value={draft.baseUrl} placeholder="https://api.example.com/v1" autoComplete="off"
@@ -74,6 +74,6 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
         问答评分时会把题干、参考答案与你的作答发送到你填写的地址；Key 仅保存在本机。
         直连需服务端允许浏览器跨域（CORS），Ollama 需配置 <code>OLLAMA_ORIGINS</code>。
       </p>
-    </section>
+    </div>
   );
 }

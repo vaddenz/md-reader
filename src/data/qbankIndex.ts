@@ -4,6 +4,7 @@
  */
 import type { GitHubClient } from './github';
 import { getBlob, kvGet, openDb, putBlob } from './db';
+import { activeRepo } from './repos';
 import { parseBankText, type BankQuestion, type ParseWarning } from '../lib/qbank';
 
 export interface BankMeta {
@@ -27,7 +28,6 @@ export interface ParsedBank {
 
 interface TreeEntryLite { path: string; sha: string; size: number; type: string }
 interface TreeCache { entries: TreeEntryLite[] }
-interface RepoRef { owner: string; repo: string; branch: string }
 
 export function bankName(path: string): string {
   const base = path.slice(path.lastIndexOf('/') + 1);
@@ -78,8 +78,7 @@ export async function ensureBankLoaded(
   if (blob) text = await blob.blob.text();
 
   if (text === null) {
-    const cfg = await kvGet<RepoRef>('config');
-    if (!cfg) throw new Error('未配置仓库，请先在设置中填写');
+    const cfg = activeRepo();
     try {
       text = await client.getBlobText(cfg.owner, cfg.repo, entry.sha);
     } catch {

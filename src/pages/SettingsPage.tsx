@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  SETTINGS_ABOUT, SETTINGS_ACCOUNT, SETTINGS_DATA, SETTINGS_READING, goBackOrHome,
+  SETTINGS_ABOUT, SETTINGS_ACCOUNT, SETTINGS_DATA, SETTINGS_MEMORY, SETTINGS_READING, goBackOrHome,
 } from '../app/nav';
 import SettingsHeader from '../components/SettingsHeader';
 import pkg from '../../package.json';
-import { DEFAULT_REPO } from '../constants';
 import { DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
-import { kvGet, listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
+import { listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
+import { activeRepo, loadRepoState } from '../data/repos';
 import { bytesToText } from '../lib/format';
 import { maskToken } from '../lib/token';
-import { useSync, type RepoConfig } from '../state/SyncContext';
+import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/settings.css';
 
@@ -59,6 +59,18 @@ function DatabaseIcon() {
   );
 }
 
+function MemoryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <rect x="4" y="7" width="13" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+        d="M8 4h9a3 3 0 0 1 3 3v9M8 12h5M8 16h5"
+      />
+    </svg>
+  );
+}
+
 function InfoIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -86,17 +98,14 @@ export default function SettingsPage() {
   const { token } = useToken();
   const { status, lastSyncAt, syncNow, timeAgo } = useSync();
 
-  const [cfg, setCfg] = useState<RepoConfig>({ ...DEFAULT_REPO });
+  const cfg = activeRepo();
+  const repoCount = loadRepoState().repos.length;
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null);
   const [metas, setMetas] = useState<FileMeta[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void kvGet<RepoConfig>('config').then(
-      (saved) => { if (!cancelled && saved) setCfg(saved); },
-      () => {},
-    );
     void getAppearance().then(
       (value) => { if (!cancelled) setAppearance(value); },
       () => {},
@@ -152,6 +161,12 @@ export default function SettingsPage() {
             <span className="settings-connect-repo">{cfg.owner} / {cfg.repo}</span>
             <span className="settings-connect-meta">
               <span>{cfg.branch}</span>
+              {repoCount > 1 && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>{repoCount} 个仓库</span>
+                </>
+              )}
               <span aria-hidden="true">·</span>
               <code className="settings-connect-token">{token ? maskToken(token) : '未配置 Token'}</code>
             </span>
@@ -192,6 +207,16 @@ export default function SettingsPage() {
               <span className="settings-group-text">
                 <span className="settings-group-title">数据管理</span>
                 <span className="settings-group-sub">{dataSummary} · 高亮备份</span>
+              </span>
+              <ChevronIcon />
+            </a>
+          </li>
+          <li>
+            <a className="settings-group-link" href={SETTINGS_MEMORY}>
+              <span className="settings-group-icon"><MemoryIcon /></span>
+              <span className="settings-group-text">
+                <span className="settings-group-title">记忆助手</span>
+                <span className="settings-group-sub">训练题量、每日新题与 AI 模型</span>
               </span>
               <ChevronIcon />
             </a>

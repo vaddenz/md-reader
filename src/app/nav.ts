@@ -7,6 +7,7 @@ export const SETTINGS = '#/settings';
 export const SETTINGS_ACCOUNT = '#/settings/account';
 export const SETTINGS_READING = '#/settings/reading';
 export const SETTINGS_DATA = '#/settings/data';
+export const SETTINGS_MEMORY = '#/settings/memory';
 export const SETTINGS_ABOUT = '#/settings/about';
 export const MEMORY = '#/memory';
 export const MEMORY_TRAIN = '#/memory/train';
@@ -29,7 +30,7 @@ export function goBackOrHome(navigate: NavigateFunction): void {
   goBackOr(navigate, HOME);
 }
 
-/** 设置二级页返回设置首页；直接打开二级页（无应用内历史）时兜底到设置首页。 */
+/** 设置二级页返回上一页（通常为设置首页）；直接打开二级页（无应用内历史）时兜底到设置首页。 */
 export function goBackOrSettings(navigate: NavigateFunction): void {
   goBackOr(navigate, SETTINGS);
 }

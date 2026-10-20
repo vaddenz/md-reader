@@ -30,6 +30,8 @@ export const FONT_STACKS: Record<FontChoice, string> = {
 };
 
 const APPEARANCE_KEY = 'appearance';
+/** 全局外观（跨仓库共享）：localStorage 优先，kv 保留为镜像/旧数据迁移源。 */
+const GLOBAL_APPEARANCE_KEY = 'mdreader.appearance';
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
@@ -48,9 +50,32 @@ export function sanitizeAppearance(raw: unknown): ReaderAppearance {
   };
 }
 
-export async function getAppearance(): Promise<ReaderAppearance> {
+function readGlobalAppearance(): unknown {
   try {
-    return sanitizeAppearance(await kvGet<unknown>(APPEARANCE_KEY));
+    const raw = globalThis.localStorage?.getItem(GLOBAL_APPEARANCE_KEY);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeGlobalAppearance(a: ReaderAppearance): void {
+  try {
+    globalThis.localStorage?.setItem(GLOBAL_APPEARANCE_KEY, JSON.stringify(a));
+  } catch {
+    // localStorage 不可用时退化为当前仓库库内的 kv 镜像
+  }
+}
+
+export async function getAppearance(): Promise<ReaderAppearance> {
+  const global = readGlobalAppearance();
+  if (global !== undefined) return sanitizeAppearance(global);
+  try {
+    const stored = await kvGet<unknown>(APPEARANCE_KEY);
+    const clean = sanitizeAppearance(stored);
+    // 旧版外观存在仓库库中：首次读取时提升为全局，切换仓库后保持一致。
+    if (stored !== undefined) writeGlobalAppearance(clean);
+    return clean;
   } catch {
     // spec §3.1：kv 读取失败时回退默认值
     return { ...DEFAULT_APPEARANCE };
@@ -59,7 +84,17 @@ export async function getAppearance(): Promise<ReaderAppearance> {
 
 export function saveAppearance(a: ReaderAppearance): Promise<void> {
   const clean = sanitizeAppearance(a);
+  writeGlobalAppearance(clean);
   return serialize(async () => { await kvSet(APPEARANCE_KEY, clean); });
+}
+
+/** 危险区清除全局外观（当前仓库库内的 kv 镜像随清库一并删除）。 */
+export function clearGlobalAppearance(): void {
+  try {
+    globalThis.localStorage?.removeItem(GLOBAL_APPEARANCE_KEY);
+  } catch {
+    // 忽略
+  }
 }
 
 /** appearanceStyle 返回值：CSSProperties 基础上带上五个可索引的自定义属性（供单测/消费方直接读取）。 */

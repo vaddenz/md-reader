@@ -46,7 +46,7 @@ test('返回语义：设置返回回到来源页（阅读页/首页）', async (
   await page.getByRole('button', { name: '设置' }).click();
   await page.getByRole('link', { name: /数据管理/ }).click();
   await expect(page).toHaveURL(/#\/settings\/data$/);
-  await page.getByRole('button', { name: '返回设置' }).click();
+  await page.getByRole('button', { name: '返回', exact: true }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await page.getByRole('button', { name: '返回', exact: true }).click();
   await expect(page).toHaveURL(/#\/doc\//);

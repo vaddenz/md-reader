@@ -11,12 +11,12 @@ import RelatedDocs from '../components/RelatedDocs';
 import SelectionMenu from '../components/SelectionMenu';
 import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
-import { DEFAULT_REPO } from '../constants';
 import { appearanceStyle, DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
 import { addHighlight, getDocHighlights, removeHighlights, type HighlightRecord } from '../data/highlights';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
+import { activeRepo } from '../data/repos';
 import { downloadDocText } from '../data/sync';
 import { useReadingProgress } from '../hooks/useReadingProgress';
 import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError } from '../lib/errors';
@@ -28,7 +28,6 @@ import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
 import { renderDoc } from '../markdown/render';
 import { useOrientation } from '../state/OrientationContext';
-import type { RepoConfig } from '../state/SyncContext';
 import { useSync } from '../state/SyncContext';
 import { useTabs } from '../state/TabsContext';
 import { useToken } from '../state/TokenContext';
@@ -133,7 +132,7 @@ export default function DocPage() {
       if (rec.text !== null) { setState({ kind: 'ready', path, title: rec.title, text: rec.text }); return; }
 
       setState({ kind: 'downloading', path });
-      const cfg = (await kvGet<RepoConfig>('config').catch(() => undefined)) ?? DEFAULT_REPO;
+      const cfg = activeRepo();
       if (cancelled) return;
       if (!token) { setState({ kind: 'download-failed', path }); return; }
       try {
@@ -219,7 +218,7 @@ export default function DocPage() {
     const tree = await kvGet<{ entries: TreeEntry[] }>('tree');
     const sha = tree?.entries.find((e) => e.path === repoPath)?.sha;
     if (!sha) throw new Error('图片不在本地目录树中');
-    const cfg = (await kvGet<RepoConfig>('config').catch(() => undefined)) ?? DEFAULT_REPO;
+    const cfg = activeRepo();
     return new GitHubClient(token).getBlobBytes(cfg.owner, cfg.repo, sha);
   }, [token]);
 

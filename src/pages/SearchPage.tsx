@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { docHref, goBackOrHome } from '../app/nav';
-import { DEFAULT_REPO } from '../constants';
-import { kvGet, listFilesMeta, type FileMeta } from '../data/db';
+import { listFilesMeta, type FileMeta } from '../data/db';
 import { GitHubClient } from '../data/github';
+import { activeRepo } from '../data/repos';
 import { searchDocs, type SearchHit } from '../data/search';
 import { loadCachedTexts } from '../data/searchCache';
 import { downloadDocText } from '../data/sync';
@@ -11,7 +11,7 @@ import { QUOTA_TEXT, isQuotaError } from '../lib/errors';
 import { runPool } from '../lib/pool';
 import { showToast } from '../lib/toast';
 import { termRanges } from '../markdown/highlight';
-import { useSync, type RepoConfig } from '../state/SyncContext';
+import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/search.css';
 
@@ -100,7 +100,7 @@ export default function SearchPage() {
     if (busy || !token || !uncached.length) return;
     setBusy({ done: 0, total: uncached.length });
     setFailed(0);
-    const cfg = (await kvGet<RepoConfig>('config').catch(() => undefined)) ?? DEFAULT_REPO;
+    const cfg = activeRepo();
     const client = new GitHubClient(token);
     let bad = 0;
     let quota = false;

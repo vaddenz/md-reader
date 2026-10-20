@@ -10,6 +10,7 @@ import SearchPage from './pages/SearchPage';
 import SettingsAboutPage from './pages/SettingsAboutPage';
 import SettingsAccountPage from './pages/SettingsAccountPage';
 import SettingsDataPage from './pages/SettingsDataPage';
+import SettingsMemoryPage from './pages/SettingsMemoryPage';
 import SettingsPage from './pages/SettingsPage';
 import SettingsReadingPage from './pages/SettingsReadingPage';
 import SetupPage from './pages/SetupPage';
@@ -23,6 +24,7 @@ const router = createHashRouter([
     { path: 'settings/account', element: <SettingsAccountPage /> },
     { path: 'settings/reading', element: <SettingsReadingPage /> },
     { path: 'settings/data', element: <SettingsDataPage /> },
+    { path: 'settings/memory', element: <SettingsMemoryPage /> },
     { path: 'settings/about', element: <SettingsAboutPage /> },
     { path: 'font-preview', element: <FontPreviewPage /> },
     { path: 'setup', element: <SetupPage /> },

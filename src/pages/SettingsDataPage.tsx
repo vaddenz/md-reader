@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { SETUP, goBackOrSettings, toRouterPath } from '../app/nav';
 import HighlightsSection from '../components/HighlightsSection';
 import SettingsHeader from '../components/SettingsHeader';
-import { clearAllData, listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
+import { clearGlobalAppearance } from '../data/appearance';
+import { listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
+import { clearGlobalMemorySettings } from '../data/memory';
+import { clearAllLibraries } from '../data/repos';
 import { bytesToText } from '../lib/format';
 import { DATA_CLEARED_EVENT } from '../state/TabsContext';
 import { useSync } from '../state/SyncContext';
@@ -38,11 +41,13 @@ export default function SettingsDataPage() {
 
   async function onClearAll() {
     if (clearing) return;
-    if (!window.confirm('确定清除全部数据吗？将删除本机全部缓存、收藏、阅读进度、记忆训练数据与 Token，且不可恢复。')) return;
+    if (!window.confirm('确定清除全部数据吗？将删除本机所有仓库的缓存、收藏、阅读进度、记忆训练数据与 Token，且不可恢复。')) return;
     setClearing(true);
     setClearError(null);
     try {
-      await clearAllData();
+      await clearAllLibraries();
+      clearGlobalAppearance();
+      clearGlobalMemorySettings();
       clear();
       window.dispatchEvent(new Event(DATA_CLEARED_EVENT));
       navigate(toRouterPath(SETUP));
@@ -59,9 +64,9 @@ export default function SettingsDataPage() {
     <main className="settings">
       <SettingsHeader
         title="数据管理"
-        subtitle="缓存、阅读数据与备份；清除操作不可恢复。"
-        backLabel="设置"
-        backAriaLabel="返回设置"
+        subtitle="当前仓库的缓存、阅读数据与备份；清除操作会清空全部仓库且不可恢复。"
+        backLabel="返回"
+        backAriaLabel="返回"
         onBack={() => goBackOrSettings(navigate)}
       />
 
@@ -81,7 +86,7 @@ export default function SettingsDataPage() {
 
       <section className="settings-section settings-danger" aria-labelledby="settings-danger-title">
         <h2 id="settings-danger-title">危险区</h2>
-        <p className="settings-note">清除本机全部缓存数据与 Token，并返回引导页；此操作不可恢复。</p>
+        <p className="settings-note">清除本机所有仓库的缓存数据与 Token，并返回引导页；此操作不可恢复。</p>
         <button type="button" className="settings-danger-btn" onClick={() => void onClearAll()} disabled={clearing}>
           {clearing ? '清除中…' : '清除全部数据'}
         </button>

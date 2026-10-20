@@ -80,6 +80,9 @@ export interface MemoryStats {
 const SELECTION_KEY = 'memSelection';
 const LLM_KEY = 'llmConfig';
 const SESSION_KEY = 'memSession';
+/** 跨仓库共享的记忆设置：训练题量/每日新题、AI 模型。bank/filter 仍按仓库库存储。 */
+const GLOBAL_TRAINING_KEY = 'mdreader.memoryTraining';
+const GLOBAL_LLM_KEY = 'mdreader.llmConfig';
 const VERDICTS: Verdict[] = ['excellent', 'good', 'hard', 'again'];
 const MODES: MemoryAttempt['mode'][] = ['ai', 'self', 'choice'];
 
@@ -92,6 +95,34 @@ function strArray(v: unknown): string[] {
 
 function num(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
+function readGlobalJson(key: string): unknown {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeGlobalJson(key: string, value: unknown): void {
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // localStorage 不可用时退化为按仓库库存储
+  }
+}
+
+function readGlobalTraining(): Pick<MemorySelection, 'sessionSize' | 'newPerDay'> | null {
+  const raw = readGlobalJson(GLOBAL_TRAINING_KEY);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const size = num(r.sessionSize, DEFAULT_SELECTION.sessionSize);
+  return {
+    sessionSize: SESSION_SIZE_CHOICES.includes(size) ? size : DEFAULT_SELECTION.sessionSize,
+    newPerDay: Math.min(50, Math.max(0, Math.round(num(r.newPerDay, DEFAULT_SELECTION.newPerDay)))),
+  };
 }
 
 /** 记录去重键（导入合并与列表展开共用）：同题、同毫秒、同形态视为同一条。 */
@@ -121,11 +152,18 @@ export function sanitizeSelection(raw: unknown): MemorySelection {
 }
 
 export async function getSelection(): Promise<MemorySelection> {
-  return sanitizeSelection(await kvGet(SELECTION_KEY));
+  const sel = sanitizeSelection(await kvGet(SELECTION_KEY));
+  const global = readGlobalTraining();
+  if (global) return { ...sel, ...global };
+  // 旧版按仓库存储：首次读取时把题量/每日新题提升为全局。
+  writeGlobalJson(GLOBAL_TRAINING_KEY, { sessionSize: sel.sessionSize, newPerDay: sel.newPerDay });
+  return sel;
 }
 
 export function saveSelection(sel: MemorySelection): Promise<void> {
-  return serialize(() => kvSet(SELECTION_KEY, sanitizeSelection(sel)));
+  const clean = sanitizeSelection(sel);
+  writeGlobalJson(GLOBAL_TRAINING_KEY, { sessionSize: clean.sessionSize, newPerDay: clean.newPerDay });
+  return serialize(() => kvSet(SELECTION_KEY, clean));
 }
 
 export function sanitizeLlmConfig(raw: unknown): LlmConfig | undefined {
@@ -138,11 +176,36 @@ export function sanitizeLlmConfig(raw: unknown): LlmConfig | undefined {
 }
 
 export async function getLlmConfig(): Promise<LlmConfig | undefined> {
-  return sanitizeLlmConfig(await kvGet(LLM_KEY));
+  const global = readGlobalJson(GLOBAL_LLM_KEY);
+  if (global !== undefined) {
+    const clean = sanitizeLlmConfig(global);
+    if (clean) return clean;
+  }
+  try {
+    const stored = await kvGet(LLM_KEY);
+    const clean = sanitizeLlmConfig(stored);
+    // 旧版模型配置存在仓库库中：首次读取时提升为全局，切换仓库后无需重填 Key。
+    if (clean) writeGlobalJson(GLOBAL_LLM_KEY, clean);
+    return clean;
+  } catch {
+    return undefined;
+  }
 }
 
 export function saveLlmConfig(cfg: LlmConfig): Promise<void> {
-  return serialize(() => kvSet(LLM_KEY, { baseUrl: cfg.baseUrl.trim(), apiKey: cfg.apiKey.trim(), model: cfg.model.trim() }));
+  const clean = { baseUrl: cfg.baseUrl.trim(), apiKey: cfg.apiKey.trim(), model: cfg.model.trim() };
+  writeGlobalJson(GLOBAL_LLM_KEY, clean);
+  return serialize(() => kvSet(LLM_KEY, clean));
+}
+
+/** 危险区清除全局记忆设置（训练偏好与模型配置）；仓库库内的选择/记录由清库流程处理。 */
+export function clearGlobalMemorySettings(): void {
+  try {
+    globalThis.localStorage?.removeItem(GLOBAL_TRAINING_KEY);
+    globalThis.localStorage?.removeItem(GLOBAL_LLM_KEY);
+  } catch {
+    // 忽略
+  }
 }
 
 export function sanitizeSrs(raw: unknown): SrsState | null {

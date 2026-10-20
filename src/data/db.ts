@@ -4,13 +4,15 @@ import { showToast } from '../lib/toast';
 export interface FileRecord { path: string; sha: string; size: number; text: string | null; title: string; lastUsedAt: number; updatedAt: number }
 export interface TreeEntry { path: string; sha: string; size: number; type: 'blob' }
 
-const DB_NAME = 'mdreader';
+/** 默认库沿用旧名 `mdreader`（单仓库时代的数据原地保留）；多仓库各自使用独立库。 */
+const DEFAULT_DB_NAME = 'mdreader';
 const SCHEMA_VER = 2;
 
+let dbName = DEFAULT_DB_NAME;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function open(): Promise<IDBPDatabase> {
-  return openDB(DB_NAME, SCHEMA_VER, {
+  return openDB(dbName, SCHEMA_VER, {
     blocked() {
       // 首次升级被其它标签页的旧连接挡住：提示用户关闭旧标签页后刷新。
       showToast('数据库被其它标签页占用，请关闭后刷新本页', { kind: 'error' });
@@ -52,7 +54,7 @@ export function openDb(): Promise<IDBPDatabase> {
       // 自愈：结构损坏/版本冲突 → 删库重建
       // 不能调用 clearAllData()：它会 await 本函数正在构造的 dbPromise，导致死锁
       dbPromise = null;
-      await deleteDB(DB_NAME);
+      await deleteDB(dbName);
       const retry = open().catch((err) => {
         dbPromise = null;
         throw err;
@@ -118,13 +120,33 @@ export async function storageEstimate() {
   const e = await navigator.storage?.estimate?.();
   return { usage: e?.usage ?? 0, quota: e?.quota ?? 0 };
 }
+/** 关闭当前仓库库连接（切换仓库/清库前调用；可重复调用）。 */
+export async function closeDb(): Promise<void> {
+  const pending = dbPromise;
+  dbPromise = null;
+  if (!pending) return;
+  const db = await pending.catch(() => null);
+  db?.close();
+}
+
+/** 当前仓库的 IndexedDB 名（默认仓库为 mdreader，其余为 mdreader-<repoId>）。 */
+export function getRepoDbName(): string {
+  return dbName;
+}
+
+/**
+ * 切换当前仓库的库作用域。必须先关闭旧连接再打开新库；
+ * 启动阶段（main.tsx）在渲染前调用，运行期切换仓库通过整页刷新完成。
+ */
+export async function setRepoDbName(name: string): Promise<void> {
+  if (name === dbName) return;
+  await closeDb();
+  dbName = name;
+}
+
+/** 仅清空当前仓库库（单元测试与单仓库清理用）；清空所有仓库请用 repos.clearAllLibraries。 */
 export async function clearAllData(): Promise<void> {
-  try {
-    const db = dbPromise ? await dbPromise.catch(() => null) : null;
-    if (db) db.close();
-    dbPromise = null;
-    await indexedDB.deleteDatabase(DB_NAME);
-  } finally {
-    dbPromise = null;
-  }
+  const name = dbName;
+  await closeDb();
+  await deleteDB(name);
 }

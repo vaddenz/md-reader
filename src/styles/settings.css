@@ -376,6 +376,119 @@
 }
 .settings-token-form button:disabled { background: #8b949e; cursor: default; }
 
+/* 账户与仓库（同一 Owner 下的多仓库列表） */
+.settings-subhead {
+  margin: 10px 0 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.settings-owner-form {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-repo-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-repo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-repo-item:last-child { border-bottom: 0; }
+
+.settings-repo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.settings-repo-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.settings-repo-row-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-repo-row-branch {
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-repo-current {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(31, 63, 212, 0.08);
+  color: var(--acc-text);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.settings-section .settings-repo-delete {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: none;
+  color: var(--danger);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.settings-repo-edit,
+.settings-add-form {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-repo-edit .settings-subhead { margin-top: 0; }
+
+.settings-section .settings-add-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 0 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
 /* 仓库配置表单 */
 .settings-repo-form {
   display: grid;
@@ -439,6 +552,68 @@
 }
 .settings-danger-btn:disabled { border-color: var(--line); color: #8b949e; cursor: default; }
 
+/* 记忆助手设置：复用 memory 控件，但压过设置页的通用按钮基线（0,2,0 > 0,1,1）。 */
+.settings-section .memory-chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.settings-section .memory-chip-on {
+  border-color: var(--acc);
+  background: rgba(31, 63, 212, 0.08);
+  color: var(--acc-text);
+}
+
+.settings-section .memory-row input[type='number'] {
+  width: 72px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.settings-section .memory-field input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.settings-section .memory-field input::placeholder { color: var(--ink2); opacity: 1; }
+
+.settings-section .memory-primary {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+.settings-section .memory-secondary {
+  min-height: 40px;
+  background: var(--shell);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.settings-section .memory-actions-row > button { flex: 1 1 0; min-width: 0; }
+
+@media (hover: hover) {
+  .settings-section .memory-chip:hover { border-color: var(--acc); }
+  .settings-section .memory-secondary:not(:disabled):hover { background: var(--line); }
+}
+
 /* 关于（页面标题已表达主题，卡内不再重复组标签） */
 .settings-about { padding-top: 16px; }
 
@@ -470,6 +645,8 @@
   .settings-sync-btn:not(:disabled):hover,
   .settings-token-row button:not(:disabled):hover,
   .settings-sync-row button:not(:disabled):hover { background: var(--line); }
+  .settings-section .settings-repo-delete:hover { background: rgba(192, 57, 43, 0.07); }
+  .settings-section .settings-add-toggle:hover { background: var(--shell); }
   .settings-token-form button:not(:disabled):hover,
   .settings-repo-form button:not(:disabled):hover { background: #1932aa; /* 主按钮悬停：accent 暗 20% */ }
   .settings-danger-btn:not(:disabled):hover { background: rgba(192, 57, 43, 0.07); }

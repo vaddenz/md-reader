@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAllData, kvGet, kvSet, openDb } from '../../src/data/db';
 import {
-  DEFAULT_SELECTION, SESSION_SIZE_CHOICES, appendAttempt, clearSession, clearTrainingData,
+  DEFAULT_SELECTION, SESSION_SIZE_CHOICES, appendAttempt, clearGlobalMemorySettings, clearSession, clearTrainingData,
   exportMemory, getLlmConfig, getSelection, getSession, importMemory, listAttempts, loadSrsMap,
   putSrs, sanitizeAttempt, sanitizeLlmConfig, sanitizeSelection, sanitizeSrs, saveLlmConfig,
   saveSelection, saveSession, summarize,
@@ -13,7 +13,10 @@ import type { SrsState } from '../../src/lib/srs';
 const NOW = new Date(2026, 9, 19, 15, 30).getTime();
 const DAY = 24 * 60 * 60 * 1000;
 
-beforeEach(async () => { await clearAllData(); });
+beforeEach(async () => {
+  await clearAllData();
+  clearGlobalMemorySettings();
+});
 
 function attempt(extra: Partial<MemoryAttempt> = {}): MemoryAttempt {
   return {
@@ -49,6 +52,36 @@ describe('sanitizeSelection', () => {
     await saveSelection({ banks: ['b.jsonl'], filters: { kinds: ['single'], chapters: [], types: [], tags: [], difficulty: [] }, sessionSize: 10, newPerDay: 5 });
     const back = await getSelection();
     expect(back).toMatchObject({ banks: ['b.jsonl'], sessionSize: 10, newPerDay: 5 });
+  });
+});
+
+describe('跨仓库共享的记忆设置', () => {
+  it('训练偏好与模型配置写入全局 localStorage；清空仓库库后仍保留', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+      clear: () => { store.clear(); },
+    });
+    try {
+      await saveSelection({
+        banks: ['b.jsonl'],
+        filters: { kinds: ['qa'], chapters: [], types: [], tags: [], difficulty: [] },
+        sessionSize: 50,
+        newPerDay: 3,
+      });
+      await saveLlmConfig({ baseUrl: 'https://x/v1', apiKey: 'k', model: 'm' });
+      expect(store.has('mdreader.memoryTraining')).toBe(true);
+      expect(store.has('mdreader.llmConfig')).toBe(true);
+
+      // 模拟切换到另一个仓库库：仓库内选择清空，但训练偏好/模型仍全局有效。
+      await clearAllData();
+      expect(await getSelection()).toMatchObject({ banks: [], sessionSize: 50, newPerDay: 3 });
+      expect(await getLlmConfig()).toEqual({ baseUrl: 'https://x/v1', apiKey: 'k', model: 'm' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

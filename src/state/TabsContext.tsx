@@ -8,7 +8,7 @@ import {
 
 const TABS_KEY = 'tabs';
 
-/** 清除全部数据事件（SettingsPage 在 clearAllData 后派发，Provider 据此重置内存标签）。 */
+/** 清除全部数据事件（设置 › 数据管理在清空所有仓库后派发，Provider 据此重置内存标签）。 */
 export const DATA_CLEARED_EVENT = 'mdreader:data-cleared';
 
 interface TabsCtx {
@@ -57,7 +57,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  // 清除全部数据后重置内存标签（SettingsPage 在 clearAllData 后派发）。
+  // 清除全部数据后重置内存标签（设置 › 数据管理在清空所有仓库后派发）。
   useEffect(() => {
     const onCleared = () => setTabs(EMPTY_TABS);
     window.addEventListener(DATA_CLEARED_EVENT, onCleared);

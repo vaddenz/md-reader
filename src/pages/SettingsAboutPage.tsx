@@ -13,8 +13,8 @@ export default function SettingsAboutPage() {
       <SettingsHeader
         title="关于"
         subtitle="版本、定位与隐私说明。"
-        backLabel="设置"
-        backAriaLabel="返回设置"
+        backLabel="返回"
+        backAriaLabel="返回"
         onBack={() => goBackOrSettings(navigate)}
       />
       <AboutSection />

@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearAllData, getFile, kvGet, kvSet, listFilesMeta, markExpired, putFiles, deleteFiles, touchFile, openDb } from '../../src/data/db';
+import { clearAllData, getFile, kvGet, kvSet, listFilesMeta, markExpired, putFiles, deleteFiles, touchFile, openDb, setRepoDbName } from '../../src/data/db';
 
 beforeEach(async () => { await clearAllData(); });
 
@@ -26,6 +26,20 @@ describe('db', () => {
     await clearAllData();
     expect(await kvGet('lastSyncAt')).toBeUndefined();
   });
+  it('多仓库库作用域：文件/缓存互不可见，切回后原数据保留', async () => {
+    await putFiles([{ path: 'a.md', sha: 's1', size: 2, text: 'hi', title: 'A', lastUsedAt: 100, updatedAt: 1 }]);
+    try {
+      await setRepoDbName('mdreader-test-scope');
+      expect(await getFile('a.md')).toBeUndefined();
+      await putFiles([{ path: 'b.md', sha: 's2', size: 2, text: 'yo', title: 'B', lastUsedAt: 100, updatedAt: 1 }]);
+      expect(await listFilesMeta()).toHaveLength(1);
+      await clearAllData(); // 删除测试库
+    } finally {
+      await setRepoDbName('mdreader');
+    }
+    expect((await getFile('a.md'))?.text).toBe('hi');
+  });
+
   it('openDb 版本冲突时自愈且不挂起、不泄漏连接', async () => {
     // 造一个更高版本的库，使 SCHEMA_VER 更低的 open 异步失败（VersionError）
     await new Promise<void>((resolve, reject) => {

@@ -11,7 +11,8 @@
 }
 .memory-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .memory-title { margin: 8px 0 4px; font-size: 24px; }
-.memory-link { display: inline-flex; align-items: center; min-height: 32px; color: var(--acc-text); font-size: 14px; }
+.memory-header-links { display: flex; align-items: center; gap: 14px; }
+.memory-link { display: inline-flex; align-items: center; min-height: 32px; color: var(--acc-text); font-size: 14px; text-decoration: none; }
 
 .memory-card {
   margin: 18px 0 0; padding: 6px 16px 16px;
@@ -158,3 +159,7 @@
 .memory-stat span.memory-verdict-hard { color: var(--ink2); }
 .memory-verdict-again,
 .memory-stat span.memory-verdict-again { color: var(--danger); }
+
+@media (hover: hover) {
+  .memory-link:hover { text-decoration: underline; }
+}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SETUP, toRouterPath } from '../app/nav';
 import { kvGet } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
+import { activeRepo } from '../data/repos';
 import { sweepExpired, syncRepo, type SyncProgress } from '../data/sync';
 import { useOnline } from '../hooks/useOnline';
 import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError, ratelimitToastText } from '../lib/errors';
@@ -11,7 +12,7 @@ import { showToast } from '../lib/toast';
 import { useToken } from './TokenContext';
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
-export interface RepoConfig { owner: string; repo: string; branch: string }
+export type { RepoConfig } from '../data/repos';
 
 interface SyncCtx {
   status: SyncStatus;
@@ -49,11 +50,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (running.current) return; // 防重入：同步中再次触发直接忽略
     running.current = true;
     try {
-      const cfg = await kvGet<RepoConfig>('config');
-      if (!cfg || !token) {
+      if (!token) {
         navigate(toRouterPath(SETUP));
         return;
       }
+      const cfg = activeRepo();
       setStatus('syncing');
       setError(null);
       await syncRepo(new GitHubClient(token), cfg, setProgress);
@@ -110,7 +111,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   useEffect(() => { syncRef.current = syncNow; }, [syncNow]);
 
   // 启动时：先本地清理；无 Token 时停留/跳转引导页（spec §3 无 Token 不可用）；
-  // 有 token && config 且在线时后台静默同步；恢复在线/配置 Token 后同样触发。
+  // 有 token 且在线时后台静默同步当前仓库；恢复在线/切换仓库（整页刷新）后同样触发。
   // 注意：依赖不含 navigate（其身份随路由变化，入依赖会导致每次导航都重跑本效应）；
   // 此处只用绝对路径导航，闭包中的旧实例仍然有效。
   useEffect(() => {
@@ -124,8 +125,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!online) return;
-      const cfg = await kvGet<RepoConfig>('config').catch(() => undefined);
-      if (!cancelled && cfg) void syncRef.current();
+      if (!cancelled) void syncRef.current();
     })();
     return () => { cancelled = true; };
   }, [token, online]);

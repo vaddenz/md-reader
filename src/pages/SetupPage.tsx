@@ -1,9 +1,8 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HOME, toRouterPath } from '../app/nav';
-import { DEFAULT_REPO } from '../constants';
-import { kvGet, kvSet } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
+import { activeRepo, initRepoState } from '../data/repos';
 import { AUTH_EXPIRED_TEXT, githubErrorText } from '../lib/errors';
 import { useToken } from '../state/TokenContext';
 import '../styles/setup.css';
@@ -56,6 +55,7 @@ export default function SetupPage() {
   const [searchParams] = useSearchParams();
   const reauth = searchParams.get('reauth') === '1';
   const { setToken } = useToken();
+  const repo = activeRepo();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,9 +75,9 @@ export default function SetupPage() {
     setError(null);
     try {
       await new GitHubClient(token).getUser();
-      // 先落盘 config 再 setToken：SyncContext 的 [token] 效应在 render 后立即读取 config，
-      // 顺序颠倒时首次自动同步可能读到空 config 而不触发（T9 竞态；T23 探针确定性复现）。
-      if (!(await kvGet('config'))) await kvSet('config', DEFAULT_REPO);
+      // 先确保当前仓库配置与库作用域就绪，再 setToken：
+      // SyncContext 的 [token] 效应在 render 后立即按当前仓库自动同步（T9/T23 竞态口径）。
+      await initRepoState();
       setToken(token);
       navigate(toRouterPath(HOME));
     } catch (err) {
@@ -184,7 +184,7 @@ export default function SetupPage() {
                 <p className="setup-step-title">只授权这一个仓库</p>
                 <p className="setup-step-body">
                   Repository access 选择 <code>Only select repositories</code>，勾选{' '}
-                  <code>{DEFAULT_REPO.owner}/{DEFAULT_REPO.repo}</code>。
+                  <code>{repo.owner}/{repo.repo}</code>。
                 </p>
               </div>
             </li>

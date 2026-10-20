@@ -15,8 +15,8 @@ export default function SettingsReadingPage() {
       <SettingsHeader
         title="阅读体验"
         subtitle="正文排版与屏幕方向；外观改动即时预览并自动保存。"
-        backLabel="设置"
-        backAriaLabel="返回设置"
+        backLabel="返回"
+        backAriaLabel="返回"
         onBack={() => goBackOrSettings(navigate)}
       />
 

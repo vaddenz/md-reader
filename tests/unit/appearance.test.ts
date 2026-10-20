@@ -52,6 +52,41 @@ describe('getAppearance / saveAppearance', () => {
     // 恢复后仍能正常读回，确认 mock 未污染后续调用
     expect(await getAppearance()).toEqual(DEFAULT_APPEARANCE);
   });
+
+  it('外观跨仓库共享：写全局 localStorage，清空当前仓库库后仍可读回', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+      clear: () => { store.clear(); },
+    });
+    try {
+      await saveAppearance({ fontFamily: 'serif', fontSize: 19, fontWeight: 500, tableScale: 0.8, quoteScale: 0.9 });
+      expect(store.get('mdreader.appearance')).toContain('"fontFamily":"serif"');
+      await clearAllData();
+      expect(await getAppearance()).toMatchObject({ fontFamily: 'serif', fontSize: 19 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('旧版外观从 kv 读取后提升为全局', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+      clear: () => { store.clear(); },
+    });
+    try {
+      await kvSet('appearance', { fontFamily: 'xihei', fontSize: 18 });
+      expect(await getAppearance()).toMatchObject({ fontFamily: 'xihei', fontSize: 18 });
+      expect(store.get('mdreader.appearance')).toContain('"fontFamily":"xihei"');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('appearanceStyle', () => {

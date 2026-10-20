@@ -1,19 +1,24 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { goBackOrSettings } from '../app/nav';
 import SettingsHeader from '../components/SettingsHeader';
-import { DEFAULT_REPO } from '../constants';
-import { kvGet, kvSet } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
+import {
+  activeRepo, addRepo, deleteRepoDatabase, loadRepoState, mirrorActiveRepo, removeRepo,
+  switchActiveRepo, updateOwner, updateRepo, type RepoState,
+} from '../data/repos';
 import { githubErrorText } from '../lib/errors';
 import { maskToken } from '../lib/token';
-import { useSync, type RepoConfig } from '../state/SyncContext';
+import { useSync } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/settings.css';
 
 interface Msg { kind: 'ok' | 'err'; text: string }
 
-/** 设置 · 账户与仓库：Token / 仓库配置 / 同步（原设置页前三区块）。 */
+/**
+ * 设置 · 账户与仓库：Token / 共享 Owner / 同用户名下的多仓库（各自独立本机书库）/ 同步。
+ * 多仓库仅支持同一 GitHub 用户名；切换仓库通过整页刷新重建库作用域。
+ */
 export default function SettingsAccountPage() {
   const navigate = useNavigate();
   const { token, setToken, clear } = useToken();
@@ -24,18 +29,18 @@ export default function SettingsAccountPage() {
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenMsg, setTokenMsg] = useState<Msg | null>(null);
 
-  const [cfg, setCfg] = useState<RepoConfig>({ ...DEFAULT_REPO });
+  const [repoState, setRepoState] = useState<RepoState>(() => loadRepoState());
+  const active = activeRepo(repoState);
+  const [ownerDraft, setOwnerDraft] = useState(repoState.owner);
+  const [ownerMsg, setOwnerMsg] = useState<Msg | null>(null);
+  const [repoDraft, setRepoDraft] = useState(active.repo);
+  const [branchDraft, setBranchDraft] = useState(active.branch);
   const [repoMsg, setRepoMsg] = useState<Msg | null>(null);
 
-  // 仓库配置：读取已保存值（缺失回退默认仓库）。
-  useEffect(() => {
-    let cancelled = false;
-    void kvGet<RepoConfig>('config').then(
-      (saved) => { if (!cancelled && saved) setCfg(saved); },
-      () => {},
-    );
-    return () => { cancelled = true; };
-  }, []);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newRepo, setNewRepo] = useState('');
+  const [newBranch, setNewBranch] = useState('main');
+  const [addMsg, setAddMsg] = useState<Msg | null>(null);
 
   async function onChangeToken(e: FormEvent) {
     e.preventDefault();
@@ -67,19 +72,64 @@ export default function SettingsAccountPage() {
     setTokenMsg(null);
   }
 
-  async function onSaveRepo(e: FormEvent) {
+  async function onSaveOwner(e: FormEvent) {
     e.preventDefault();
-    const next = { owner: cfg.owner.trim(), repo: cfg.repo.trim(), branch: cfg.branch.trim() };
-    if (!next.owner || !next.repo || !next.branch) {
-      setRepoMsg({ kind: 'err', text: '请填写完整的仓库信息（Owner / 仓库名 / 分支）' });
+    const next = ownerDraft.trim();
+    if (!next) {
+      setOwnerMsg({ kind: 'err', text: '请填写 GitHub 用户名' });
       return;
     }
+    const saved = updateOwner(next);
+    setRepoState(saved);
+    setOwnerDraft(saved.owner);
+    await mirrorActiveRepo();
+    setOwnerMsg({ kind: 'ok', text: '用户名已保存' });
+  }
+
+  async function onSaveRepo(e: FormEvent) {
+    e.preventDefault();
+    const repo = repoDraft.trim();
+    const branch = branchDraft.trim();
+    if (!repo || !branch) {
+      setRepoMsg({ kind: 'err', text: '请填写仓库名与分支' });
+      return;
+    }
+    if (repoState.repos.some((r) => r.id !== active.id && r.repo === repo && r.branch === branch)) {
+      setRepoMsg({ kind: 'err', text: '该仓库已在列表中' });
+      return;
+    }
+    const saved = updateRepo(active.id, { repo, branch });
+    const updated = saved.repos.find((r) => r.id === active.id)!;
+    setRepoState(saved);
+    setRepoDraft(updated.repo);
+    setBranchDraft(updated.branch);
+    await mirrorActiveRepo();
+    setRepoMsg({ kind: 'ok', text: '仓库已保存，下次同步使用新配置' });
+  }
+
+  function onAddRepo(e: FormEvent) {
+    e.preventDefault();
     try {
-      await kvSet('config', next);
-      setCfg(next);
-      setRepoMsg({ kind: 'ok', text: '已保存' });
-    } catch {
-      setRepoMsg({ kind: 'err', text: '保存失败，请重试' });
+      const saved = addRepo(newRepo, newBranch);
+      setRepoState(saved);
+      setNewRepo('');
+      setNewBranch('main');
+      setAddOpen(false);
+      setAddMsg({ kind: 'ok', text: '仓库已添加；切换到该仓库后开始同步' });
+    } catch (err) {
+      setAddMsg({ kind: 'err', text: err instanceof Error ? err.message : '添加失败，请重试' });
+    }
+  }
+
+  function onRemoveRepo(id: string, repo: string) {
+    if (!window.confirm(`确定删除仓库「${repo}」吗？该仓库的本机缓存、收藏、进度与标签页也会删除。`)) return;
+    try {
+      const saved = removeRepo(id);
+      setRepoState(saved);
+      void deleteRepoDatabase(id);
+      setRepoMsg({ kind: 'ok', text: '仓库已删除' });
+    } catch (err) {
+      setRepoMsg({ kind: 'err', text: err instanceof Error ? err.message : '删除失败，请重试' });
     }
   }
 
@@ -89,14 +139,16 @@ export default function SettingsAccountPage() {
     <main className="settings">
       <SettingsHeader
         title="账户与仓库"
-        subtitle="GitHub 访问凭据与内容来源；Token 只保存在本机。"
-        backLabel="设置"
-        backAriaLabel="返回设置"
+        subtitle="同一 GitHub 用户名下的多个仓库共用一个 Token；每个仓库有独立的本机书库。"
+        backLabel="返回"
+        backAriaLabel="返回"
         onBack={() => goBackOrSettings(navigate)}
       />
 
-      <section className="settings-section" aria-labelledby="settings-token-title">
-        <h2 id="settings-token-title">访问 Token</h2>
+      <section className="settings-section" aria-labelledby="settings-account-title">
+        <h2 id="settings-account-title">GitHub 账号</h2>
+
+        <p className="settings-subhead">访问 Token</p>
         <p className="settings-token-row">
           <code className="settings-token">{token ? maskToken(token) : '未配置'}</code>
           <button
@@ -128,43 +180,127 @@ export default function SettingsAccountPage() {
             {tokenMsg.text}
           </p>
         )}
-      </section>
 
-      <section className="settings-section" aria-labelledby="settings-repo-title">
-        <h2 id="settings-repo-title">仓库配置</h2>
-        <form className="settings-repo-form" onSubmit={onSaveRepo}>
+        <form className="settings-repo-form settings-owner-form" onSubmit={onSaveOwner}>
           <label>
             Owner
             <input
-              value={cfg.owner}
-              onChange={(e) => { setCfg({ ...cfg, owner: e.target.value }); setRepoMsg(null); }}
+              value={ownerDraft}
+              onChange={(e) => { setOwnerDraft(e.target.value); setOwnerMsg(null); }}
               autoComplete="off"
             />
           </label>
+          <p className="settings-note">GitHub 用户名（所有仓库共用）。Token 需包含各仓库的 Contents 只读权限。</p>
+          <button type="submit">保存 Owner</button>
+          {ownerMsg && (
+            <p role={ownerMsg.kind === 'err' ? 'alert' : 'status'} className={ownerMsg.kind === 'err' ? 'settings-error' : 'settings-ok'}>
+              {ownerMsg.text}
+            </p>
+          )}
+        </form>
+      </section>
+
+      <section className="settings-section" aria-labelledby="settings-repo-title">
+        <h2 id="settings-repo-title">仓库（{repoState.repos.length}）</h2>
+
+        <ul className="settings-repo-list" aria-label="仓库列表">
+          {repoState.repos.map((r) => {
+            const isActive = r.id === repoState.activeRepoId;
+            return (
+              <li key={r.id} className="settings-repo-item">
+                <label className="settings-repo-row">
+                  <input
+                    type="radio"
+                    name="active-repo"
+                    checked={isActive}
+                    onChange={() => { if (!isActive) switchActiveRepo(r.id); }}
+                  />
+                  <span className="settings-repo-row-text">
+                    <span className="settings-repo-row-name">{r.repo}</span>
+                    <span className="settings-repo-row-branch">{r.branch}</span>
+                  </span>
+                  {isActive && <span className="settings-repo-current">当前</span>}
+                </label>
+                {!isActive && (
+                  <button
+                    type="button"
+                    className="settings-repo-delete"
+                    aria-label={`删除仓库 ${r.repo}`}
+                    onClick={() => onRemoveRepo(r.id, r.repo)}
+                  >
+                    删除
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="settings-note">点选仓库即可切换；切换会重新载入，并打开该仓库独立的本机缓存、收藏、进度与标签页。</p>
+
+        <form className="settings-repo-form settings-repo-edit" onSubmit={onSaveRepo}>
+          <p className="settings-subhead">当前仓库</p>
           <label>
             仓库名
             <input
-              value={cfg.repo}
-              onChange={(e) => { setCfg({ ...cfg, repo: e.target.value }); setRepoMsg(null); }}
+              value={repoDraft}
+              onChange={(e) => { setRepoDraft(e.target.value); setRepoMsg(null); }}
               autoComplete="off"
             />
           </label>
           <label>
             分支
             <input
-              value={cfg.branch}
-              onChange={(e) => { setCfg({ ...cfg, branch: e.target.value }); setRepoMsg(null); }}
+              value={branchDraft}
+              onChange={(e) => { setBranchDraft(e.target.value); setRepoMsg(null); }}
               autoComplete="off"
             />
           </label>
-          <p className="settings-note">修改后需点击「保存」才会生效；「立即同步」将使用上次保存的配置。</p>
-          <button type="submit">保存</button>
+          <p className="settings-note">修改后需点击「保存仓库」才会生效；「立即同步」将使用上次保存的配置。</p>
+          <button type="submit">保存仓库</button>
           {repoMsg && (
             <p role={repoMsg.kind === 'err' ? 'alert' : 'status'} className={repoMsg.kind === 'err' ? 'settings-error' : 'settings-ok'}>
               {repoMsg.text}
             </p>
           )}
         </form>
+
+        <button
+          type="button"
+          className="settings-add-toggle"
+          onClick={() => { setAddOpen((v) => !v); setAddMsg(null); }}
+        >
+          {addOpen ? '取消添加' : '+ 添加仓库'}
+        </button>
+
+        {addOpen && (
+          <form className="settings-repo-form settings-add-form" onSubmit={onAddRepo}>
+            <label>
+              仓库名
+              <input
+                value={newRepo}
+                onChange={(e) => { setNewRepo(e.target.value); setAddMsg(null); }}
+                placeholder="my-notes"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              分支
+              <input
+                value={newBranch}
+                onChange={(e) => { setNewBranch(e.target.value); setAddMsg(null); }}
+                autoComplete="off"
+              />
+            </label>
+            <p className="settings-note">仓库需属于上方 Owner；添加后不会自动切换，也不会立即下载。</p>
+            <button type="submit">添加</button>
+          </form>
+        )}
+
+        {addMsg && (
+          <p role={addMsg.kind === 'err' ? 'alert' : 'status'} className={addMsg.kind === 'err' ? 'settings-error' : 'settings-ok'}>
+            {addMsg.text}
+          </p>
+        )}
       </section>
 
       <section className="settings-section" aria-labelledby="settings-sync-title">

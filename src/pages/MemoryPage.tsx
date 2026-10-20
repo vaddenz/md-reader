@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HOME, MEMORY_RECORDS, MEMORY_TRAIN, toRouterPath } from '../app/nav';
-import LlmConfigForm from '../components/memory/LlmConfigForm';
+import { HOME, MEMORY_RECORDS, MEMORY_TRAIN, SETTINGS_MEMORY, toRouterPath } from '../app/nav';
+import MemoryChips from '../components/memory/MemoryChips';
 import { GitHubClient } from '../data/github';
 import { isLlmConfigured } from '../data/llm';
 import {
-  SESSION_SIZE_CHOICES, getLlmConfig, getSelection, loadSrsMap, listAttempts,
-  saveLlmConfig, saveSelection, saveSession, summarize,
+  getLlmConfig, getSelection, loadSrsMap, listAttempts,
+  saveSelection, saveSession, summarize,
   type LlmConfig, type MemoryAttempt, type MemorySelection,
 } from '../data/memory';
 import { ensureBankLoaded, getParsedBank, listBanks, type BankMeta, type ParsedBank } from '../data/qbankIndex';
@@ -27,38 +27,6 @@ function clientFor(token: string | null): Pick<GitHubClient, 'getBlobText'> {
   return token
     ? new GitHubClient(token)
     : { getBlobText: () => Promise.reject(new Error('未配置访问 Token，无法获取题库')) };
-}
-
-function FilterRow(props: {
-  label: string;
-  options: { value: string; label: string }[];
-  selected: string[];
-  onToggle: (v: string) => void;
-  single?: boolean;
-}) {
-  const { label, options, selected, onToggle, single } = props;
-  return (
-    <div className="memory-row">
-      <span className="memory-row-label">{label}</span>
-      <div className="memory-chips" role={single ? 'radiogroup' : 'group'} aria-label={label}>
-        {options.map((o) => {
-          const on = selected.includes(o.value);
-          return (
-            <button
-              key={o.value}
-              type="button"
-              role={single ? 'radio' : 'checkbox'}
-              aria-checked={on}
-              className={on ? 'memory-chip memory-chip-on' : 'memory-chip'}
-              onClick={() => onToggle(o.value)}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 export default function MemoryPage() {
@@ -291,7 +259,10 @@ export default function MemoryPage() {
       <a className="memory-back" href={HOME}>← 返回首页</a>
       <header className="memory-header">
         <h1 className="memory-title">记忆助手</h1>
-        <a className="memory-link" href={MEMORY_RECORDS}>训练记录</a>
+        <div className="memory-header-links">
+          <a className="memory-link" href={MEMORY_RECORDS}>训练记录</a>
+          <a className="memory-link" href={SETTINGS_MEMORY}>设置</a>
+        </div>
       </header>
 
       <section className="memory-card" aria-labelledby="memory-today-title">
@@ -306,7 +277,9 @@ export default function MemoryPage() {
           {starting ? '准备中…' : '开始训练'}
         </button>
         {msg && <p className="memory-note" role="status">{msg}</p>}
-        {!llmReady && <p className="memory-note">未配置模型，将使用「对照参考答案 + 自评」模式。</p>}
+        {!llmReady && (
+          <p className="memory-note">未配置模型，将使用「对照参考答案 + 自评」模式。</p>
+        )}
       </section>
 
       <section className="memory-card" aria-labelledby="memory-banks-title">
@@ -337,54 +310,22 @@ export default function MemoryPage() {
         )}
         {parsed.size > 0 && selection && (
           <div className="memory-filters">
-            <FilterRow label="形态" options={KIND_OPTIONS} selected={selection.filters.kinds} onToggle={(v) => toggleFilter('kinds', v)} />
+            <MemoryChips label="形态" options={KIND_OPTIONS} selected={selection.filters.kinds} onToggle={(v) => toggleFilter('kinds', v)} />
             {filterOptions.types.length > 0 && (
-              <FilterRow label="题型" options={filterOptions.types.map((t) => ({ value: t, label: t }))} selected={selection.filters.types} onToggle={(v) => toggleFilter('types', v)} />
+              <MemoryChips label="题型" options={filterOptions.types.map((t) => ({ value: t, label: t }))} selected={selection.filters.types} onToggle={(v) => toggleFilter('types', v)} />
             )}
             {filterOptions.chapters.length > 0 && (
-              <FilterRow label="章节" options={filterOptions.chapters.map((c) => ({ value: c, label: c }))} selected={selection.filters.chapters} onToggle={(v) => toggleFilter('chapters', v)} />
+              <MemoryChips label="章节" options={filterOptions.chapters.map((c) => ({ value: c, label: c }))} selected={selection.filters.chapters} onToggle={(v) => toggleFilter('chapters', v)} />
             )}
             {filterOptions.tags.length > 0 && (
-              <FilterRow label="标签" options={filterOptions.tags.map((t) => ({ value: t, label: t }))} selected={selection.filters.tags} onToggle={(v) => toggleFilter('tags', v)} />
+              <MemoryChips label="标签" options={filterOptions.tags.map((t) => ({ value: t, label: t }))} selected={selection.filters.tags} onToggle={(v) => toggleFilter('tags', v)} />
             )}
             {filterOptions.difficulty.length > 0 && (
-              <FilterRow label="难度" options={filterOptions.difficulty.map((d) => ({ value: d, label: d }))} selected={selection.filters.difficulty} onToggle={(v) => toggleFilter('difficulty', v)} />
+              <MemoryChips label="难度" options={filterOptions.difficulty.map((d) => ({ value: d, label: d }))} selected={selection.filters.difficulty} onToggle={(v) => toggleFilter('difficulty', v)} />
             )}
           </div>
         )}
       </section>
-
-      <section className="memory-card" aria-labelledby="memory-settings-title">
-        <h2 id="memory-settings-title" className="memory-card-title">训练设置</h2>
-        <div className="memory-filters">
-          <FilterRow
-            label="每次题量"
-            options={SESSION_SIZE_CHOICES.map((n) => ({ value: String(n), label: n === 0 ? '不限' : String(n) }))}
-            selected={[String(selection?.sessionSize ?? 20)]}
-            onToggle={(v) => selection && updateSelection({ ...selection, sessionSize: Number(v) })}
-            single
-          />
-          <div className="memory-row">
-            <span className="memory-row-label">每日新题</span>
-            <input
-              type="number" min={0} max={50}
-              value={selection?.newPerDay ?? 10}
-              aria-label="每日新题上限"
-              onChange={(e) => {
-                if (!selection) return;
-                const n = Math.min(50, Math.max(0, Math.round(Number(e.target.value) || 0)));
-                updateSelection({ ...selection, newPerDay: n });
-              }}
-            />
-            <span className="memory-unit">题</span>
-          </div>
-        </div>
-      </section>
-
-      <LlmConfigForm
-        cfg={llm}
-        onChange={(next) => { setLlm(next); void saveLlmConfig(next); }}
-      />
 
       {progress.length > 0 && (
         <section className="memory-card" aria-labelledby="memory-progress-title">
