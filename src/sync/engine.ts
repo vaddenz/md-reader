@@ -220,9 +220,13 @@ let activeSync: Promise<SyncSummary> | null = null;
 /** 手动 / 自动同步统一入口；并发调用复用同一 Promise。 */
 export function syncNow(opts?: { signal?: AbortSignal }): Promise<SyncSummary> {
   if (activeSync) return activeSync;
-  const config = loadSyncConfig();
-  if (!config.enabled) return Promise.reject(new SyncError('config', '同步已停用'));
-  const backend = createSyncBackend(config);
-  activeSync = syncAll(backend, opts).finally(() => { activeSync = null; });
-  return activeSync;
+  try {
+    const config = loadSyncConfig();
+    if (!config.enabled) return Promise.reject(new SyncError('config', '同步已停用'));
+    const backend = createSyncBackend(config);
+    activeSync = syncAll(backend, opts).finally(() => { activeSync = null; });
+    return activeSync;
+  } catch (error) {
+    return Promise.reject(error);
+  }
 }
