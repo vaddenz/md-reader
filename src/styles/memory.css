@@ -117,12 +117,12 @@
 .memory-option-on { border-color: var(--acc); background: rgba(31, 63, 212, .08); }
 .memory-option-eliminated { opacity: .5; text-decoration: line-through; cursor: default; }
 .memory-option-static { cursor: default; }
-/* 结果回放：正确 = 主题蓝底白字；误选 = 砖红底白字；已排除 = 中性灰删除线 */
-.memory-option-correct { border-color: transparent; background: var(--acc-fill); color: #fff; }
+/* 结果回放：正确 = 主题蓝（半透明）白字；误选 = 砖红（半透明）白字；已排除 = 中性灰删除线 */
+.memory-option-correct { border-color: transparent; background: rgba(31, 63, 212, .88); color: #fff; }
 .memory-option-correct .memory-option-key,
 .memory-option-correct .memory-option-mark,
 .memory-option-correct .memory-option-tag { color: #fff; }
-.memory-option-wrong { border-color: transparent; background: var(--danger); color: #fff; }
+.memory-option-wrong { border-color: transparent; background: rgba(192, 57, 43, .92); color: #fff; }
 .memory-option-wrong .memory-option-key,
 .memory-option-wrong .memory-option-mark,
 .memory-option-wrong .memory-option-tag { color: #fff; }
