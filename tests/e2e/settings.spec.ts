@@ -76,22 +76,22 @@ test('设置页：Owner 与当前仓库需「保存」才写入（trim 后生效
   const owner = page.getByLabel('Owner');
   const repoName = page.getByLabel('仓库名');
   const branch = page.getByLabel('分支');
-  await expect(owner).toHaveValue('vaddenz');
-  await expect(repoName).toHaveValue('interview');
+  await expect(owner).toHaveValue('your-name');
+  await expect(repoName).toHaveValue('your-notes');
   await expect(branch).toHaveValue('main');
 
   // Owner 草稿不写入；保存后 trim 生效
   await owner.fill('  other  ');
-  expect(await readConfig(page)).toEqual({ owner: 'vaddenz', repo: 'interview', branch: 'main' });
+  expect(await readConfig(page)).toEqual({ owner: 'your-name', repo: 'your-notes', branch: 'main' });
   await page.getByRole('button', { name: '保存 Owner' }).click();
   await expect(page.getByText('用户名已保存')).toBeVisible();
-  expect(await readConfig(page)).toEqual({ owner: 'other', repo: 'interview', branch: 'main' });
+  expect(await readConfig(page)).toEqual({ owner: 'other', repo: 'your-notes', branch: 'main' });
   await expect(owner).toHaveValue('other');
 
   // 仓库草稿不写入；保存后 trim 生效
   await repoName.fill('  notes  ');
   await branch.fill('  dev  ');
-  expect(await readConfig(page)).toEqual({ owner: 'other', repo: 'interview', branch: 'main' });
+  expect(await readConfig(page)).toEqual({ owner: 'other', repo: 'your-notes', branch: 'main' });
   await page.getByRole('button', { name: '保存仓库' }).click();
   await expect(page.getByText('仓库已保存，下次同步使用新配置')).toBeVisible();
   expect(await readConfig(page)).toEqual({ owner: 'other', repo: 'notes', branch: 'dev' });
@@ -108,8 +108,8 @@ test('设置页：Owner 与当前仓库需「保存」才写入（trim 后生效
 test('设置页：同一 Owner 下添加/切换仓库，书库相互隔离', async ({ page }) => {
   await configureAndSync(page);
 
-  // notes 返回空树：用于确认新仓库拥有独立书库，不会读到 interview 的缓存。
-  await page.route('https://api.github.com/repos/vaddenz/notes/git/trees/**', (route) =>
+  // scratch 返回空树：用于确认新仓库拥有独立书库，不会读到 your-notes 的缓存。
+  await page.route('https://api.github.com/repos/your-name/scratch/git/trees/**', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -120,41 +120,41 @@ test('设置页：同一 Owner 下添加/切换仓库，书库相互隔离', asy
   await goToSettings(page, 'account');
   await page.getByRole('button', { name: '+ 添加仓库' }).click();
   const addForm = page.locator('.settings-add-form');
-  await addForm.getByLabel('仓库名').fill('notes');
+  await addForm.getByLabel('仓库名').fill('scratch');
   await addForm.getByLabel('分支').fill('dev');
   await addForm.getByRole('button', { name: '添加', exact: true }).click();
   await expect(page.getByText('仓库已添加；切换到该仓库后开始同步')).toBeVisible();
-  await expect(page.locator('.settings-repo-row-name')).toHaveText(['interview', 'notes']);
+  await expect(page.locator('.settings-repo-row-name')).toHaveText(['your-notes', 'scratch']);
 
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('mdreader.repos')!));
-  expect(state.owner).toBe('vaddenz');
+  expect(state.owner).toBe('your-name');
   expect(state.repos).toHaveLength(2);
   expect(state.activeRepoId).toBe('default');
 
-  // 切换到 notes：整页刷新后仍回到设置账户页，当前仓库随之变化。
-  await page.locator('.settings-repo-row').filter({ hasText: 'notes' }).getByRole('radio').check();
+  // 切换到 scratch：整页刷新后仍回到设置账户页，当前仓库随之变化。
+  await page.locator('.settings-repo-row').filter({ hasText: 'scratch' }).getByRole('radio').check();
   await page.waitForURL(/#\/settings\/account$/);
-  await expect(page.getByLabel('仓库名')).toHaveValue('notes');
+  await expect(page.getByLabel('仓库名')).toHaveValue('scratch');
   await expect(page.locator('.settings-repo-current')).toHaveCount(1);
 
-  // notes 的独立书库：空树同步后首页为空。
+  // scratch 的独立书库：空树同步后首页为空。
   await page.goto('./#/');
   await expect(page.getByText('暂无文档，点「更新目录」同步仓库')).toBeVisible();
 
-  // 切回 interview：原书库的 3 篇文档仍在。
+  // 切回 your-notes：原书库的 3 篇文档仍在。
   await goToSettings(page, 'account');
-  await page.locator('.settings-repo-row').filter({ hasText: 'interview' }).getByRole('radio').check();
+  await page.locator('.settings-repo-row').filter({ hasText: 'your-notes' }).getByRole('radio').check();
   await page.waitForURL(/#\/settings\/account$/);
-  await expect(page.getByLabel('仓库名')).toHaveValue('interview');
+  await expect(page.getByLabel('仓库名')).toHaveValue('your-notes');
   await page.goto('./#/');
   await expect(page.locator('.tree-item')).toHaveCount(3);
 
-  // 删除非当前仓库 notes（本机独立库一并回收）。
+  // 删除非当前仓库 scratch（本机独立库一并回收）。
   await goToSettings(page, 'account');
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: '删除仓库 notes' }).click();
+  await page.getByRole('button', { name: '删除仓库 scratch' }).click();
   await expect(page.getByText('仓库已删除')).toBeVisible();
-  await expect(page.locator('.settings-repo-row-name')).toHaveText(['interview']);
+  await expect(page.locator('.settings-repo-row-name')).toHaveText(['your-notes']);
 });
 
 test('设置页：清除全部数据需二次确认，确认后清空并回引导页', async ({ page }) => {
@@ -225,7 +225,7 @@ test('设置首页：连接状态卡 + 分组导航进入二级页并可返回',
 
   // 连接状态卡：仓库、分支、掩码 Token 与一键同步
   await expect(page.getByText('GitHub 连接')).toBeVisible();
-  await expect(page.getByText('vaddenz / interview')).toBeVisible();
+  await expect(page.getByText('your-name / your-notes')).toBeVisible();
   await expect(page.locator('.settings-connect-token')).toHaveText('ghp_e2e_fake…oken');
   await expect(page.getByRole('button', { name: '立即同步' })).toBeVisible();
 

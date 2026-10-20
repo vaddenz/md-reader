@@ -15,7 +15,7 @@
 | `npm run typecheck` | ✅ 无类型错误 |
 | `npm run build` | ✅ 构建成功（3.82s）；PWA 预缓存 71 项 / 3845.53 KiB；mermaid chunk >500kB 为已知观察项（动态加载，不影响使用） |
 | `npm run test:e2e` | ✅ 24 个用例全部通过（11.3s；Playwright + mock `api.github.com`，不触网） |
-| `npm run corpus -- ~/workspace/src/interview` | ✅ files 43 / totalBytes 3710796 / headings 3108 / anchorLinks 1042 / unresolved 0 / markCount 0 / mermaidBlocks 212（29 篇）—— 体检通过 |
+| `npm run corpus -- ~/workspace/src/your-notes` | ✅ files 43 / totalBytes 3710796 / headings 3108 / anchorLinks 1042 / unresolved 0 / markCount 0 / mermaidBlocks 212（29 篇）—— 体检通过 |
 
 e2e 覆盖场景（`tests/e2e/`）：引导配置 Token（`auth.spec`）→ 自动同步 → 阅读 / TOC / mermaid / 互链 / 返回来源（`reader.spec`）→ 搜索直达（`search.spec`）→ 收藏与进度恢复（`progress.spec`）→ 离线可读可搜（`offline.spec`）→ 401 重新授权且缓存保留（`auth.spec`）→ 缓存过期清理与按需重下（`expiry.spec`）→ PWA / manifest / noindex（`pwa.spec`）→ 设置与清除数据（`settings.spec`）。
 
@@ -32,9 +32,9 @@ e2e 覆盖场景（`tests/e2e/`）：引导配置 Token（`auth.spec`）→ 自�
 | 7 | 搜索「MVCC」命中多篇、直达并高亮；「gVisor 沙箱」AND 语义正确 | ✅ 用户验收通过（2026-10-18） | 操作：搜索「MVCC」应命中多篇，点结果直达并高亮命中处；搜索「gVisor 沙箱」应只命中同时包含两个词的文档。（自动化兜底：e2e `search.spec` 直达高亮、unit `search.test.ts` 中文子串 / AND / 排序） |
 | 8 | 收藏 2 篇；阅读进度滚到中部退出重开，恢复误差 ≤5% | ✅ 用户验收通过（2026-10-18） | 操作：星标 2 篇（首页出现收藏区）；长文档滚到中部后退出重开，应恢复到原位置附近。（自动化兜底：e2e `progress.spec` 断言恢复 ±5% 与收藏区） |
 | 9 | PWA：添加到主屏幕 → 独立窗口打开 → 离线可启动 | ✅ | P0 阶段手机验收（2026-10-18：可添加到主屏幕、图标正常）；e2e `pwa.spec`（SW 注册 / 接管 / 预缓存、manifest `display: standalone`、noindex）、`offline.spec`（离线可启动可读）。主屏启动即为独立窗口（依据 manifest `display: standalone` 断言与 P0 主屏验收，未单独复看）。 |
-| 10 | 内容更新：push 一篇修改 → 手机自动增量同步（请求数可见于同步状态页） | ✅ 用户验收通过（2026-10-18）（本项未单独复验；自动化证据见备注） | 操作：在电脑上向 interview 仓库 push 一篇小改动 → 手机打开应用确认自动同步（「上次同步」时间刷新，且仅该篇被更新）。备注（自动化证据，非真机）：unit `diff.test.ts`（四态）/ `sync.test.ts`（增量只下载变更、处理删除；按 sha 跳过已写入，天然断点续传）；e2e `reader.spec`（自动同步仅触发一次）、`settings.spec`（「立即同步」）、`offline.spec`（恢复在线自动补同步）；mock `syncCalls` 为请求数的自动化口径；P1 阶段手机验收仅覆盖全量 43 篇同步，未验证增量场景。 |
+| 10 | 内容更新：push 一篇修改 → 手机自动增量同步（请求数可见于同步状态页） | ✅ 用户验收通过（2026-10-18）（本项未单独复验；自动化证据见备注） | 操作：在电脑上向默认仓库 push 一篇小改动 → 手机打开应用确认自动同步（「上次同步」时间刷新，且仅该篇被更新）。备注（自动化证据，非真机）：unit `diff.test.ts`（四态）/ `sync.test.ts`（增量只下载变更、处理删除；按 sha 跳过已写入，天然断点续传）；e2e `reader.spec`（自动同步仅触发一次）、`settings.spec`（「立即同步」）、`offline.spec`（恢复在线自动补同步）；mock `syncCalls` 为请求数的自动化口径；P1 阶段手机验收仅覆盖全量 43 篇同步，未验证增量场景。 |
 | 11 | Token 失效：提示重新授权，本地缓存不清 | ✅ | e2e `auth.spec`（同步遇 401 → 跳转 `#/setup?reauth=1` 提示重新授权，本地缓存保留）、`reader.spec`（401 不写入 Token）；错误文案 unit `errors.test.ts`。 |
-| 12 | 性能：打开最大文档（130KB + 多图）滚动流畅，无明显卡顿 | ✅ 用户验收通过（2026-10-18） | 操作：打开最大文档（如《智能体/智能体沙箱.md》156KB、《大模型本地部署调优与服务面试题库_2026年9月.md》131KB），快速上下滚动确认流畅、无明显卡顿。 |
+| 12 | 性能：打开最大文档（130KB + 多图）滚动流畅，无明显卡顿 | ✅ 用户验收通过（2026-10-18） | 操作：打开最大文档（如《智能体/智能体沙箱.md》156KB，以及另一篇 131KB 的长文档），快速上下滚动确认流畅、无明显卡顿。 |
 | 13 | 过期清理：将某篇文档的 `lastUsedAt` 调整为 8 天前并重启应用 → 目录显示「未缓存」→ 点击后自动下载并正常阅读 | ✅ | e2e `expiry.spec`：`expireDoc` 置 8 天前 → reload 触发 `sweepExpired` → 正文置空 + 目录「未缓存」徽标 → 点击按需下载并写回；另覆盖过期文档离线提示与「纳入全文搜索」。 |
 | 14 | 目录手动更新：仓库 push 一篇修改 → 手机点「更新目录」→ 仅该篇增量更新；未缓存文档不会被同步重新下载 | ✅ 用户验收通过（2026-10-18） | 操作：仓库推送一篇修改 → 点同步徽标旁的「更新目录」→ 确认仅该篇更新，此前「未缓存」的文档不应被自动下载。（自动化兜底：unit `sync.test.ts`「过期文档：sha 变化只更新记录、不下载」、`diff.test.ts`） |
 

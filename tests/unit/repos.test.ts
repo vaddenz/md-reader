@@ -34,7 +34,7 @@ describe('sanitizeRepoState', () => {
     expect(sanitizeRepoState(null)).toEqual(defaultRepoState());
     expect(sanitizeRepoState([])).toEqual(defaultRepoState());
     expect(sanitizeRepoState({ owner: '', repos: [] })).toMatchObject({
-      owner: 'vaddenz', activeRepoId: 'default',
+      owner: 'your-name', activeRepoId: 'default',
     });
   });
 
@@ -110,7 +110,7 @@ describe('仓库配置读写', () => {
 
     expect(setActiveRepo(notes.id).activeRepoId).toBe(notes.id);
     expect(activeRepo().repo).toBe('handbook');
-    expect(removeRepo(notes.id).repos).toEqual([{ id: 'default', repo: 'interview', branch: 'main' }]);
+    expect(removeRepo(notes.id).repos).toEqual([{ id: 'default', repo: 'your-notes', branch: 'main' }]);
     expect(() => removeRepo('default')).toThrow('至少保留一个仓库');
   });
 

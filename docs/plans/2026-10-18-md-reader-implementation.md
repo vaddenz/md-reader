@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 构建一个个人自用的 PWA 阅读器：用浏览器舒适地阅读私有 GitHub 仓库 `vaddenz/interview` 中的 Markdown（中文排版 / mermaid / 图片 / 搜索 / 离线 / 灵活目录跳转）。
+**Goal:** 构建一个个人自用的 PWA 阅读器：用浏览器舒适地阅读私有 GitHub 仓库 `your-name/your-notes` 中的 Markdown（中文排版 / mermaid / 图片 / 搜索 / 离线 / 灵活目录跳转）。
 
 **Architecture:** 纯静态前端（React + Vite），hash 路由；内容通过 Fine-grained PAT 直连 `api.github.com` 按 git blob SHA 增量同步到 IndexedDB，全量离线可用；渲染内核 markdown-it（工程配置已按真实语料校准，见 Spec §2）；部署于 GitHub Pages。
 
@@ -169,7 +169,7 @@ export default defineConfig({
 ```ts
 // src/constants.ts
 export const APP_TITLE = '知识库';
-export const DEFAULT_REPO = { owner: 'vaddenz', repo: 'interview', branch: 'main' } as const;
+export const DEFAULT_REPO = { owner: 'your-name', repo: 'your-notes', branch: 'main' } as const;
 ```
 
 ```tsx
@@ -236,7 +236,7 @@ import { APP_TITLE, DEFAULT_REPO } from '../../src/constants';
 describe('常量', () => {
   it('标题与默认仓库配置就绪', () => {
     expect(APP_TITLE).toBe('知识库');
-    expect(DEFAULT_REPO).toEqual({ owner: 'vaddenz', repo: 'interview', branch: 'main' });
+    expect(DEFAULT_REPO).toEqual({ owner: 'your-name', repo: 'your-notes', branch: 'main' });
   });
 });
 ```
@@ -961,7 +961,7 @@ export const useToken = () => useContext(Ctx);
 - [ ] **Step 3: 实现 `src/pages/SetupPage.tsx`（含创建指引与校验）**
 
 要点（完整实现按此结构）：
-- 未登录时展示 4 步图文指引：打开 GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained**；`Repository access` 选 `vaddenz/interview`；`Permissions → Contents: Read-only`；生成后粘贴。
+- 未登录时展示 4 步图文指引：打开 GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained**；`Repository access` 选 `your-name/your-notes`；`Permissions → Contents: Read-only`；生成后粘贴。
 - 输入框 >「验证并保存」按钮：`new GitHubClient(token).getUser()` 成功 → `setToken` → `kvSet('config', DEFAULT_REPO)`（若不存在）→ `navigate(HOME)`；失败按 `GitHubError.kind` 显示对应文案（auth=「Token 无效」，network=「网络不可用」）。
 - 页脚声明：「本应用仅供个人自用（非通用 Markdown 阅读器）」。
 
@@ -1568,7 +1568,7 @@ export function renderDoc(src: string, opts: RenderOptions): { html: string; hea
 
 ```bash
 npx vitest run tests/unit/render.test.ts
-# 追加 tests/unit/render-corpus.test.ts（可选、本地有语料时跑）：读取 ../interview 目录渲染全部 md，
+# 追加 tests/unit/render-corpus.test.ts（可选、本地有语料时跑）：读取 ../your-notes 目录渲染全部 md，
 # 断言：= 0 个 <mark> 出现在非预期文本（直接统计总数应与语料中 == 高亮用法一致，语料当前为 0）、
 # 断言 mermaid div 数量 = 语料 ```mermaid 出现处数（29 文件）。
 ```
@@ -1797,7 +1797,7 @@ DocPage：进入前（导航离开时 via `useBlocker`? 简化：滚动节流写
 
 - [ ] **Step 2: 写 e2e fixtures（mock GitHub API）**
 
-要点：`page.route('https://api.github.com/**')`；按 URL 分发：`/user` → `{login:'vaddenz'}`（`failAuth` 时 401）；`/repos/vaddenz/interview` → `{default_branch:'main'}`；`/git/trees/main?recursive=1` → fixture 树（文档：`a.md`、`深挖/b.md`（含 mermaid + 互链 + 高亮/删除线）、`长文档.md`（20 个标题））；`/git/blobs/<sha>` → 对应内容文本。fixture 内容用中文，含 `# 标题`、`## 标题`（重复）、`==高亮==`、`~~删除~~`、mermaid 块、`[去 b](深挖/b.md)`、`](#标题)`。
+要点：`page.route('https://api.github.com/**')`；按 URL 分发：`/user` → `{login:'vaddenz'}`（`failAuth` 时 401）；`/repos/your-name/your-notes` → `{default_branch:'main'}`；`/git/trees/main?recursive=1` → fixture 树（文档：`a.md`、`深挖/b.md`（含 mermaid + 互链 + 高亮/删除线）、`长文档.md`（20 个标题））；`/git/blobs/<sha>` → 对应内容文本。fixture 内容用中文，含 `# 标题`、`## 标题`（重复）、`==高亮==`、`~~删除~~`、mermaid 块、`[去 b](深挖/b.md)`、`](#标题)`。
 
 - [ ] **Step 3: 写 `reader.spec.ts`（P2 全链路）**
 
@@ -2076,7 +2076,7 @@ git add -A && git commit -m "test: e2e 全场景（离线/失效授权/PWA）"
 
 - [ ] **Step 1: 写 `scripts/corpus.mjs`**
 
-用法：`npm run corpus -- ~/workspace/src/interview`。实现：遍历 `*.md` → 用 `github-slugger` 与行级解析校验全部 `](#...)` 链接（复用本计划 §2-1 方法）→ `markdown-it`+`mark` 渲染统计 `<mark>` 数 → 统计 mermaid fence 数 → 输出报表；失败项非零退出。
+用法：`npm run corpus -- ~/workspace/src/your-notes`。实现：遍历 `*.md` → 用 `github-slugger` 与行级解析校验全部 `](#...)` 链接（复用本计划 §2-1 方法）→ `markdown-it`+`mark` 渲染统计 `<mark>` 数 → 统计 mermaid fence 数 → 输出报表；失败项非零退出。
 
 ```js
 // scripts/corpus.mjs（核心逻辑）
@@ -2096,12 +2096,12 @@ if (!root) { console.error('用法: npm run corpus -- <markdown 目录>'); proce
 
 - [ ] **Step 2: 写 `scripts/conformance.mjs`（可选工具）**
 
-用法：`GH_TOKEN=xxx npm run conformance -- <仓库内 md 相对路径>`；`POST /markdown`? 不——用 `GET /repos/{o}/{r}/contents/{path}` + `Accept: application/vnd.github.html+json` 拿官方 HTML → 提取 `<a id="user-content-…">` 的 slug 集合（去前缀）→ 与本地 `github-slugger` 生成集合比对 → 输出差异。需要 `conformance.mjs` 内解析目标仓库 owner/repo/ref（默认 `vaddenz/interview@main`，可用环境变量覆盖）。
+用法：`GH_TOKEN=xxx npm run conformance -- <仓库内 md 相对路径>`；`POST /markdown`? 不——用 `GET /repos/{o}/{r}/contents/{path}` + `Accept: application/vnd.github.html+json` 拿官方 HTML → 提取 `<a id="user-content-…">` 的 slug 集合（去前缀）→ 与本地 `github-slugger` 生成集合比对 → 输出差异。需要 `conformance.mjs` 内解析目标仓库 owner/repo/ref（默认 `your-name/your-notes@main`，可用环境变量覆盖）。
 
 - [ ] **Step 3: 运行实测**
 
 ```bash
-npm run corpus -- ~/workspace/src/interview   # 期望：unresolved=0；mark 计数=0；mermaid 块 29 文件命中
+npm run corpus -- ~/workspace/src/your-notes   # 期望：unresolved=0；mark 计数=0；mermaid 块 29 文件命中
 GH_TOKEN=$(gh auth token) npm run conformance -- AGENTS.md   # 期望：slug 差异 0
 ```
 

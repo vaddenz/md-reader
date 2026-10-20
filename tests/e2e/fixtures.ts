@@ -6,8 +6,8 @@ import { expect, type Page } from '@playwright/test';
  * 另附 IndexedDB 直读/直改辅助（P4 过期与缓存保留用例）。
  */
 
-const OWNER = 'vaddenz';
-const REPO = 'interview';
+const OWNER = 'your-name';
+const REPO = 'your-notes';
 const BRANCH = 'main';
 
 export interface GitHubMockOptions {

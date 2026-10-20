@@ -1,7 +1,7 @@
 // scripts/conformance.mjs — 渲染对拍（可选工具）：拿 GitHub 官方渲染的标题 slug 与本地 github-slugger 对比。
 // 用法：GH_TOKEN=xxx npm run conformance -- <仓库内 md 相对路径>
 // 环境变量：
-//   REPO  — 目标仓库，默认 vaddenz/interview，可写成 owner/repo@ref
+//   REPO  — 目标仓库，默认 your-name/your-notes，可写成 owner/repo@ref
 //   REF   — 目标分支/标签，默认 main
 //   LOCAL — 本地 clone 根目录（指定后原文从本地读取，HTML 仍从 GitHub 拉取）
 // 退出码：0 = 无差异；1 = slug 集合有差异；2 = 用法/环境/网络错误。
@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import GithubSlugger from 'github-slugger';
 
 const USAGE = '用法: GH_TOKEN=xxx npm run conformance -- <仓库内 md 相对路径>';
-const DEFAULT_REPO = 'vaddenz/interview';
+const DEFAULT_REPO = 'your-name/your-notes';
 const DEFAULT_REF = 'main';
 
 const token = process.env.GH_TOKEN;
