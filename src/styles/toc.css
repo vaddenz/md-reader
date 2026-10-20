@@ -30,3 +30,12 @@
   background: rgba(31, 63, 212, 0.08);
   font-weight: 600;
 }
+
+/* 无 h1–h4 标题时的目录空态 */
+.toc-empty {
+  margin: 0;
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--ink2);
+  font-size: 14px;
+}

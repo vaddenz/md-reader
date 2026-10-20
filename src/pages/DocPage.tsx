@@ -169,7 +169,7 @@ export default function DocPage() {
   const ready = rendered !== null;
   const html = rendered?.html ?? '';
 
-  // 目录抽屉只列 h1–h4（brief 约定）；没有这样的标题时不显示入口。
+  // 目录抽屉只列 h1–h4（brief 约定）；无标题时入口仍显示，抽屉内呈现空态（2026-10-20 用户裁定）。
   const tocHeadings = useMemo(
     () => (rendered?.headings ?? []).filter((h) => h.level <= 4),
     [rendered],
@@ -540,7 +540,7 @@ export default function DocPage() {
         onFlipOrientation={flip}
         remember={remember}
       />
-      {ready && tocHeadings.length > 0 && !tocOpen && (
+      {ready && !tocOpen && (
         <FloatingTocButton onOpen={openToc} />
       )}
       {from && <BackToSource />}
