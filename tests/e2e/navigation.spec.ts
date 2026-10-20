@@ -41,6 +41,17 @@ test('返回语义：设置返回回到来源页（阅读页/首页）', async (
   await expect(page).toHaveURL(/#\/doc\//);
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
+  // 设置二级页：先返回设置首页，再回到来源页（阅读页）
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('link', { name: /数据管理/ }).click();
+  await expect(page).toHaveURL(/#\/settings\/data$/);
+  await page.getByRole('button', { name: '返回设置' }).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page).toHaveURL(/#\/doc\//);
+  await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
+
   // 阅读页顶栏返回 → 回首页；首页 → ⚙ → 返回 → 回首页
   await page.getByRole('button', { name: '返回首页' }).click();
   await expect(page).toHaveURL(/#\/$/);

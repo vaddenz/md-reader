@@ -114,7 +114,7 @@ test('退出全屏后重新应用锁定（静默）', async ({ page }) => {
 test('设置页三态单选与头部同步', async ({ page }) => {
   await stubOrientation(page);
   await configureAndSync(page);
-  await page.goto('./#/settings');
+  await page.goto('./#/settings/reading');
   await page.getByRole('radio', { name: '横屏', exact: true }).check();
   await expect.poll(() => page.evaluate(() => (window as any).__lockCalls)).toContain('landscape-primary');
 });

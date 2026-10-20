@@ -1,5 +1,5 @@
-/* 设置页（T21 · 风格刷新）：iOS 分组卡——组标签 + 白卡行。
-   结构、aria-labelledby id、getByRole 控件名与既有 settings / appearance 类名全部不动，纯 CSS 换装。 */
+/* 设置页（分组重构）：设置首页 = 连接状态卡 + 分组导航；二级页沿用 iOS 式软影白卡。
+   视觉令牌全部取自 base.css；浅蓝只给链接、主操作与状态图形。 */
 
 .settings {
   max-width: 640px;
@@ -7,17 +7,25 @@
   padding: 16px 16px calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
+/* ---------- 页头（首页与二级页共用） ---------- */
+
+.settings-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 .settings-back {
   display: inline-flex;
   align-items: center;
+  gap: 2px;
   min-height: 32px;
-  color: var(--acc-text);
-  font-size: 14px;
-  text-decoration: none;
-  padding: 0;
+  padding: 0 2px 0 0;
   border: 0;
   background: none;
-  font-family: inherit;
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -26,8 +34,241 @@
   font-size: 24px;
 }
 
-/* 区块 = 软影白卡；h2 作卡内组标签（结构不动，aria 不动）。
-   边框整圈去掉（brief 的 border-top: 0 会留下三面边框，与「白卡 + 软影」相悖）。 */
+.settings-lede {
+  margin: 2px 0 0;
+  color: var(--ink2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* ---------- 设置首页：GitHub 连接状态卡 ---------- */
+
+.settings-connect {
+  margin: 18px 0 0;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.settings-connect-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 14px 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.settings-connect-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(31, 63, 212, 0.08);
+  color: var(--acc-text);
+}
+
+.settings-connect-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-connect-eyebrow {
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.settings-connect-repo {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-connect-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  color: var(--ink2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.settings-connect-token {
+  overflow: hidden;
+  padding: 0;
+  background: none;
+  color: var(--ink2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-connect-chevron {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink2);
+}
+
+/* 连接卡底部：同步状态 + 立即同步（与卡内链接分行，避免嵌套交互元素） */
+.settings-connect-sync {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--ink2);
+  font-size: 12.5px;
+}
+
+.settings-connect-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7d868f;
+}
+
+.settings-dot-offline { background: #b87200; }
+.settings-dot-error { background: #d1242f; }
+.settings-dot-syncing {
+  background: transparent;
+  border: 2px solid var(--acc);
+  border-top-color: transparent;
+  animation: settings-rotate 0.8s linear infinite;
+}
+
+@keyframes settings-rotate {
+  to { transform: rotate(360deg); }
+}
+
+.settings-sync-btn {
+  flex: none;
+  min-height: 32px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--shell);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-sync-btn:disabled {
+  color: #8b949e;
+  cursor: default;
+}
+
+/* ---------- 设置首页：分组导航 ---------- */
+
+.settings-nav {
+  margin: 0;
+}
+
+.settings-groups-label {
+  margin: 22px 4px 8px;
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.settings-groups {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  list-style: none;
+}
+
+.settings-groups > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.settings-group-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.settings-group-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-ctl);
+  background: var(--shell);
+  color: var(--ink2);
+}
+
+.settings-group-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-group-title {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.settings-group-sub {
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-group-chevron {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink2);
+}
+
+.settings-privacy {
+  margin: 24px 4px 0;
+  color: var(--ink2);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---------- 二级页：iOS 式分组卡 ---------- */
+
 .settings-section {
   margin: 18px 0 0;
   padding: 6px 16px 16px;
@@ -39,9 +280,9 @@
 
 .settings-section > h2 {
   margin: 10px 0 6px;
+  color: var(--ink2);
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--ink2);
   letter-spacing: 0.04em;
 }
 
@@ -64,10 +305,8 @@
 }
 .settings-section input[type='range'] { accent-color: var(--acc); }
 
-/* 按钮分层（以文件现状选择器为准逐个核对）：
-   - 默认 = 主按钮：实心浅蓝白字 → 表单提交「验证并保存」「保存」；
-   - 行内工具按钮降为灰底幽灵：token 行（更换/取消更换/清除）、同步行（立即同步/导出高亮/导入高亮）；
-   - 危险区按钮以更特异选择器压回红字描边（见 .settings-danger .settings-danger-btn，免 !important）。 */
+/* 按钮分层：默认 = 主按钮（表单提交）；行内工具按钮降为灰底幽灵；
+   危险区按钮以更特异选择器压回红字描边。 */
 .settings-section button {
   min-height: 36px;
   padding: 0 14px;
@@ -104,7 +343,6 @@
   overflow-wrap: anywhere;
 }
 
-/* 尺寸沿用现状（紧凑行），颜色走通用按钮分层 */
 .settings-token-row button {
   min-height: 32px;
   padding: 0 12px;
@@ -179,15 +417,12 @@
 .settings-sync-row button:disabled { color: #8b949e; cursor: default; }
 .settings-sync-row .settings-note { margin: 0; }
 
-/* 阅读外观（T3）：实时预览（控件样式 T4 起抽到 appearance.css，随 AppearanceControls 引入） */
-/* settings.css 在构建产物中先于 content.css，等特异性下会被 .doc-content 覆盖，
-   故这里带上 .doc-content 提升特异性（布局覆盖必须生效，仅新属性如边框不冲突）。 */
+/* 阅读外观：实时预览（控件样式在 appearance.css，随 AppearanceControls 引入） */
 .doc-content.appearance-preview { max-width: none; margin: 12px 0 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--r-ctl); }
 .appearance-preview > :first-child { margin-top: 0; }
 .appearance-preview > :last-child { margin-bottom: 0; }
 
-/* 危险区：与其他区块同为白卡，靠红字组标签 + 红字描边按钮示警（去掉旧的粉底）。
-   选择器压过通用 .settings-section button（0,2,0 > 0,1,1），等价于 brief 的 !important 但更可组合。 */
+/* 危险区：与其他区块同为白卡，靠红字组标签 + 红字描边按钮示警。 */
 .settings-danger h2 { color: var(--danger); }
 
 .settings-danger .settings-danger-btn {
@@ -204,7 +439,9 @@
 }
 .settings-danger-btn:disabled { border-color: var(--line); color: #8b949e; cursor: default; }
 
-/* 关于 */
+/* 关于（页面标题已表达主题，卡内不再重复组标签） */
+.settings-about { padding-top: 16px; }
+
 .settings-version {
   margin: 0 0 8px;
   color: var(--ink2);
@@ -228,9 +465,16 @@
 
 @media (hover: hover) {
   .settings-back:hover { text-decoration: underline; }
+  .settings-connect-link:hover,
+  .settings-group-link:hover { background: var(--shell); }
+  .settings-sync-btn:not(:disabled):hover,
   .settings-token-row button:not(:disabled):hover,
   .settings-sync-row button:not(:disabled):hover { background: var(--line); }
   .settings-token-form button:not(:disabled):hover,
   .settings-repo-form button:not(:disabled):hover { background: #1932aa; /* 主按钮悬停：accent 暗 20% */ }
   .settings-danger-btn:not(:disabled):hover { background: rgba(192, 57, 43, 0.07); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-dot-syncing { animation: none; }
 }

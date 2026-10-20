@@ -33,7 +33,7 @@ test('未设置外观时保持现状口径（17px / 400 / 0.95 / 1）', async ({
 
 test('字体粗细：设置页与阅读页生效、刷新持久化', async ({ page }) => {
   await configureAndSync(page);
-  await page.goto('./#/settings');
+  await page.goto('./#/settings/reading');
 
   const section = page.locator('section', { has: page.getByRole('heading', { name: '阅读外观' }) });
   await expect(section).toBeVisible();
@@ -72,7 +72,7 @@ test('字体粗细：设置页与阅读页生效、刷新持久化', async ({ pa
 
 test('设置页调整外观：预览联动、防抖持久化、阅读页生效', async ({ page }) => {
   await configureAndSync(page);
-  await page.goto('./#/settings');
+  await page.goto('./#/settings/reading');
 
   const section = page.locator('section', { has: page.getByRole('heading', { name: '阅读外观' }) });
   await expect(section).toBeVisible();
@@ -102,7 +102,7 @@ test('设置页调整外观：预览联动、防抖持久化、阅读页生效',
 
 test('设置分组卡皮肤：区块为软影白卡、单选选中为浅蓝', async ({ page }) => {
   await configureAndSync(page);
-  await page.goto('./#/settings');
+  await page.goto('./#/settings/reading');
   const section = page.locator('section', { has: page.getByRole('heading', { name: '阅读外观' }) });
   await expect(section).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(section).toHaveCSS('border-radius', '14px');

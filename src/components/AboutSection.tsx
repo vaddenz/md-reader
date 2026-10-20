@@ -6,9 +6,7 @@ import pkg from '../../package.json';
  */
 export default function AboutSection() {
   return (
-    <section className="settings-section settings-about" aria-labelledby="settings-about-title">
-      <h2 id="settings-about-title">关于</h2>
-
+    <section className="settings-section settings-about" aria-label="关于">
       <p className="settings-version">
         版本 <code>v{pkg.version}</code>
       </p>

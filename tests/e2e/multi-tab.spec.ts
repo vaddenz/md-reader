@@ -155,6 +155,8 @@ test('清除全部数据后标签清空（不复活、不写回）', async ({ pa
   await page.getByRole('button', { name: '返回首页' }).click(); // 顶栏返回 = 回首页（标签保留）
   await page.getByRole('link', { name: '设置' }).click();
   await expect(page).toHaveURL(/#\/settings/);
+  await page.getByRole('link', { name: /数据管理/ }).click();
+  await expect(page).toHaveURL(/#\/settings\/data$/);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: '清除全部数据' }).click();
   await page.waitForURL(/#\/setup$/);

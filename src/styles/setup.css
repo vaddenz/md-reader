@@ -1,0 +1,321 @@
+/* 首次引导 / 重新授权页：品牌页头 + Token 表单卡 + 可折叠创建指南。
+   与设置页共享暖灰壳底、白卡软影与浅蓝主操作；表单输入 16px 防 iOS 聚焦缩放。 */
+
+.setup {
+  display: flex;
+  justify-content: center;
+  min-height: 100svh;
+  padding: clamp(28px, 7vh, 64px) 16px calc(32px + env(safe-area-inset-bottom, 0px));
+  background: var(--shell);
+}
+
+.setup-panel {
+  width: 100%;
+  max-width: 520px;
+}
+
+/* ---------- 页头 ---------- */
+
+.setup-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.setup-mark {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.setup-title {
+  margin: 16px 0 0;
+  font-size: 24px;
+  line-height: 1.35;
+}
+
+.setup-lede {
+  max-width: 100%;
+  margin: 8px 0 0;
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* 重新授权提示：暖黄 highlight 令牌作告警底，文字仍用墨色保证对比度 */
+.setup-reauth {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-ctl);
+  background: var(--hl-yellow);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.setup-reauth-icon {
+  flex: none;
+  display: inline-flex;
+  margin-top: 1px;
+  color: var(--ink);
+}
+
+/* ---------- Token 表单 ---------- */
+
+.setup-card {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.setup-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.setup-label {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.setup-help-link {
+  color: var(--acc-text);
+  font-size: 12.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.setup-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--card);
+}
+
+.setup-input-wrap:focus-within {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.setup-input-invalid { border-color: var(--danger); }
+
+.setup-input-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--ink2);
+}
+
+.setup-input-wrap input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* ≥16px：iOS 聚焦时不放大页面 */
+}
+
+.setup-input-wrap input:focus-visible { outline: none; }
+
+.setup-input-wrap input::placeholder { color: var(--ink2); }
+
+.setup-input-wrap input:disabled { color: var(--ink2); }
+
+.setup-reveal {
+  flex: none;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.setup-reveal:disabled { color: #8b949e; cursor: default; }
+
+.setup-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--acc-fill);
+  color: #ffffff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.setup-submit:disabled {
+  background: #8b949e;
+  cursor: default;
+}
+
+.setup-error {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.setup-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 12px 0 0;
+  color: var(--ink2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.setup-privacy svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ---------- 创建指南（可折叠） ---------- */
+
+.setup-guide { padding: 0 16px; }
+
+.setup-guide-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.setup-guide-summary::-webkit-details-marker { display: none; }
+
+.setup-guide-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.setup-guide-meta {
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-guide-chevron {
+  flex: none;
+  color: var(--ink2);
+  transition: transform 0.18s ease;
+}
+
+.setup-guide[open] .setup-guide-chevron {
+  transform: rotate(90deg);
+}
+
+.setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 14px 0 14px;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.setup-steps li {
+  display: flex;
+  gap: 10px;
+}
+
+.setup-step-num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(31, 63, 212, 0.08);
+  color: var(--acc-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.setup-step-text { min-width: 0; }
+
+.setup-step-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.setup-step-body {
+  margin: 2px 0 0;
+  color: var(--ink2);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.setup-step-body code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+/* ---------- 页脚 ---------- */
+
+.setup-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 6px;
+  margin-top: 22px;
+  color: var(--ink2);
+  font-size: 11.5px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+@media (max-width: 380px) {
+  .setup-guide-meta { display: none; }
+}
+
+@media (hover: hover) {
+  .setup-help-link:hover,
+  .setup-reveal:not(:disabled):hover { text-decoration: underline; }
+  .setup-submit:not(:disabled):hover { background: #1932aa; /* accent 暗 20% */ }
+  .setup-guide-summary:hover .setup-guide-title { color: var(--acc-text); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-guide-chevron { transition: none; }
+}

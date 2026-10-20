@@ -24,16 +24,27 @@ async function readConfig(page: Page): Promise<unknown> {
   );
 }
 
+type SettingsSection = 'account' | 'reading' | 'data' | 'about';
+
+const SECTION_TITLES: Record<SettingsSection, string> = {
+  account: '账户与仓库',
+  reading: '阅读体验',
+  data: '数据管理',
+  about: '关于',
+};
+
 /** SPA 内切换路由（仅改 hash，不整页刷新，保留内存中的同步状态）。 */
-async function goToSettings(page: Page): Promise<void> {
-  await page.evaluate(() => { window.location.hash = '#/settings'; });
-  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+async function goToSettings(page: Page, section?: SettingsSection): Promise<void> {
+  const hash = section ? `#/settings/${section}` : '#/settings';
+  await page.evaluate((h) => { window.location.hash = h; }, hash);
+  await expect(page.getByRole('heading', { name: section ? SECTION_TITLES[section] : '设置' })).toBeVisible();
 }
 
 test('设置页：Token 掩码显示；更换需校验成功后写入', async ({ page }) => {
   const oldToken = 'ghp_e2e_fake_token_1234';
   await installGitHubMock(page, { token: oldToken });
-  await page.goto('./#/settings');
+  await page.goto('./#/settings/account');
+  await expect(page.getByRole('heading', { name: '账户与仓库' })).toBeVisible();
 
   // 掩码：只显示前缀与末 4 位，完整值不出现在页面上
   await expect(page.locator('.settings-token')).toHaveText('ghp_e2e_fake…1234');
@@ -60,7 +71,7 @@ test('设置页：Token 掩码显示；更换需校验成功后写入', async ({
 
 test('设置页：仓库配置需「保存」才写入（trim 后生效）', async ({ page }) => {
   await configureAndSync(page);
-  await goToSettings(page);
+  await goToSettings(page, 'account');
 
   const owner = page.getByLabel('Owner');
   await expect(owner).toHaveValue('vaddenz');
@@ -73,7 +84,7 @@ test('设置页：仓库配置需「保存」才写入（trim 后生效）', asy
 
   // 保存：trim 后写入
   await page.getByRole('button', { name: '保存' }).click();
-  await expect(page.getByText('已保存')).toBeVisible();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   expect(await readConfig(page)).toEqual({ owner: 'other', repo: 'interview', branch: 'main' });
   await expect(owner).toHaveValue('other');
 
@@ -86,12 +97,12 @@ test('设置页：仓库配置需「保存」才写入（trim 后生效）', asy
 
 test('设置页：清除全部数据需二次确认，确认后清空并回引导页', async ({ page }) => {
   await configureAndSync(page);
-  await goToSettings(page);
+  await goToSettings(page, 'data');
 
-  // 取消确认：数据保留，停留设置页
+  // 取消确认：数据保留，停留数据管理页
   page.once('dialog', (d) => d.dismiss());
   await page.getByRole('button', { name: '清除全部数据' }).click();
-  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page).toHaveURL(/#\/settings\/data$/);
   expect(await page.evaluate(() => localStorage.getItem('mdreader.token'))).toBe('ghp_e2e_fake_token');
 
   // 确认：清空 IndexedDB + Token → 引导页
@@ -124,13 +135,14 @@ test('设置页：清除全部数据需二次确认，确认后清空并回引�
 
 test('设置页：立即同步与存储统计', async ({ page }) => {
   const mock = await configureAndSync(page);
-  await goToSettings(page);
 
-  // 存储统计：3 篇全部已缓存 + 体积文案
+  // 数据管理：存储统计 3 篇全部已缓存 + 体积文案
+  await goToSettings(page, 'data');
   await expect(page.getByText('已缓存 3 篇 / 未缓存 0 篇')).toBeVisible();
   await expect(page.getByText(/已用 .+ \/ 配额 /)).toBeVisible();
 
-  // 立即同步：目录请求 +1，完成后显示「上次同步：刚刚」
+  // 账户与仓库：立即同步 → 目录请求 +1，完成后显示「上次同步：刚刚」
+  await goToSettings(page, 'account');
   const before = mock.syncCalls();
   await page.getByRole('button', { name: '立即同步' }).click();
   await expect.poll(() => mock.syncCalls()).toBe(before + 1);
@@ -143,4 +155,32 @@ test('首页「设置」入口：点击进入设置页', async ({ page }) => {
   await page.getByRole('link', { name: '设置' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+});
+
+test('设置首页：连接状态卡 + 分组导航进入二级页并可返回', async ({ page }) => {
+  await configureAndSync(page);
+  await page.goto('./#/settings');
+
+  // 连接状态卡：仓库、分支、掩码 Token 与一键同步
+  await expect(page.getByText('GitHub 连接')).toBeVisible();
+  await expect(page.getByText('vaddenz / interview')).toBeVisible();
+  await expect(page.locator('.settings-connect-token')).toHaveText('ghp_e2e_fake…oken');
+  await expect(page.getByRole('button', { name: '立即同步' })).toBeVisible();
+
+  // 分组导航：三项进入各自二级页
+  await expect(page.getByRole('link', { name: /阅读体验/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /数据管理/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /关于/ })).toBeVisible();
+
+  await page.getByRole('link', { name: /阅读体验/ }).click();
+  await expect(page).toHaveURL(/#\/settings\/reading$/);
+  await expect(page.getByRole('heading', { name: '阅读体验' })).toBeVisible();
+  await page.getByRole('button', { name: '返回设置' }).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+
+  await page.getByRole('link', { name: /数据管理/ }).click();
+  await expect(page).toHaveURL(/#\/settings\/data$/);
+  await expect(page.getByRole('heading', { name: '数据管理' })).toBeVisible();
+  await page.getByRole('button', { name: '返回设置' }).click();
+  await expect(page).toHaveURL(/#\/settings$/);
 });

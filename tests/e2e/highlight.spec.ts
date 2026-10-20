@@ -286,7 +286,7 @@ test('全选后正文原位换新（同容器）：复制不再被塌缩旧选�
 test('高亮导出 JSON 与导入合并', async ({ page }) => {
   await configureAndSync(page);
   await writeKv(page, 'highlights', { 'a.md': [record('h1')] });
-  await page.goto('./#/settings');
+  await page.goto('./#/settings/data');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

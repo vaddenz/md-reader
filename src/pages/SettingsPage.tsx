@@ -1,74 +1,114 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SETUP, goBackOrHome, toRouterPath } from '../app/nav';
-import AboutSection from '../components/AboutSection';
-import AppearanceSection from '../components/AppearanceSection';
-import HighlightsSection from '../components/HighlightsSection';
+import {
+  SETTINGS_ABOUT, SETTINGS_ACCOUNT, SETTINGS_DATA, SETTINGS_READING, goBackOrHome,
+} from '../app/nav';
+import SettingsHeader from '../components/SettingsHeader';
+import pkg from '../../package.json';
 import { DEFAULT_REPO } from '../constants';
-import { clearAllData, kvGet, kvSet, listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
-import { GitHubClient, GitHubError } from '../data/github';
+import { DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
+import { kvGet, listFilesMeta, storageEstimate, type FileMeta } from '../data/db';
 import { bytesToText } from '../lib/format';
-import { useOrientation } from '../state/OrientationContext';
-import { DATA_CLEARED_EVENT } from '../state/TabsContext';
+import { maskToken } from '../lib/token';
 import { useSync, type RepoConfig } from '../state/SyncContext';
 import { useToken } from '../state/TokenContext';
 import '../styles/settings.css';
 
-/** Token 掩码：长 Token 显示前缀 + 末 4 位；短 Token 全部以圆点遮蔽（绝不明文展示完整值）。 */
-function maskToken(t: string): string {
-  if (t.length <= 8) return '••••';
-  const tail = t.slice(-4);
-  if (t.length <= 16) return `••••${tail}`;
-  return `${t.slice(0, 12)}…${tail}`;
+const FONT_LABELS: Record<ReaderAppearance['fontFamily'], string> = {
+  system: '系统字体',
+  xihei: '等线',
+  serif: '宋体',
+};
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
+        d="M10.4 13.6a4.2 4.2 0 0 0 6 0l2.1-2.1a4.2 4.2 0 0 0-6-6l-1.2 1.2"
+      />
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
+        d="M13.6 10.4a4.2 4.2 0 0 0-6 0l-2.1 2.1a4.2 4.2 0 0 0 6 6l1.2-1.2"
+      />
+    </svg>
+  );
 }
 
-/** Token 校验失败文案（按 GitHubError.kind 映射，与引导页一致）。 */
-function errorText(err: GitHubError): string {
-  switch (err.kind) {
-    case 'auth': return 'Token 无效或已过期';
-    case 'network': return '网络不可用';
-    default: return `验证失败（${err.kind}）：${err.message}`;
-  }
+function BookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
+        d="M12 6.6C9.9 5.1 7.2 4.5 4.8 5.2v13.1c2.4-.7 5.1-.1 7.2 1.4 2.1-1.5 4.8-2.1 7.2-1.4V5.2c-2.4-.7-5.1-.1-7.2 1.4Z"
+      />
+      <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" d="M12 6.6v13.1" />
+    </svg>
+  );
 }
 
-interface Msg { kind: 'ok' | 'err'; text: string }
+function DatabaseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <ellipse cx="12" cy="6" rx="6.6" ry="2.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+        d="M5.4 6v6c0 1.3 3 2.4 6.6 2.4s6.6-1.1 6.6-2.4V6M5.4 12v6c0 1.3 3 2.4 6.6 2.4s6.6-1.1 6.6-2.4v-6"
+      />
+    </svg>
+  );
+}
 
-/** 设置页：Token / 仓库配置 / 同步 / 存储 / 危险区 / 关于（Spec §3/§5.3/§9）。 */
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" d="M12 11v5" />
+      <circle cx="12" cy="8" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg className="settings-group-chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path
+        fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"
+        d="m9.5 5.5 6.5 6.5-6.5 6.5"
+      />
+    </svg>
+  );
+}
+
+/** 设置首页：连接状态 + 分组导航；细节收进各二级页（账户 / 阅读 / 数据 / 关于）。 */
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { token, setToken, clear } = useToken();
-  const { status, progress, lastSyncAt, error, syncNow, timeAgo } = useSync();
-  const { state: orientation, setOrientation } = useOrientation();
-
-  const [changing, setChanging] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
-  const [tokenBusy, setTokenBusy] = useState(false);
-  const [tokenMsg, setTokenMsg] = useState<Msg | null>(null);
+  const { token } = useToken();
+  const { status, lastSyncAt, syncNow, timeAgo } = useSync();
 
   const [cfg, setCfg] = useState<RepoConfig>({ ...DEFAULT_REPO });
-  const [repoMsg, setRepoMsg] = useState<Msg | null>(null);
-
+  const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null);
   const [metas, setMetas] = useState<FileMeta[] | null>(null);
 
-  const [clearing, setClearing] = useState(false);
-  const [clearError, setClearError] = useState<string | null>(null);
-
-  // 仓库配置：读取已保存值（缺失回退默认仓库）。
   useEffect(() => {
     let cancelled = false;
     void kvGet<RepoConfig>('config').then(
       (saved) => { if (!cancelled && saved) setCfg(saved); },
       () => {},
     );
+    void getAppearance().then(
+      (value) => { if (!cancelled) setAppearance(value); },
+      () => {},
+    );
     return () => { cancelled = true; };
   }, []);
 
-  // 存储统计：进入页面与每次同步完成后刷新。
+  // 存储统计与文档数量：进入页面与每次同步完成后刷新。
   useEffect(() => {
     let cancelled = false;
     void storageEstimate().then(
-      (s) => { if (!cancelled) setStorage(s); },
+      (value) => { if (!cancelled) setStorage(value); },
       () => {},
     );
     void listFilesMeta().then(
@@ -78,211 +118,98 @@ export default function SettingsPage() {
     return () => { cancelled = true; };
   }, [lastSyncAt]);
 
-  async function onChangeToken(e: FormEvent) {
-    e.preventDefault();
-    const next = tokenInput.trim();
-    if (!next) {
-      setTokenMsg({ kind: 'err', text: '请先粘贴 Token' });
-      return;
-    }
-    if (tokenBusy) return;
-    setTokenBusy(true);
-    setTokenMsg(null);
-    try {
-      await new GitHubClient(next).getUser();
-      setToken(next);
-      setChanging(false);
-      setTokenInput('');
-      setTokenMsg({ kind: 'ok', text: 'Token 已更新' });
-    } catch (err) {
-      setTokenMsg({ kind: 'err', text: err instanceof GitHubError ? errorText(err) : '验证失败，请重试' });
-    } finally {
-      setTokenBusy(false);
-    }
-  }
-
-  function onClearToken() {
-    clear();
-    setChanging(false);
-    setTokenInput('');
-    setTokenMsg(null);
-  }
-
-  async function onSaveRepo(e: FormEvent) {
-    e.preventDefault();
-    const next = { owner: cfg.owner.trim(), repo: cfg.repo.trim(), branch: cfg.branch.trim() };
-    if (!next.owner || !next.repo || !next.branch) {
-      setRepoMsg({ kind: 'err', text: '请填写完整的仓库信息（Owner / 仓库名 / 分支）' });
-      return;
-    }
-    try {
-      await kvSet('config', next);
-      setCfg(next);
-      setRepoMsg({ kind: 'ok', text: '已保存' });
-    } catch {
-      setRepoMsg({ kind: 'err', text: '保存失败，请重试' });
-    }
-  }
-
-  async function onClearAll() {
-    if (clearing) return;
-    if (!window.confirm('确定清除全部数据吗？将删除本机全部缓存、收藏、阅读进度、记忆训练数据与 Token，且不可恢复。')) return;
-    setClearing(true);
-    setClearError(null);
-    try {
-      await clearAllData();
-      clear();
-      window.dispatchEvent(new Event(DATA_CLEARED_EVENT));
-      navigate(toRouterPath(SETUP));
-    } catch {
-      setClearError('清除失败，请重试');
-      setClearing(false);
-    }
-  }
-
   const syncing = status === 'syncing';
   const cachedCount = metas?.filter((m) => m.cached).length ?? 0;
-  const uncachedCount = metas ? metas.length - cachedCount : 0;
+  const syncText = syncing
+    ? '同步中…'
+    : status === 'offline'
+      ? lastSyncAt ? `离线 · 上次同步 ${timeAgo(lastSyncAt)}` : '离线'
+      : status === 'error'
+        ? '同步失败'
+        : lastSyncAt ? `上次同步 ${timeAgo(lastSyncAt)}` : '尚未同步';
+
+  const readingSummary = `${FONT_LABELS[appearance.fontFamily]} · ${appearance.fontSize}px`;
+  const dataSummary = metas === null
+    ? '读取中…'
+    : storage
+      ? `${cachedCount} 篇已缓存 · ${bytesToText(storage.usage)}`
+      : `${cachedCount} 篇已缓存`;
 
   return (
     <main className="settings">
-      <button type="button" className="settings-back" aria-label="返回" onClick={() => goBackOrHome(navigate)}>← 返回</button>
-      <h1 className="settings-title">设置</h1>
+      <SettingsHeader
+        title="设置"
+        backLabel="返回"
+        backAriaLabel="返回"
+        onBack={() => goBackOrHome(navigate)}
+      />
 
-      <section className="settings-section" aria-labelledby="settings-token-title">
-        <h2 id="settings-token-title">访问 Token</h2>
-        <p className="settings-token-row">
-          <code className="settings-token">{token ? maskToken(token) : '未配置'}</code>
+      <section className="settings-connect" aria-label="GitHub 连接">
+        <a className="settings-connect-link" href={SETTINGS_ACCOUNT}>
+          <span className="settings-connect-icon"><LinkIcon /></span>
+          <span className="settings-connect-text">
+            <span className="settings-connect-eyebrow">GitHub 连接</span>
+            <span className="settings-connect-repo">{cfg.owner} / {cfg.repo}</span>
+            <span className="settings-connect-meta">
+              <span>{cfg.branch}</span>
+              <span aria-hidden="true">·</span>
+              <code className="settings-connect-token">{token ? maskToken(token) : '未配置 Token'}</code>
+            </span>
+          </span>
+          <ChevronIcon />
+        </a>
+
+        <div className="settings-connect-sync">
+          <span className={`settings-dot settings-dot-${status}`} aria-hidden="true" />
+          <span className="settings-connect-status">{syncText}</span>
           <button
             type="button"
-            onClick={() => { setChanging((v) => !v); setTokenMsg(null); }}
+            className="settings-sync-btn"
+            onClick={() => void syncNow()}
+            disabled={syncing}
           >
-            {changing ? '取消更换' : '更换'}
-          </button>
-          <button type="button" onClick={onClearToken} disabled={!token}>清除</button>
-        </p>
-        <p className="settings-note">Token 仅保存在本机浏览器，不会上传到任何第三方，也不会写入 URL 或日志。</p>
-
-        {changing && (
-          <form className="settings-token-form" onSubmit={onChangeToken}>
-            <input
-              type="password"
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="粘贴新的 Fine-grained PAT"
-              aria-label="新的 GitHub Token"
-              autoComplete="off"
-              disabled={tokenBusy}
-            />
-            <button type="submit" disabled={tokenBusy}>{tokenBusy ? '验证中…' : '验证并保存'}</button>
-          </form>
-        )}
-        {tokenMsg && (
-          <p role={tokenMsg.kind === 'err' ? 'alert' : 'status'} className={tokenMsg.kind === 'err' ? 'settings-error' : 'settings-ok'}>
-            {tokenMsg.text}
-          </p>
-        )}
-      </section>
-
-      <section className="settings-section" aria-labelledby="settings-repo-title">
-        <h2 id="settings-repo-title">仓库配置</h2>
-        <form className="settings-repo-form" onSubmit={onSaveRepo}>
-          <label>
-            Owner
-            <input
-              value={cfg.owner}
-              onChange={(e) => { setCfg({ ...cfg, owner: e.target.value }); setRepoMsg(null); }}
-              autoComplete="off"
-            />
-          </label>
-          <label>
-            仓库名
-            <input
-              value={cfg.repo}
-              onChange={(e) => { setCfg({ ...cfg, repo: e.target.value }); setRepoMsg(null); }}
-              autoComplete="off"
-            />
-          </label>
-          <label>
-            分支
-            <input
-              value={cfg.branch}
-              onChange={(e) => { setCfg({ ...cfg, branch: e.target.value }); setRepoMsg(null); }}
-              autoComplete="off"
-            />
-          </label>
-          <p className="settings-note">修改后需点击「保存」才会生效；「立即同步」将使用已保存的配置。</p>
-          <button type="submit">保存</button>
-          {repoMsg && (
-            <p role={repoMsg.kind === 'err' ? 'alert' : 'status'} className={repoMsg.kind === 'err' ? 'settings-error' : 'settings-ok'}>
-              {repoMsg.text}
-            </p>
-          )}
-        </form>
-      </section>
-
-      <section className="settings-section" aria-labelledby="settings-sync-title">
-        <h2 id="settings-sync-title">同步</h2>
-        <p className="settings-sync-row">
-          <button type="button" onClick={() => void syncNow()} disabled={syncing}>
             {syncing ? '同步中…' : '立即同步'}
           </button>
-          <span className="settings-note">{lastSyncAt ? `上次同步：${timeAgo(lastSyncAt)}` : '尚未同步'}</span>
-        </p>
-        {syncing && (
-          <p className="settings-note" role="status">
-            {progress?.phase === 'download' ? `同步中：${progress.done} / ${progress.total} 篇` : '同步中…'}
-          </p>
-        )}
-        {status === 'offline' && <p className="settings-note">离线中，联网后可同步。</p>}
-        {status === 'error' && error && (
-          <p role="alert" className="settings-error">同步失败：{error.message}</p>
-        )}
-      </section>
-
-      <AppearanceSection />
-
-      <section className="settings-section" aria-labelledby="settings-orientation-title">
-        <h2 id="settings-orientation-title">显示方向</h2>
-        <div className="appearance-row" role="radiogroup" aria-label="显示方向">
-          {([
-            ['portrait', '竖屏锁定'],
-            ['landscape', '横屏'],
-            ['landscape-flipped', '横屏（翻转）'],
-          ] as const).map(([id, label]) => (
-            <label key={id} className="appearance-radio">
-              <input type="radio" name="orientation" checked={orientation === id} onChange={() => setOrientation(id)} />
-              {label}
-            </label>
-          ))}
         </div>
-        <p className="settings-note">方向锁定需要以主屏幕应用（PWA）打开；浏览器标签下可能不支持。默认竖屏锁定、不跟随手机旋转。</p>
       </section>
 
-      <HighlightsSection />
+      <nav className="settings-nav" aria-label="设置分类">
+        <p className="settings-groups-label">更多设置</p>
+        <ul className="settings-groups">
+          <li>
+            <a className="settings-group-link" href={SETTINGS_READING}>
+              <span className="settings-group-icon"><BookIcon /></span>
+              <span className="settings-group-text">
+                <span className="settings-group-title">阅读体验</span>
+                <span className="settings-group-sub">{readingSummary} · 显示方向</span>
+              </span>
+              <ChevronIcon />
+            </a>
+          </li>
+          <li>
+            <a className="settings-group-link" href={SETTINGS_DATA}>
+              <span className="settings-group-icon"><DatabaseIcon /></span>
+              <span className="settings-group-text">
+                <span className="settings-group-title">数据管理</span>
+                <span className="settings-group-sub">{dataSummary} · 高亮备份</span>
+              </span>
+              <ChevronIcon />
+            </a>
+          </li>
+          <li>
+            <a className="settings-group-link" href={SETTINGS_ABOUT}>
+              <span className="settings-group-icon"><InfoIcon /></span>
+              <span className="settings-group-text">
+                <span className="settings-group-title">关于</span>
+                <span className="settings-group-sub">v{pkg.version} · 个人自用与隐私说明</span>
+              </span>
+              <ChevronIcon />
+            </a>
+          </li>
+        </ul>
+      </nav>
 
-      <section className="settings-section" aria-labelledby="settings-storage-title">
-        <h2 id="settings-storage-title">存储</h2>
-        <p className="settings-note">
-          {storage
-            ? `已用 ${bytesToText(storage.usage)} / 配额 ${storage.quota > 0 ? bytesToText(storage.quota) : '未知'}`
-            : '读取中…'}
-        </p>
-        <p className="settings-note">
-          {metas ? `已缓存 ${cachedCount} 篇 / 未缓存 ${uncachedCount} 篇` : '统计中…'}
-        </p>
-      </section>
-
-      <section className="settings-section settings-danger" aria-labelledby="settings-danger-title">
-        <h2 id="settings-danger-title">危险区</h2>
-        <p className="settings-note">清除本机全部缓存数据与 Token，并返回引导页；此操作不可恢复。</p>
-        <button type="button" className="settings-danger-btn" onClick={() => void onClearAll()} disabled={clearing}>
-          {clearing ? '清除中…' : '清除全部数据'}
-        </button>
-        {clearError && <p role="alert" className="settings-error">{clearError}</p>}
-      </section>
-
-      <AboutSection />
+      <p className="settings-privacy">Token 与阅读数据仅保存在本机</p>
     </main>
   );
 }

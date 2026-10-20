@@ -64,7 +64,7 @@ test('记忆助手：同步后 sha 变化使解析缓存失效并自动重载', 
   mock.updateDoc(BANK_PATH, updated);
   await page.goto('./#/settings');
   await page.getByRole('button', { name: '立即同步' }).click();
-  await expect(page.getByText('上次同步：刚刚')).toBeVisible();
+  await expect(page.getByText(/上次同步 刚刚/)).toBeVisible();
 
   // 回到概览页：sha 不一致 → 不沿用旧解析，自动重载新版本
   await page.goto('./#/memory');

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NavigateFunction } from 'react-router-dom';
-import { docHref, goBackOrHome, searchHref, toRouterPath } from '../../src/app/nav';
+import { docHref, goBackOrHome, goBackOrSettings, searchHref, toRouterPath } from '../../src/app/nav';
 
 describe('nav', () => {
   it('文档链接对路径与中文正确编码', () => {
@@ -32,6 +32,21 @@ describe('nav', () => {
       const navigate = vi.fn();
       goBackOrHome(navigate as unknown as NavigateFunction);
       expect(navigate).toHaveBeenCalledWith('/');
+    });
+  });
+  describe('goBackOrSettings：二级页返回', () => {
+    afterEach(() => { vi.unstubAllGlobals(); });
+    it('有应用内历史 → 弹出（回到设置首页，不新增历史条目）', () => {
+      vi.stubGlobal('window', { history: { state: { idx: 2 } } });
+      const navigate = vi.fn();
+      goBackOrSettings(navigate as unknown as NavigateFunction);
+      expect(navigate).toHaveBeenCalledWith(-1);
+    });
+    it('直接打开二级页（无历史）→ 设置首页', () => {
+      vi.stubGlobal('window', { history: { state: { idx: 0 } } });
+      const navigate = vi.fn();
+      goBackOrSettings(navigate as unknown as NavigateFunction);
+      expect(navigate).toHaveBeenCalledWith('/settings');
     });
   });
 });

@@ -7,7 +7,11 @@ import MemoryPage from './pages/MemoryPage';
 import MemoryRecordsPage from './pages/MemoryRecordsPage';
 import MemoryTrainPage from './pages/MemoryTrainPage';
 import SearchPage from './pages/SearchPage';
+import SettingsAboutPage from './pages/SettingsAboutPage';
+import SettingsAccountPage from './pages/SettingsAccountPage';
+import SettingsDataPage from './pages/SettingsDataPage';
 import SettingsPage from './pages/SettingsPage';
+import SettingsReadingPage from './pages/SettingsReadingPage';
 import SetupPage from './pages/SetupPage';
 
 const router = createHashRouter([
@@ -16,6 +20,10 @@ const router = createHashRouter([
     { path: 'doc/*', element: <DocPage /> },
     { path: 'search', element: <SearchPage /> },
     { path: 'settings', element: <SettingsPage /> },
+    { path: 'settings/account', element: <SettingsAccountPage /> },
+    { path: 'settings/reading', element: <SettingsReadingPage /> },
+    { path: 'settings/data', element: <SettingsDataPage /> },
+    { path: 'settings/about', element: <SettingsAboutPage /> },
     { path: 'font-preview', element: <FontPreviewPage /> },
     { path: 'setup', element: <SetupPage /> },
     { path: 'memory', element: <MemoryPage /> },
