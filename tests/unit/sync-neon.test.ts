@@ -68,6 +68,26 @@ describe('neon backend', () => {
     expect(seen[1]).toContain('offset=500');
   });
 
+  it('pull：微秒时间戳截断到毫秒后解析', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([{
+      collection: 'reading.progress', record_id: 'p', payload: null, updated_at: 1,
+      deleted: false, device_id: 'd', server_updated_at: '2026-10-20T00:00:00.123456+00:00',
+    }]), { status: 200 })));
+    const backend = neonDefinition.create({ endpoint: values.endpoint, token: jwt({ sub: 'md-reader' }) });
+    const rows = await backend.pull('s', 0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].serverUpdatedAt).toBe(Date.parse('2026-10-20T00:00:00.123Z'));
+  });
+
+  it('pull：非法 server_updated_at 抛 parse 错误而非静默丢弃', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([{
+      collection: 'reading.progress', record_id: 'p', payload: null, updated_at: 1,
+      deleted: false, device_id: 'd', server_updated_at: 'not-a-date',
+    }]), { status: 200 })));
+    const backend = neonDefinition.create({ endpoint: values.endpoint, token: jwt({ sub: 'md-reader' }) });
+    await expect(backend.pull('s', 0)).rejects.toMatchObject({ kind: 'parse' });
+  });
+
   it('pull：since > 0 时带 server_updated_at 过滤；since = 0 不带', async () => {
     const seen: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {

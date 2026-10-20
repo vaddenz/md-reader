@@ -21,6 +21,14 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+function parseServerTimestamp(value: unknown): number {
+  const text = String(value ?? '').trim();
+  // PostgREST 的 timestamptz 可能带微秒（6 位小数），Date.parse 只保证毫秒精度；先截断到 3 位。
+  const ms = Date.parse(text.replace(/(\.\d{3})\d+/, '$1'));
+  if (!Number.isFinite(ms)) throw new SyncError('parse', '服务器时间戳格式异常');
+  return ms;
+}
+
 export class NeonBackend implements SyncBackend {
   private readonly endpoint: string;
   private readonly token: string;
@@ -114,8 +122,7 @@ export class NeonBackend implements SyncBackend {
       try { rows = await res.json(); } catch { throw new SyncError('parse', '响应不是合法 JSON'); }
       if (!Array.isArray(rows)) throw new SyncError('parse', '响应格式异常');
       for (const row of rows as Record<string, unknown>[]) {
-        const serverUpdatedAt = Date.parse(String(row.server_updated_at ?? ''));
-        if (!Number.isFinite(serverUpdatedAt)) continue;
+        const serverUpdatedAt = parseServerTimestamp(row.server_updated_at);
         out.push({
           scope,
           collection: String(row.collection ?? ''),
