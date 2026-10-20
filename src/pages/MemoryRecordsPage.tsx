@@ -124,7 +124,7 @@ export default function MemoryRecordsPage() {
         <p className="memory-note">到期：今日 {stats.dueToday} · 3 天内 {stats.due3} · 7 天内 {stats.due7}</p>
         <ul className="memory-verdicts">
           {VERDICT_ORDER.map((v) => (
-            <li key={v}><span>{VERDICT_LABELS[v]}</span><b>{stats.verdictCounts[v]}</b></li>
+            <li key={v}><span className={`memory-verdict-${v}`}>{VERDICT_LABELS[v]}</span><b>{stats.verdictCounts[v]}</b></li>
           ))}
         </ul>
         <div className="memory-trend" aria-label="近 14 天趋势">

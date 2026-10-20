@@ -254,8 +254,8 @@ test('选择题提交前查看参考答案：按不会记录且档位不推进',
   await page.getByRole('button', { name: '查看参考答案' }).click();
   await expect(page.locator('.memory-answer')).toContainText('libuv 提供事件循环与线程池');
   await expect(page.getByText('已记录（本地判分）')).toBeVisible();
-  // 判定文案采用中性色（不使用红绿琥珀语义色）
-  await expect(page.locator('.memory-verdict')).toHaveCSS('color', 'rgb(92, 96, 102)');
+  // 判定文案：不会 = 砖红（--danger #C0392B）
+  await expect(page.locator('.memory-verdict')).toHaveCSS('color', 'rgb(192, 57, 43)');
 
   const attempts = await readStore(page, 'mem_attempts') as { mode: string; verdict: string; revealed: boolean }[];
   expect(attempts).toHaveLength(1);

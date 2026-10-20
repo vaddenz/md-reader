@@ -362,7 +362,7 @@ export default function MemoryTrainPage() {
               {(['excellent', 'good', 'hard', 'again'] as Verdict[]).map((v) => (
                 <div key={v} className="memory-stat">
                   <b>{(sessionVerdicts ?? EMPTY_VERDICT_COUNTS)[v]}</b>
-                  <span>{VERDICT_LABELS[v]}</span>
+                  <span className={`memory-verdict-${v}`}>{VERDICT_LABELS[v]}</span>
                 </div>
               ))}
             </div>
@@ -409,7 +409,7 @@ export default function MemoryTrainPage() {
                 <div className="memory-score">
                   {result.mode === 'ai' ? result.score : result.mode === 'choice' ? choiceOutcomeLabel(result.verdict) : VERDICT_LABELS[result.verdict]}
                 </div>
-                <p className="memory-verdict">
+                <p className={`memory-verdict memory-verdict-${result.verdict}`}>
                   {result.mode === 'ai' && VERDICT_LABELS[result.verdict]}
                   {result.mode === 'self' && `${VERDICT_LABELS[result.verdict]} · 已记录（自评）`}
                   {result.mode === 'choice' && `${VERDICT_LABELS[result.verdict]} · 已记录（本地判分）`}
