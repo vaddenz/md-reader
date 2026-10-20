@@ -13,7 +13,7 @@
 2. **可扩展的本地集合适配器**：阅读进度、高亮、收藏、记忆 SRS、训练记录、题库偏好各自一个适配器；笔记（notes）只预留扩展点，本期不做 UI。
 3. **Neon Postgres Data API 后端**：使用用户自备的 Data API URL + JWT，读写单张通用记录表；提供建表 / RLS / 条件 upsert RPC 的初始化 SQL。
 4. **多仓库同步**：一次同步遍历本机已配置的全部 GitHub 仓库，各仓库数据按 `owner/repo@branch` 分域；不需要切换到某个仓库才能同步它（自动或手动发起都一样）。
-5. **自动 + 手动触发（自动可关）**：启动、联网恢复、页面隐藏/退出、数据变更后合并推送，另加「立即同步」；设置页提供「自动同步」开关，关闭后不再自动发起任何同步，只能手动同步。
+5. **自动 + 手动触发（自动默认关闭）**：启动、联网恢复、页面隐藏/退出、数据变更后合并推送，另加「立即同步」；设置页提供「自动同步」开关，**默认关闭**，关闭时只能手动同步，开启后才自动发起上述同步。
 6. **设置页接入**：新增「设置 › 跨设备同步」页，包含后端配置、连接测试、状态、初始化说明与危险操作。
 7. **配套改动**：IndexedDB schema v3、收藏存储迁移、`MemorySelection.updatedAt`、PRODUCT.md / README / DESIGN.md 文案同步。
 
@@ -25,7 +25,7 @@
 | 2 | 首批同步：阅读进度、文本高亮、收藏、记忆 SRS、训练记录、题库偏好；笔记预留 |
 | 3 | 不同步：正文、GitHub Token、AI Key/模型配置、当前训练会话、打开的多标签、阅读外观与全局设置 |
 | 4 | 多仓库全部同步（自动或手动）；各仓库数据独立，scope = `owner/repo@branch` |
-| 5 | 同步分「自动同步」与「手动同步」两种模式；自动同步默认开启，可随时关闭，关闭后只有点击「立即同步」才会发起同步（用于控制请求 / 流量成本） |
+| 5 | 同步分「自动同步」与「手动同步」两种模式；**自动同步默认关闭**，可随时开启；关闭时只有点击「立即同步」才会发起同步（用于控制请求 / 流量成本） |
 | 6 | 远端采用通用记录表，不为每种数据类型建表；加数据类型不改远端 schema |
 | 7 | 冲突策略：逐记录 LWW（最后写入获胜），时间戳相同时用 `deviceId` 确定性裁决；同一设备同一毫秒视为同一条 |
 | 8 | 删除使用 tombstone；「清除训练数据」使用集合级 reset 标记，避免另一台设备把旧记录推回来 |
@@ -454,7 +454,7 @@ syncRepo(backend, repo, state):
 
 ### 8.4 自动触发与「自动同步」开关
 
-`SyncConfig` 增加 `autoSync: boolean`（默认 `true`）。`DataSyncProvider` 在应用根部挂载（`App` 内、`RouterProvider` 外层）：
+`SyncConfig` 增加 `autoSync: boolean`（**默认 `false`**）。首次保存配置后处于「仅手动」状态，设置页明确提示点击「立即同步」；用户主动打开开关后才进入自动模式。`DataSyncProvider` 在应用根部挂载（`App` 内、`RouterProvider` 外层）：
 
 **自动同步开启（`enabled && autoSync`）时：**
 
@@ -572,7 +572,7 @@ Neon Data API 默认允许所有来源；建议在 Data API Settings → CORS al
 interface SyncConfig {
   version: 1;
   enabled: boolean;       // 总开关：停用后手动同步也禁用
-  autoSync: boolean;      // 自动同步开关：默认 true；关闭后仅手动
+  autoSync: boolean;      // 自动同步开关：默认 false；关闭后仅手动
   backend: string;
   values: Record<string, string>;
 }
@@ -581,7 +581,7 @@ interface SyncConfig {
 - 保存配置时：
   - 校验必填字段；`endpoint` 去尾部 `/`；
   - 若 `backend` / `endpoint` / `token` 任一变化，清空 `syncState.repos` 的 cursor（下次全量拉取），保留 outbox；
-  - `enabled = true`；`autoSync` 保持用户当前选择，缺省 true；
+  - `enabled = true`；`autoSync` 保持用户当前选择，缺省 false；
   - 切换 `autoSync` 单独保存，不重置 cursor、不影响 outbox；从关到开且 `enabled && configured` 时延迟 3 秒触发一次同步。
 - 清除配置：删除 `syncConfig` 与 `syncState`，保留各仓库 outbox；下次重新配置后仍可补推。
 - 「清除全部数据」：删除仓库库、仓库配置、GitHub Token，同时清除 `syncConfig`、`syncState`、`syncDeviceId`，避免清空后被远端自动恢复；确认文案加入「跨设备同步配置」。
@@ -595,7 +595,7 @@ interface SyncConfig {
 Neon Data API 需要 JWKS 验证 JWT。两种路径：
 
 1. **已有 provider**：Auth0 / Clerk / Keycloak / Firebase 等，按其 JWKS URL 配置 Neon，应用只填 JWT。
-2. **个人长期 JWT（推荐给本项目）**：附带 `scripts/sync-jwt.mjs`：
+2. **个人长期 JWT（本期保留的可选工具）**：附带 `scripts/sync-jwt.mjs`（是否长期维护后续再定）：
    - 生成 RSA 密钥对；私钥写到 `.sync-jwt/private.pem`（gitignore，0600）；
    - 公钥 JWKS 写到 `public/sync-jwks.json`（公钥可公开，随 GitHub Pages 部署）；
    - 签发 `sub` 可配置（默认 `md-reader`）、有效期默认 10 年的 RS256 JWT，打印到终端；
@@ -627,7 +627,7 @@ JWT 安全：
 
 1. **Header**：标题「跨设备同步」，副标题「阅读进度、高亮、收藏与记忆数据在多台设备间同步；正文与 GitHub Token 不上传。」
 2. **状态卡**：状态点 + 文案（未配置 / 已启用 / 同步中 / 离线 / 失败）；上次同步；待推送条数；最近错误。待推送条数在进入页面时打开各仓库库统计 outbox（仓库少、数据量小，可接受），同步完成后由 Provider 刷新。
-   - 「自动同步」开关（iOS 式 switch）：默认开；关闭后显示「仅手动同步」，并说明「启动、联网、页面隐藏与数据变更都不会自动同步；点击「立即同步」才会同步」。切换立即保存。
+   - 「自动同步」开关（iOS 式 switch）：**默认关**；关闭时显示「仅手动同步」，并说明「启动、联网、页面隐藏与数据变更都不会自动同步；点击「立即同步」才会同步」。切换立即保存。
    - 「停用」是总开关，停用后自动与手动同步都不可用；「自动同步」关闭只停自动触发，两者文案不要混用。
 3. **后端卡**：
    - 后端选择（注册表驱动；当前只有 Neon 时显示静态标签）；
@@ -667,6 +667,7 @@ interface DataSyncContextValue {
 - 表单校验：URL 必须 `https://`（允许 `http://localhost` 开发）；JWT 非空；保存/测试时错误就地显示。
 - 测试连接中按钮禁用并显示「测试中…」；成功后显示「连接成功：表与 RPC 可用」；若返回 `warning`（如 JWT 临近过期），用黄色提示条展示，不阻断保存。
 - 同步中禁用「立即同步」；显示进度「正在同步 owner/repo（2/3）」。
+- 首次保存配置后若未打开「自动同步」，状态卡显示「仅手动同步」，并提示「自动同步已关闭，点击「立即同步」开始首次同步」。
 - 自动同步关闭时，状态卡显示「仅手动同步」；「待推送条数」可能持续增加，页面提示「自动同步已关闭，点击「立即同步」上传」。
 - 自动同步关闭时，如果正在同步，当前轮正常完成；之后的自动触发不再发生。
 - 错误文案按 `SyncErrorKind` 映射，不显示原始响应体（可能含敏感信息）；详细错误只显示状态码与短句。
@@ -725,7 +726,7 @@ class SyncError extends Error {
 
 ### 14.1 单元测试
 
-- `syncConfig`：缺字段、URL 规范化、未知后端、password 字段、保存重置 cursor；`autoSync` 缺省 true、关闭后持久化、切换不重置 cursor。
+- `syncConfig`：缺字段、URL 规范化、未知后端、password 字段、保存重置 cursor；`autoSync` 缺省 false、关闭后持久化、切换不重置 cursor。
 - `syncMerge`：LWW、deviceId 平局、同设备同毫秒 no-op、tombstone、reset 过滤。
 - `syncOutbox`：入队 upsert 去重、rev 更新、推送后 rev 安全删除、reset 清理、按 collection seed 不重复、新增 collection 只补 seed 自己。
 - `syncCollections`：六个适配器的 list/get/apply/clearBefore；收藏 V2 迁移；attemptKey；selection 只同步 banks/filters。
@@ -759,7 +760,7 @@ npm run test:e2e
 - 新增 `docs/sync-neon-setup.md`：Neon Data API 启用、JWT/JWKS（含本地脚本）、SQL、CORS、应用配置、轮换与故障排查。
 - 新增 `docs/plans/2026-10-20-md-reader-data-sync-implementation.md`（下一步 writing-plans 产出）。
 - README：
-  - 功能列表加「跨设备同步（可选，Neon）」；
+  - 功能列表加「跨设备同步（可选，Neon；自动同步默认关闭，需手动开启）」；
   - 数据管理/隐私说明更新；
   - 指向 setup 文档。
 - PRODUCT.md：
@@ -815,7 +816,7 @@ npm run test:e2e
 4. 删除高亮 / 取消收藏后同步，另一台设备对应记录消失。
 5. 「清除训练数据」同步后，另一台设备旧训练记录被清掉，且不会被旧 outbox 推回。
 6. 多个仓库全部自动同步；切换仓库不需要手动触发；非当前仓库也能同步。
-7. 关闭「自动同步」后，启动、联网、页面隐藏与数据变更都不发请求；待同步条数保留；点击「立即同步」能正常拉取 + 推送；重新开启后恢复自动同步。
+7. 首次配置后「自动同步」默认关闭；启动、联网、页面隐藏与数据变更都不发请求；待同步条数保留；点击「立即同步」能正常拉取 + 推送；手动打开开关后恢复自动同步。
 8. 离线 / 后端失败时本地功能不受影响，outbox 保留；自动同步开启时恢复后自动补推，关闭时等待手动同步。
 9. `npm run typecheck` / `npm test` / `npm run build` / `npm run test:e2e` 全绿。
 10. README / PRODUCT.md / DESIGN.md / setup 文档与实现一致。
