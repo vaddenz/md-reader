@@ -362,7 +362,7 @@ export default function MemoryTrainPage() {
               {(['excellent', 'good', 'hard', 'again'] as Verdict[]).map((v) => (
                 <div key={v} className="memory-stat">
                   <b>{(sessionVerdicts ?? EMPTY_VERDICT_COUNTS)[v]}</b>
-                  <span className={`memory-verdict-${v}`}>{VERDICT_LABELS[v]}</span>
+                  <span>{VERDICT_LABELS[v]}</span>
                 </div>
               ))}
             </div>
@@ -409,7 +409,7 @@ export default function MemoryTrainPage() {
                 <div className="memory-score">
                   {result.mode === 'ai' ? result.score : result.mode === 'choice' ? choiceOutcomeLabel(result.verdict) : VERDICT_LABELS[result.verdict]}
                 </div>
-                <p className={`memory-verdict memory-verdict-${result.verdict}`}>
+                <p className="memory-verdict">
                   {result.mode === 'ai' && VERDICT_LABELS[result.verdict]}
                   {result.mode === 'self' && `${VERDICT_LABELS[result.verdict]} · 已记录（自评）`}
                   {result.mode === 'choice' && `${VERDICT_LABELS[result.verdict]} · 已记录（本地判分）`}
@@ -536,8 +536,10 @@ function OptionList(props: {
               : pickedIt
                 ? '误选'
                 : '';
+        const mark = onPick ? '' : eliminatedIt ? '–' : isCorrect ? '✓' : pickedIt ? '✕' : '';
         const inner = (
           <>
+            {!onPick && <span className="memory-option-mark">{mark}</span>}
             <span className="memory-option-key">{o.key}</span>
             <span className="memory-option-text">{o.text}</span>
             {tag && <span className="memory-option-tag">{tag}</span>}
@@ -556,7 +558,7 @@ function OptionList(props: {
             {inner}
           </button>
         ) : (
-          <div key={o.key} className={cls}>{inner}</div>
+          <div key={o.key} className={`${cls} memory-option-static`}>{inner}</div>
         );
       })}
     </div>

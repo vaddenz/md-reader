@@ -31,17 +31,18 @@
 }
 .memory-primary:disabled { opacity: .6; cursor: default; }
 
-/* 答题 / 结果页：问题与提示在上，操作区贴近屏幕下方（保留底部安全距离，便于单手操作） */
+/* 答题 / 结果页：问题与提示在上（可滚动），操作区固定在屏幕下方（保留底部安全距离） */
 .memory-train {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
 }
 .memory-train .memory-header { flex: none; }
-.memory-train-card { flex: 1; display: flex; flex-direction: column; }
-.memory-zone-question { min-width: 0; }
-.memory-zone-answer { margin-top: auto; padding-top: 16px; }
+.memory-train-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.memory-zone-question { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.memory-zone-answer { flex: none; padding-top: 12px; }
 .memory-zone-answer .memory-input,
 .memory-zone-answer .memory-options { margin-top: 0; }
 
@@ -98,7 +99,7 @@
 .memory-md { font-size: 15px; line-height: 1.7; }
 .memory-md p { margin: 6px 0; }
 .memory-md pre { overflow-x: auto; }
-.memory-hint { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--r-ctl); background: rgba(31, 63, 212, .08); color: var(--acc-text); font-size: 13px; }
+.memory-hint { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--r-ctl); background: var(--shell); color: var(--ink2); font-size: 13px; }
 .memory-input { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; font-size: 15px; line-height: 1.6; resize: vertical; }
 .memory-result { margin-top: 10px; }
 .memory-score { font-size: 32px; font-weight: 600; }
@@ -114,9 +115,13 @@
   text-align: left; cursor: pointer;
 }
 .memory-option-on { border-color: var(--acc); background: rgba(31, 63, 212, .08); }
-.memory-option-eliminated { opacity: .45; text-decoration: line-through; cursor: default; }
-.memory-option-correct { border-color: #2f7d4f; background: rgba(47, 125, 79, .10); }
-.memory-option-wrong { border-color: var(--danger); background: rgba(192, 57, 43, .08); }
+.memory-option-eliminated { opacity: .5; text-decoration: line-through; cursor: default; }
+.memory-option-static { cursor: default; }
+/* 结果回放：只用中性标记与文字标签表达对错，不使用红绿底色/描边 */
+.memory-option-correct { border-color: var(--line); }
+.memory-option-wrong { border-color: var(--line); }
+.memory-option-wrong .memory-option-text { color: var(--ink2); text-decoration: line-through; }
+.memory-option-mark { flex: none; width: 14px; color: var(--ink2); font-weight: 600; }
 .memory-option-key { flex: none; font-weight: 600; color: var(--ink2); }
 .memory-option-tag { margin-left: auto; padding-left: 8px; flex: none; font-size: 12px; color: var(--ink2); white-space: nowrap; }
 .memory-unit { color: var(--ink2); font-size: 13px; }
@@ -138,13 +143,3 @@
 .memory-record-body { padding: 4px 0 10px; }
 .memory-danger { color: var(--danger); border-color: var(--danger); }
 .memory-row select { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; }
-
-/* 档位标签（spec §11）：纸面对比度 ≥ 4.5:1。 */
-.memory-verdict-excellent,
-.memory-stat span.memory-verdict-excellent { color: #2b6e46; }
-.memory-verdict-good,
-.memory-stat span.memory-verdict-good { color: var(--acc-text); }
-.memory-verdict-hard,
-.memory-stat span.memory-verdict-hard { color: #8a5f00; }
-.memory-verdict-again,
-.memory-stat span.memory-verdict-again { color: var(--danger); }
