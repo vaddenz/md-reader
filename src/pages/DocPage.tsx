@@ -773,6 +773,7 @@ export default function DocPage() {
           }}
           onRefreshVoices={tts.refreshVoices}
           onOpenToc={() => {
+            tts.pause();
             setTtsOpen(false);
             openToc();
           }}
