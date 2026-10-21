@@ -147,6 +147,17 @@ describe('buildQueue', () => {
     expect(queue(candidates, new Map(), { filters: { ...EMPTY_FILTERS, difficulty: ['基础'] } }).map((e) => e.qid)).toEqual(['qa']);
   });
 
+  it('坏题排除：不进入队列，也不占新题额度', () => {
+    const candidates = [
+      cand('bad', { line: 1 }),
+      cand('due', { line: 2 }),
+      cand('fresh', { line: 3 }),
+    ];
+    const map = new Map([['due', srs('due', NOW - 1)]]);
+    expect(queue(candidates, map, { excludedQids: new Set(['bad']), newPerDay: 1 }).map((e) => e.qid))
+      .toEqual(['due', 'fresh']);
+  });
+
   it('追问链排序：母题在前、追问紧随；多子题按行序；母题缺席保持原位', () => {
     const candidates = [
       cand('A', { line: 1 }),

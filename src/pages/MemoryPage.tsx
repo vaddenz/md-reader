@@ -9,7 +9,8 @@ import {
   saveSelection, saveSession, summarize,
   type LlmConfig, type MemoryAttempt, type MemorySelection,
 } from '../data/memory';
-import { ensureBankLoaded, getParsedBank, listBanks, type BankMeta, type ParsedBank } from '../data/qbankIndex';
+import { ensureBankLoaded, getParsedBank, listBanks, bankName, type BankMeta, type ParsedBank } from '../data/qbankIndex';
+import { loadBadQuestionMap, unmarkBadQuestion, type BadQuestion } from '../data/badQuestions';
 import { buildQueue, dayStart, isMastered, type QueueCandidate, type SrsState } from '../lib/srs';
 import { showToast } from '../lib/toast';
 import { useSync } from '../state/SyncContext';
@@ -40,6 +41,7 @@ export default function MemoryPage() {
   const [srsList, setSrsList] = useState<SrsState[]>([]);
   const [attempts, setAttempts] = useState<MemoryAttempt[]>([]);
   const [llm, setLlm] = useState<LlmConfig | undefined>();
+  const [badQuestions, setBadQuestions] = useState<Map<string, BadQuestion>>(new Map());
   const [loadingBanks, setLoadingBanks] = useState<string[]>([]);
   const [starting, setStarting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -65,6 +67,16 @@ export default function MemoryPage() {
     void listBanks().then(
       (list) => { if (!cancelled) setBanks(list); },
       () => { if (!cancelled) setBanks([]); },
+    );
+    return () => { cancelled = true; };
+  }, [lastSyncAt]);
+
+  // 坏题标记：同步可能从其它设备带来变更，所以随 lastSyncAt 一起重读。
+  useEffect(() => {
+    let cancelled = false;
+    void loadBadQuestionMap().then(
+      (map) => { if (!cancelled) setBadQuestions(map); },
+      () => {},
     );
     return () => { cancelled = true; };
   }, [lastSyncAt]);
@@ -135,7 +147,11 @@ export default function MemoryPage() {
     })();
   }, [banks, loadBank, selection, setBankLoading, token]);
 
-  const stats = useMemo(() => summarize(attempts, srsList, Date.now()), [attempts, srsList]);
+  const stats = useMemo(() => {
+    const activeAttempts = attempts.filter((a) => !badQuestions.has(a.qid));
+    const activeSrs = srsList.filter((s) => !badQuestions.has(s.qid));
+    return summarize(activeAttempts, activeSrs, Date.now());
+  }, [attempts, badQuestions, srsList]);
 
   const filterOptions = useMemo(() => {
     const chapters = new Set<string>();
@@ -144,6 +160,7 @@ export default function MemoryPage() {
     const difficulty = new Set<string>();
     for (const bank of parsed.values()) {
       for (const q of bank.questions) {
+        if (badQuestions.has(q.qid)) continue;
         if (q.chapter) chapters.add(q.chapter);
         types.add(q.type);
         for (const t of q.tags ?? []) tags.add(t);
@@ -156,23 +173,44 @@ export default function MemoryPage() {
       tags: [...tags].sort(),
       difficulty: [...difficulty].sort(),
     };
-  }, [parsed]);
+  }, [badQuestions, parsed]);
 
   const progress = useMemo(() => {
     const srs = new Map(srsList.map((s) => [s.qid, s]));
     return [...parsed.entries()].map(([path, bank]) => {
       let practiced = 0;
       let mastered = 0;
+      let total = 0;
       for (const q of bank.questions) {
+        if (badQuestions.has(q.qid)) continue;
+        total += 1;
         const s = srs.get(q.qid);
         if (s) {
           practiced += 1;
           if (isMastered(s)) mastered += 1;
         }
       }
-      return { path, name: bank.name, total: bank.questions.length, practiced, mastered };
+      return {
+        path, name: bank.name, total, practiced, mastered,
+        excluded: bank.questions.length - total,
+      };
     });
-  }, [parsed, srsList]);
+  }, [badQuestions, parsed, srsList]);
+
+  const badCountByBank = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const record of badQuestions.values()) {
+      counts.set(record.bankPath, (counts.get(record.bankPath) ?? 0) + 1);
+    }
+    return counts;
+  }, [badQuestions]);
+
+  const badList = useMemo(
+    () => [...badQuestions.values()].sort(
+      (a, b) => a.bankPath.localeCompare(b.bankPath) || a.id.localeCompare(b.id),
+    ),
+    [badQuestions],
+  );
 
   const updateSelection = useCallback((next: MemorySelection) => {
     setSelection(next);
@@ -229,9 +267,10 @@ export default function MemoryPage() {
 
       const srsMap = await loadSrsMap();
       const now = Date.now();
-      const newIntroducedToday = [...srsMap.values()].filter((s) => s.firstAt >= dayStart(now)).length;
+      const newIntroducedToday = [...srsMap.values()]
+        .filter((s) => !badQuestions.has(s.qid) && s.firstAt >= dayStart(now)).length;
       const queue = buildQueue({
-        candidates, srsByQid: srsMap, filters: selection.filters,
+        candidates, srsByQid: srsMap, filters: selection.filters, excludedQids: new Set(badQuestions.keys()),
         sessionSize: selection.sessionSize, newPerDay: selection.newPerDay, newIntroducedToday, now,
       });
       if (!queue.length) { setMsg('当前范围没有到期或新题可练，试试调整范围或稍后再来'); return; }
@@ -243,7 +282,21 @@ export default function MemoryPage() {
     } finally {
       setStarting(false);
     }
-  }, [loadBank, navigate, selection, starting, token]);
+  }, [badQuestions, loadBank, navigate, selection, starting, token]);
+
+  const onUnmark = useCallback(async (qid: string) => {
+    try {
+      await unmarkBadQuestion(qid);
+      setBadQuestions((prev) => {
+        const next = new Map(prev);
+        next.delete(qid);
+        return next;
+      });
+      showToast('已恢复该题');
+    } catch {
+      showToast('恢复失败，请重试', { kind: 'error' });
+    }
+  }, []);
 
   const toggleFilter = useCallback((key: keyof MemorySelection['filters'], value: string) => {
     if (!selection) return;
@@ -290,22 +343,25 @@ export default function MemoryPage() {
           <p className="memory-note">目录树中没有 .jsonl 题库，请先到首页「更新目录」。</p>
         ) : (
           <ul className="memory-banks">
-            {banks.map((b) => (
-              <li key={b.path} className="memory-bank">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={selection?.banks.includes(b.path) ?? false}
-                    disabled={starting}
-                    onChange={(e) => void onToggleBank(b.path, e.target.checked)}
-                  />
-                  <span className="memory-bank-name">{b.name}</span>
-                  <span className="memory-bank-meta">
-                    {loadingBanks.includes(b.path) ? '加载中…' : b.fetched ? `${b.questionCount} 题${b.issueCount ? ` · ${b.issueCount} 处问题` : ''}` : '未获取'}
-                  </span>
-                </label>
-              </li>
-            ))}
+            {banks.map((b) => {
+              const badCount = badCountByBank.get(b.path) ?? 0;
+              return (
+                <li key={b.path} className="memory-bank">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selection?.banks.includes(b.path) ?? false}
+                      disabled={starting}
+                      onChange={(e) => void onToggleBank(b.path, e.target.checked)}
+                    />
+                    <span className="memory-bank-name">{b.name}</span>
+                    <span className="memory-bank-meta">
+                      {loadingBanks.includes(b.path) ? '加载中…' : b.fetched ? `${b.questionCount} 题${badCount ? ` · ${badCount} 道坏题` : ''}${b.issueCount ? ` · ${b.issueCount} 处问题` : ''}` : '未获取'}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
           </ul>
         )}
         {parsed.size > 0 && selection && (
@@ -334,10 +390,35 @@ export default function MemoryPage() {
             {progress.map((p) => (
               <li key={p.path}>
                 <span className="memory-bank-name">{p.name}</span>
-                <span className="memory-bank-meta">已练 {p.practiced}/{p.total} · 已掌握 {p.mastered}</span>
+                <span className="memory-bank-meta">
+                  已练 {p.practiced}/{p.total} · 已掌握 {p.mastered}{p.excluded ? ` · 排除坏题 ${p.excluded}` : ''}
+                </span>
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {badList.length > 0 && (
+        <section className="memory-card" aria-labelledby="memory-bad-title">
+          <details className="memory-bad-manage">
+            <summary id="memory-bad-title" className="memory-card-title">已标记坏题 · {badList.length} 道</summary>
+            <ul className="memory-bad-list">
+              {badList.map((b) => {
+                const q = parsed.get(b.bankPath)?.questions.find((item) => item.qid === b.qid);
+                return (
+                  <li key={b.qid}>
+                    <span className="memory-bad-text">
+                      <b>{bankName(b.bankPath)} · {b.id}</b>
+                      {q ? ` · ${q.question.replace(/\s+/g, ' ').slice(0, 60)}` : ''}
+                    </span>
+                    <button type="button" className="memory-textlink" onClick={() => void onUnmark(b.qid)}>恢复</button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="memory-note">恢复后该题会重新进入抽题范围；原有进度不受影响。</p>
+          </details>
         </section>
       )}
 

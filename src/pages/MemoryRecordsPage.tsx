@@ -5,6 +5,7 @@ import {
   type MemoryAttempt,
 } from '../data/memory';
 import { listBanks, type BankMeta } from '../data/qbankIndex';
+import { loadBadQuestionMap } from '../data/badQuestions';
 import { VERDICT_LABELS, type SrsState, type Verdict } from '../lib/srs';
 import { showToast } from '../lib/toast';
 import '../styles/memory.css';
@@ -22,15 +23,17 @@ function localStamp(): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** 已选题库中已缓存题库的题量和；无已选题库或全部未缓存时返回 null（界面显示「—」）。 */
-function totalCachedQuestions(selected: string[], banks: BankMeta[]): number | null {
+/** 已选题库中已缓存题库的题量和；坏题不计入。无已选题库或全部未缓存时返回 null（界面显示「—」）。 */
+function totalCachedQuestions(selected: string[], banks: BankMeta[], badByBank: Map<string, number>): number | null {
   const cached = banks.filter((b) => selected.includes(b.path) && b.fetched && b.questionCount !== null);
-  return cached.length ? cached.reduce((sum, b) => sum + (b.questionCount ?? 0), 0) : null;
+  if (!cached.length) return null;
+  return cached.reduce((sum, b) => sum + Math.max(0, (b.questionCount ?? 0) - (badByBank.get(b.path) ?? 0)), 0);
 }
 
 export default function MemoryRecordsPage() {
   const [attempts, setAttempts] = useState<MemoryAttempt[]>([]);
   const [srs, setSrs] = useState<SrsState[]>([]);
+  const [badQids, setBadQids] = useState<Set<string>>(new Set());
   const [totalQuestions, setTotalQuestions] = useState<number | null>(null);
   const [bankFilter, setBankFilter] = useState('');
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -40,12 +43,18 @@ export default function MemoryRecordsPage() {
   const reload = useCallback(async () => {
     // 全量读取：统计 / 档位分布 / 趋势 / 题库下拉与「已掌握」的全量 srs 口径保持一致；
     // 显示列表再用 shown 截断到最近 100 条。
-    const [att, srsMap, selection, banks] = await Promise.all([
-      listAttempts(), loadSrsMap(), getSelection(), listBanks(),
+    const [att, srsMap, selection, banks, badMap] = await Promise.all([
+      listAttempts(), loadSrsMap(), getSelection(), listBanks(), loadBadQuestionMap(),
     ]);
+    const excluded = new Set(badMap.keys());
+    const badByBank = new Map<string, number>();
+    for (const record of badMap.values()) {
+      badByBank.set(record.bankPath, (badByBank.get(record.bankPath) ?? 0) + 1);
+    }
     setAttempts(att);
-    setSrs([...srsMap.values()]);
-    setTotalQuestions(totalCachedQuestions(selection.banks, banks));
+    setSrs([...srsMap.values()].filter((s) => !excluded.has(s.qid)));
+    setBadQids(excluded);
+    setTotalQuestions(totalCachedQuestions(selection.banks, banks, badByBank));
     setOpenKey(null);
     // 筛选项指向的题库可能已随导入/清除消失：回退到「全部」，避免空列表误报。
     const available = new Set(att.map((a) => a.bankPath));
@@ -56,7 +65,10 @@ export default function MemoryRecordsPage() {
     void reload().catch(() => showToast('读取训练数据失败', { kind: 'error' }));
   }, [reload]);
 
-  const stats = useMemo(() => summarize(attempts, srs, Date.now()), [attempts, srs]);
+  const stats = useMemo(
+    () => summarize(attempts.filter((a) => !badQids.has(a.qid)), srs, Date.now()),
+    [attempts, badQids, srs],
+  );
   const banks = useMemo(() => [...new Set(attempts.map((a) => a.bankPath))].sort(), [attempts]);
   const shown = useMemo(
     () => (bankFilter ? attempts.filter((a) => a.bankPath === bankFilter) : attempts).slice(0, 100),
@@ -82,7 +94,7 @@ export default function MemoryRecordsPage() {
   const onImportFile = async (file: File) => {
     try {
       const r = await importMemory(await file.text());
-      showToast(`导入进度 ${r.srs} 条、记录 ${r.attempts} 条`);
+      showToast(`导入进度 ${r.srs} 条、记录 ${r.attempts} 条、坏题 ${r.bad} 道`);
       await reload();
     } catch (err) {
       showToast(err instanceof Error ? `导入失败：${err.message}` : '导入失败', { kind: 'error' });
@@ -91,7 +103,7 @@ export default function MemoryRecordsPage() {
 
   const onClear = async () => {
     if (clearing) return;
-    if (!window.confirm('确定清除全部训练进度与记录吗？此操作不可恢复（题库缓存与模型配置会保留）。')) return;
+    if (!window.confirm('确定清除全部训练进度与记录吗？此操作不可恢复（题库缓存、坏题标记与模型配置会保留）。')) return;
     setClearing(true);
     try {
       await clearTrainingData();

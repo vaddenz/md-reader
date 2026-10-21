@@ -5,6 +5,7 @@ import { favoritesCollection } from './favorites';
 import { memorySrsCollection } from './memorySrs';
 import { memoryAttemptsCollection } from './memoryAttempts';
 import { memorySelectionCollection } from './memorySelection';
+import { badQuestionsCollection } from './badQuestions';
 import type { SyncCollection } from '../types';
 
 export const SYNC_COLLECTIONS: readonly SyncCollection[] = [
@@ -15,6 +16,7 @@ export const SYNC_COLLECTIONS: readonly SyncCollection[] = [
   memorySrsCollection,
   memoryAttemptsCollection,
   memorySelectionCollection,
+  badQuestionsCollection,
 ];
 
 const byName = new Map(SYNC_COLLECTIONS.map((collection) => [collection.name, collection]));

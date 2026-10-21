@@ -8,6 +8,9 @@ import {
   saveSelection, saveSession, summarize,
   type MemoryAttempt,
 } from '../../src/data/memory';
+import {
+  loadBadQuestionMap, markBadQuestion, unmarkBadQuestion,
+} from '../../src/data/badQuestions';
 import type { SrsState } from '../../src/lib/srs';
 import type { OutboxEntry } from '../../src/sync/outbox';
 
@@ -159,6 +162,44 @@ describe('进度与记录', () => {
   });
 });
 
+describe('坏题标记', () => {
+  it('标记 / 撤销往返，并写 outbox；清除训练数据保留标记', async () => {
+    const marked = await markBadQuestion({ qid: 'q1', bankPath: 'b.jsonl', id: 'Q1' });
+    expect(marked.markedAt).toBeGreaterThan(0);
+    expect((await loadBadQuestionMap()).get('q1')).toMatchObject({ bankPath: 'b.jsonl', id: 'Q1' });
+
+    let entries = await outbox();
+    expect(entries.find((e) => e.collection === 'memory.badQuestions')).toMatchObject({
+      recordId: 'q1', deleted: false,
+    });
+
+    await putSrs(srs('q1'));
+    await appendAttempt(attempt());
+    await clearTrainingData();
+    expect((await loadBadQuestionMap()).has('q1')).toBe(true);
+    expect(await loadSrsMap()).toEqual(new Map());
+
+    expect(await unmarkBadQuestion('q1')).toBe(true);
+    expect((await loadBadQuestionMap()).has('q1')).toBe(false);
+    entries = await outbox();
+    expect(entries.find((e) => e.collection === 'memory.badQuestions')).toMatchObject({
+      recordId: 'q1', deleted: true,
+    });
+    expect(await unmarkBadQuestion('q1')).toBe(false);
+  });
+
+  it('导出 / 导入坏题；重复导入幂等', async () => {
+    await markBadQuestion({ qid: 'q1', bankPath: 'b.jsonl', id: 'Q1' });
+    const json = await exportMemory();
+    expect(JSON.parse(json).badQuestions).toHaveLength(1);
+
+    await clearAllData();
+    expect(await importMemory(json)).toEqual({ srs: 0, attempts: 0, bad: 1 });
+    expect((await loadBadQuestionMap()).get('q1')).toMatchObject({ qid: 'q1', bankPath: 'b.jsonl', id: 'Q1' });
+    expect(await importMemory(json)).toEqual({ srs: 0, attempts: 0, bad: 0 });
+  });
+});
+
 describe('同步 outbox 与 reset', () => {
   it('putSrs / appendAttempt 写 outbox；attempt 用稳定键', async () => {
     await putSrs(srs('q1'));
@@ -198,7 +239,7 @@ describe('同步 outbox 与 reset', () => {
       'memory.attempts': { [`q1|${NOW}|ai`]: 1 },
     });
     const json = JSON.stringify({ kind: 'memory', srs: [srs('q1')], attempts: [attempt()] });
-    expect(await importMemory(json)).toEqual({ srs: 1, attempts: 1 });
+    expect(await importMemory(json)).toEqual({ srs: 1, attempts: 1, bad: 0 });
     expect(await kvGet('syncTombstones')).toEqual({});
     const entries = await outbox();
     expect(entries.map((e) => e.collection).sort()).toEqual(['memory.attempts', 'memory.srs']);
@@ -228,9 +269,9 @@ describe('导出 / 导入', () => {
 
     await clearAllData();
     const res = await importMemory(json);
-    expect(res).toEqual({ srs: 1, attempts: 1 });
+    expect(res).toEqual({ srs: 1, attempts: 1, bad: 0 });
     const again = await importMemory(json); // 幂等：重复导入不重复追加
-    expect(again).toEqual({ srs: 0, attempts: 0 });
+    expect(again).toEqual({ srs: 0, attempts: 0, bad: 0 });
 
     // 本地较新时不被覆盖
     await putSrs(srs('q1', { lastAt: 999, stage: 5 }));

@@ -48,7 +48,7 @@
 .memory-zone-answer .memory-options { margin-top: 0; }
 
 /* 三级操作：文字链接（提示 / 查看参考答案），进一步弱化 */
-.memory-textactions { display: flex; justify-content: center; gap: 28px; }
+.memory-textactions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; }
 .memory-textlink {
   min-height: 36px; padding: 0 6px; border: 0; background: none;
   color: var(--ink2); font: inherit; font-size: 13px;
@@ -96,6 +96,15 @@
 .memory-progress { list-style: none; margin: 4px 0 0; padding: 0; }
 .memory-progress li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
 .memory-progress li:first-child { border-top: 0; }
+.memory-progress .memory-bank-meta { white-space: normal; text-align: right; }
+.memory-bad-manage summary { cursor: pointer; }
+.memory-bad-manage summary::marker { color: var(--ink2); }
+.memory-bad-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.memory-bad-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.memory-bad-list li:first-child { border-top: 0; }
+.memory-bad-text { min-width: 0; overflow-wrap: anywhere; color: var(--ink2); font-size: 13px; line-height: 1.55; }
+.memory-bad-text b { color: var(--ink); font-weight: 500; }
+.memory-bad-list .memory-textlink { flex: none; }
 .memory-footnote { margin: 16px 0 0; color: var(--ink2); font-size: 12.5px; line-height: 1.6; }
 
 .memory-md { font-size: 15px; line-height: 1.7; }

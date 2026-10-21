@@ -9,6 +9,7 @@ import { nextUpdatedAt } from '../sync/device';
 import { commitWithNotify, enqueueChange } from '../sync/outbox';
 import { clearTombstoneTx } from '../sync/tombstones';
 import { COLLECTIONS, RESET_RECORD_ID } from '../sync/collections/names';
+import { listBadQuestions, mergeBadQuestionsTx } from './badQuestions';
 
 /** 推理强度：与 OpenCode / OpenAI 兼容接口的 `reasoning_effort` 对齐。 */
 export type LlmReasoningEffort = 'low' | 'high' | 'max';
@@ -356,7 +357,7 @@ export async function clearSession(): Promise<void> {
   await (await openDb()).delete('kv', SESSION_KEY);
 }
 
-/** 清除训练进度与记录、会话；保留题库缓存、模型配置与范围选择。 */
+/** 清除训练进度与记录、会话；保留题库缓存、坏题标记、模型配置与范围选择。 */
 export async function clearTrainingData(): Promise<void> {
   const db = await openDb();
   const tx = db.transaction(['mem_srs', 'mem_attempts', 'kv', 'sync_outbox'], 'readwrite');
@@ -396,11 +397,13 @@ export async function clearTrainingData(): Promise<void> {
 
 export async function exportMemory(): Promise<string> {
   const db = await openDb();
-  const [srs, attempts] = await Promise.all([db.getAll('mem_srs'), db.getAll('mem_attempts')]);
-  return JSON.stringify({ app: 'md-reader', kind: 'memory', version: 1, exportedAt: Date.now(), srs, attempts }, null, 2);
+  const [srs, attempts, badQuestions] = await Promise.all([
+    db.getAll('mem_srs'), db.getAll('mem_attempts'), listBadQuestions(),
+  ]);
+  return JSON.stringify({ app: 'md-reader', kind: 'memory', version: 1, exportedAt: Date.now(), srs, attempts, badQuestions }, null, 2);
 }
 
-export async function importMemory(json: string): Promise<{ srs: number; attempts: number }> {
+export async function importMemory(json: string): Promise<{ srs: number; attempts: number; bad: number }> {
   let data: unknown;
   try { data = JSON.parse(json); } catch { throw new Error('文件不是合法 JSON'); }
   if (!data || typeof data !== 'object' || Array.isArray(data) || (data as { kind?: unknown }).kind !== 'memory') {
@@ -408,6 +411,7 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
   }
   const rawSrs = Array.isArray((data as { srs?: unknown }).srs) ? (data as { srs: unknown[] }).srs : [];
   const rawAttempts = Array.isArray((data as { attempts?: unknown }).attempts) ? (data as { attempts: unknown[] }).attempts : [];
+  const rawBad = (data as { badQuestions?: unknown }).badQuestions;
 
   const db = await openDb();
   const tx = db.transaction(['mem_srs', 'mem_attempts', 'kv', 'sync_outbox'], 'readwrite');
@@ -441,8 +445,9 @@ export async function importMemory(json: string): Promise<{ srs: number; attempt
     existingKeys.add(key);
     attemptsImported += 1;
   }
+  const bad = await mergeBadQuestionsTx(tx, rawBad);
   await commitWithNotify(tx);
-  return { srs: srsImported, attempts: attemptsImported };
+  return { srs: srsImported, attempts: attemptsImported, bad };
 }
 
 /** AI 评分记录的分值（非 AI 或无分数返回 null），供均分/趋势统一口径。 */

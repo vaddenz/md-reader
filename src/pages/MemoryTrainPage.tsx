@@ -9,6 +9,7 @@ import {
   type LlmConfig, type MemorySession,
 } from '../data/memory';
 import { getParsedBank } from '../data/qbankIndex';
+import { loadBadQuestionMap, markBadQuestion } from '../data/badQuestions';
 import { extractHintKeywords } from '../lib/hints';
 import type { BankQuestion } from '../lib/qbank';
 import { VERDICT_LABELS, nextState, verdictFromChoice, type SrsState, type Verdict } from '../lib/srs';
@@ -44,6 +45,7 @@ export default function MemoryTrainPage() {
   const [result, setResult] = useState<ResultState | null>(null);
   const [awaitingSelf, setAwaitingSelf] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [markingBad, setMarkingBad] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [hintLevel, setHintLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +56,17 @@ export default function MemoryTrainPage() {
   const abortRef = useRef<AbortController | null>(null);
   /** 「查看参考答案」发起的取消：区分于其它取消，取消后保留 onReveal 设置的 result + 自评视图。 */
   const revealRequestedRef = useRef(false);
+  /** 「标记坏题」发起的取消：取消在途评分后由标记流程接管跳题，不再切回作答视图。 */
+  const markBadRequestedRef = useRef(false);
 
   // 载入会话 + 已缓存题库（离线可用；题目不在题库时的跳过在视图层处理）
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const s = await getSession();
-      const [cfg, srsDb, metas] = await Promise.all([getLlmConfig(), loadSrsMap(), listFilesMeta()]);
+      const [cfg, srsDb, metas, bad] = await Promise.all([
+        getLlmConfig(), loadSrsMap(), listFilesMeta(), loadBadQuestionMap(),
+      ]);
       if (cancelled) return;
       if (!s || s.items.length === 0) { navigate(toRouterPath(MEMORY)); return; }
       // 一轮训练一个 OpenCode 会话：整轮评分复用同一 session ID，便于服务端复用提示词缓存。
@@ -74,12 +80,15 @@ export default function MemoryTrainPage() {
       for (const path of [...new Set(s.items.map((i) => i.bankPath))]) {
         const bank = await getParsedBank(path).catch(() => undefined);
         if (!bank) continue;
-        for (const q of bank.questions) viewsNext.set(q.qid, { bankPath: path, bankName: bank.name, question: q });
+        for (const q of bank.questions) {
+          if (bad.has(q.qid)) continue;
+          viewsNext.set(q.qid, { bankPath: path, bankName: bank.name, question: q });
+        }
       }
       if (cancelled) return;
       setViews(viewsNext);
       const missing = s.items.filter((i) => !viewsNext.has(i.qid)).length;
-      if (missing) showToast(`有 ${missing} 道题已不在题库中，将自动跳过`);
+      if (missing) showToast(`有 ${missing} 道题已不在题库中或已标记坏题，将自动跳过`);
       setPhase('answering');
     })();
     return () => { cancelled = true; };
@@ -127,6 +136,7 @@ export default function MemoryTrainPage() {
     setError(null);
     setThinking('');
     revealRequestedRef.current = false;
+    markBadRequestedRef.current = false;
     questionStartedAt.current = Date.now();
   }, []);
 
@@ -203,13 +213,15 @@ export default function MemoryTrainPage() {
           answer: q.answer ?? '',
           userAnswer: text,
         }, { signal: ac.signal, onDelta: (d) => { if (d.reasoning) setThinking((prev) => prev + d.reasoning); } });
+        // 评分期间用户已标记坏题：结果不再落库，由标记流程接管跳题。
+        if (markBadRequestedRef.current) return;
         await persist({ verdict: res.verdict, mode: 'ai', score: res.score, hit: res.hit, missed: res.missed, comment: res.comment });
         setResult({ ...res, mode: 'ai' });
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') {
-          // 查看参考答案触发的取消：不改回作答视图，让 onReveal 设置的 result + 自评视图生效；
-          // 其它取消（无 reveal 意图）维持原行为：回到作答视图。
-          if (!revealRequestedRef.current) setPhase('answering');
+          // 查看参考答案 / 标记坏题触发的取消：由对应流程接管界面；
+          // 其它取消（无明确意图）维持原行为：回到作答视图。
+          if (!revealRequestedRef.current && !markBadRequestedRef.current) setPhase('answering');
           return;
         }
         setError(err instanceof LlmError ? `评分失败：${err.message}` : '评分失败，可重试或改为自评');
@@ -270,11 +282,14 @@ export default function MemoryTrainPage() {
     setPhase('result');
   }, [current, eliminated, persist, picked, saving]);
 
-  const onNext = useCallback(async () => {
+  /** 跳到下一道可作答的题；skipQid 用于刚被标记为坏题的当前题。 */
+  const advance = useCallback(async (skipQid?: string) => {
     if (!session || currentIndex === null) { setPhase('finished'); return; }
     let next: number | null = null;
     for (let i = currentIndex + 1; i < session.items.length; i++) {
-      if (views.has(session.items[i].qid)) { next = i; break; }
+      const item = session.items[i];
+      if (item.qid === skipQid) continue;
+      if (views.has(item.qid)) { next = i; break; }
     }
     if (next === null) {
       setSession((s) => (s ? { ...s, index: s.items.length } : s));
@@ -288,6 +303,28 @@ export default function MemoryTrainPage() {
     resetQuestionState();
     setPhase('answering');
   }, [currentIndex, resetQuestionState, session, views]);
+
+  const onNext = useCallback(async () => {
+    await advance();
+  }, [advance]);
+
+  const onMarkBad = useCallback(async () => {
+    if (!session || currentIndex === null || !current || markingBad) return;
+    markBadRequestedRef.current = true;
+    abortRef.current?.abort();
+    setMarkingBad(true);
+    try {
+      await markBadQuestion({ qid: current.question.qid, bankPath: current.bankPath, id: current.question.id });
+      showToast('已标记为坏题，之后不再出现');
+      await advance(current.question.qid);
+    } catch {
+      markBadRequestedRef.current = false;
+      setPhase((phaseNow) => (phaseNow === 'scoring' ? 'answering' : phaseNow));
+      showToast('标记失败，请重试', { kind: 'error' });
+    } finally {
+      setMarkingBad(false);
+    }
+  }, [advance, current, currentIndex, markingBad, session]);
 
   /** 结束训练：清空会话并回到概览（结果视图的次级按钮）。 */
   const onEnd = useCallback(async () => {
@@ -513,6 +550,15 @@ export default function MemoryTrainPage() {
               <button type="button" className="memory-textlink" onClick={onReveal} disabled={q.kind !== 'qa' && saving}>
                 查看参考答案
               </button>
+              <button
+                type="button"
+                className="memory-textlink"
+                onClick={() => void onMarkBad()}
+                disabled={markingBad || saving}
+                title="以后抽题时跳过这道题"
+              >
+                {markingBad ? '标记中…' : '标记坏题'}
+              </button>
             </div>
           </div>
           {phase === 'scoring' && (
@@ -607,7 +653,7 @@ function FollowUpPanel(props: { followUpOf: string; parent: QueueView | null; kn
           <p className="memory-note">母题上下文，不计入本次记录。</p>
         </div>
       )}
-      {open && !props.parent && <p className="memory-note">母题不在当前题库缓存中。</p>}
+      {open && !props.parent && <p className="memory-note">母题不在当前题库缓存中（或已标记坏题）。</p>}
     </div>
   );
 }
