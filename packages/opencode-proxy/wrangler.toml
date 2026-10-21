@@ -1,0 +1,9 @@
+name = "md-reader-opencode"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# 默认值即可直接用；需要收紧来源时在 Cloudflare 控制台或这里加：
+# [vars]
+# ALLOWED_ORIGINS = "https://vaddenz.github.io,http://localhost:5173"
+# UPSTREAM = "https://opencode.ai/inference/go/openai"
+# USER_AGENT = "opencode/latest/2.1.1/cli"

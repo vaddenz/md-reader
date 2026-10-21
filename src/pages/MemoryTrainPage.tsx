@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MEMORY, toRouterPath } from '../app/nav';
 import MarkdownBlock from '../components/memory/MarkdownBlock';
 import { listFilesMeta } from '../data/db';
-import { LlmError, isLlmConfigured, scoreAnswer } from '../data/llm';
+import { LlmError, beginOpencodeSession, isLlmConfigured, scoreAnswer } from '../data/llm';
 import {
   appendAttempt, clearSession, getLlmConfig, getSession, listAttempts, loadSrsMap, putSrs, saveSession,
   type LlmConfig, type MemorySession,
@@ -61,6 +61,8 @@ export default function MemoryTrainPage() {
       const [cfg, srsDb, metas] = await Promise.all([getLlmConfig(), loadSrsMap(), listFilesMeta()]);
       if (cancelled) return;
       if (!s || s.items.length === 0) { navigate(toRouterPath(MEMORY)); return; }
+      // 一轮训练一个 OpenCode 会话：整轮评分复用同一 session ID，便于服务端复用提示词缓存。
+      beginOpencodeSession();
       setSession(s);
       setLlm(cfg);
       setSrsMap(srsDb);

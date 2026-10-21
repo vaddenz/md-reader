@@ -33,6 +33,8 @@ export interface ScoreResult {
 
 export const DEFAULT_TIMEOUT_MS = 45_000;
 const LIMITS = { userAnswer: 4000, answer: 6000, question: 2000, prompt: 2000 };
+/** OpenCode 代理路由前缀：baseUrl 形如 `https://<worker>/opencode/v1`。 */
+const OPENCODE_PROXY_PREFIX = '/opencode';
 
 interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
 export interface LlmRequestOpts { signal?: AbortSignal; timeoutMs?: number; fetchImpl?: typeof fetch }
@@ -44,6 +46,54 @@ export function isLlmConfigured(cfg: LlmConfig | undefined | null): cfg is LlmCo
 export function chatCompletionsUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, '');
   return /\/chat\/completions$/i.test(trimmed) ? trimmed : `${trimmed}/chat/completions`;
+}
+
+/** 判断地址是否指向 OpenCode（直连 opencode.ai，或本仓库 Worker 代理的 `/opencode/*` 路由）。 */
+export function isOpenCodeTarget(baseUrl: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if (host === 'opencode.ai' || host.endsWith('.opencode.ai')) return true;
+  if (path.includes('/inference/go') || path.includes('/zen/go')) return true;
+  return path === OPENCODE_PROXY_PREFIX || path.startsWith(`${OPENCODE_PROXY_PREFIX}/`);
+}
+
+function randomSessionId(): string {
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const bytes = new Uint8Array(26);
+  crypto.getRandomValues(bytes);
+  let id = '';
+  for (const b of bytes) id += alphabet[b % alphabet.length];
+  return `ses_${id}`;
+}
+
+let opencodeSessionId: string | null = null;
+
+/** 当前训练会话的 OpenCode 会话 ID；未显式开始时按需生成。 */
+export function currentOpencodeSession(): string {
+  opencodeSessionId ??= randomSessionId();
+  return opencodeSessionId;
+}
+
+/** 进入一次训练时调用：整轮训练复用同一个会话 ID（提升 OpenCode 提示词缓存命中率）。 */
+export function beginOpencodeSession(): string {
+  opencodeSessionId = randomSessionId();
+  return opencodeSessionId;
+}
+
+/** 浏览器禁止设置 User-Agent：OpenCode 需要的那部分由 Worker 代理注入。 */
+function requestHeaders(apiKey: string, baseUrl: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+  if (isOpenCodeTarget(baseUrl)) headers['x-opencode-session'] = currentOpencodeSession();
+  return headers;
 }
 
 export function truncateText(text: string, max: number): string {
@@ -129,7 +179,7 @@ async function requestChat(
     try {
       res = await fetchImpl(chatCompletionsUrl(baseUrl), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        headers: requestHeaders(apiKey, baseUrl),
         body: JSON.stringify({ model, messages, temperature: 0.2 }),
         signal: controller.signal,
       });

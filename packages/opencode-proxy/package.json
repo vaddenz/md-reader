@@ -1,0 +1,17 @@
+{
+  "name": "@md-reader/opencode-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenCode Go 的 Cloudflare Worker 代理：补 CORS、User-Agent 与 x-opencode-session",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.0.0"
+  }
+}

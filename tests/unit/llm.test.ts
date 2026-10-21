@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  LlmError, chatCompletionsUrl, extractScoreJson, isLlmConfigured, scoreAnswer, testConnection, toScoreResult, truncateText,
+  LlmError, beginOpencodeSession, chatCompletionsUrl, currentOpencodeSession, extractScoreJson, isLlmConfigured,
+  isOpenCodeTarget, scoreAnswer, testConnection, toScoreResult, truncateText,
 } from '../../src/data/llm';
 
 const CFG = { baseUrl: 'https://llm.example/v1', apiKey: 'k', model: 'm' };
@@ -164,5 +165,44 @@ describe('testConnection', () => {
     await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => new Response('not json', { status: 200 })) })).resolves.toBeUndefined();
     await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => new Response(null, { status: 204 })) })).resolves.toBeUndefined();
     await expect(testConnection(CFG, { fetchImpl: vi.fn(async () => chat('x', 401)) })).rejects.toMatchObject({ kind: 'auth' });
+  });
+});
+
+describe('OpenCode 会话头', () => {
+  it('识别直连与 Worker 代理地址，其它地址不受影响', () => {
+    expect(isOpenCodeTarget('https://opencode.ai/inference/go/openai/v1')).toBe(true);
+    expect(isOpenCodeTarget('https://api.opencode.ai/zen/go/v1')).toBe(true);
+    expect(isOpenCodeTarget('https://md-reader-opencode.pw.workers.dev/opencode/v1')).toBe(true);
+    expect(isOpenCodeTarget('https://md-reader-opencode.pw.workers.dev/opencode')).toBe(true);
+    expect(isOpenCodeTarget('https://llm.example/v1')).toBe(false);
+    expect(isOpenCodeTarget('https://example.com/opencodeish/v1')).toBe(false);
+    expect(isOpenCodeTarget('not a url')).toBe(false);
+  });
+
+  it('整轮训练复用同一个 session ID，换一轮才更新', async () => {
+    const fetchImpl = vi.fn(async () => chat(OK));
+    const cfg = { ...CFG, baseUrl: 'https://md-reader-opencode.pw.workers.dev/opencode/v1' };
+    const first = beginOpencodeSession();
+    expect(first).toMatch(/^ses_[0-9A-Za-z]{26}$/);
+    expect(currentOpencodeSession()).toBe(first);
+
+    await scoreAnswer(cfg, INPUT, { fetchImpl });
+    await scoreAnswer(cfg, INPUT, { fetchImpl });
+    const calls = fetchImpl.mock.calls as unknown as [string, RequestInit][];
+    const headers = calls.map((call) => new Headers(call[1].headers));
+    expect(headers.map((h) => h.get('x-opencode-session'))).toEqual([first, first]);
+
+    const next = beginOpencodeSession();
+    expect(next).not.toBe(first);
+    await scoreAnswer(cfg, INPUT, { fetchImpl });
+    expect(new Headers(calls[2][1].headers).get('x-opencode-session')).toBe(next);
+  });
+
+  it('非 OpenCode 地址不带会话头', async () => {
+    const fetchImpl = vi.fn(async () => chat(OK));
+    beginOpencodeSession();
+    await scoreAnswer(CFG, INPUT, { fetchImpl });
+    const [call] = fetchImpl.mock.calls as unknown as [string, RequestInit][];
+    expect(new Headers(call[1].headers).get('x-opencode-session')).toBeNull();
   });
 });

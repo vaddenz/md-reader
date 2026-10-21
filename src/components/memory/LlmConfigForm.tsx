@@ -45,6 +45,8 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
     }
   };
 
+  const opencodeDirect = /^https?:\/\/([^/]+\.)?opencode\.ai(\/|$)/i.test(draft.baseUrl.trim());
+
   return (
     <div className="memory-llm-form">
       <label className="memory-field">
@@ -74,6 +76,16 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
         问答评分时会把题干、参考答案与你的作答发送到你填写的地址；Key 仅保存在本机。
         直连需服务端允许浏览器跨域（CORS），Ollama 需配置 <code>OLLAMA_ORIGINS</code>。
       </p>
+      <p className="memory-note">
+        用 OpenCode Go 时填 Worker 代理地址（<code>https://&lt;worker&gt;/opencode/v1</code>）：
+        浏览器无法直连 <code>opencode.ai</code>，也不能设置 User-Agent，这两项由代理补上；
+        会话头 <code>x-opencode-session</code> 由应用自动附带。
+      </p>
+      {opencodeDirect && (
+        <p className="memory-note" role="alert">
+          检测到直连 <code>opencode.ai</code>：浏览器会被 CORS 拦截，请改用本仓库的 Worker 代理地址。
+        </p>
+      )}
     </div>
   );
 }

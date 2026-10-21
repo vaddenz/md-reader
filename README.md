@@ -27,7 +27,7 @@
 - 同一 GitHub 用户名下的多仓库：设置页添加 / 切换 / 删除；每个仓库拥有独立的本机书库（缓存、收藏、进度、标签页、高亮、笔记、训练数据互不串）；
 - mermaid 流程图、图片、删除线 / `==高亮==` 语法标记；
 - 灵活的目录跳转、全文搜索；
-- 记忆助手：从仓库 JSONL 题库（问答 / 单选 / 多选 / 追问）按艾宾浩斯间隔训练，AI 评分（可配 OpenAI 兼容接口）或离线自评，本地训练记录与统计（`#/memory`）；训练题量与模型设置在「设置 › 记忆助手」，跨仓库共享；
+- 记忆助手：从仓库 JSONL 题库（问答 / 单选 / 多选 / 追问）按艾宾浩斯间隔训练，AI 评分（可配 OpenAI 兼容接口；OpenCode Go 经仓库内 Worker 代理接入）或离线自评，本地训练记录与统计（`#/memory`）；训练题量与模型设置在「设置 › 记忆助手」，跨仓库共享；
 - 跨设备同步（可选，Neon；自动同步默认关闭，需手动开启）：阅读进度、高亮、笔记、收藏、记忆 SRS、训练记录与题库偏好在多台设备间同步；正文、GitHub Token、AI Key 永不上传；
 - 离线缓存。
 
@@ -43,6 +43,8 @@
 - 记忆助手真机验收清单（v1.3）：[`docs/acceptance-2026-10-19-memory-assistant.md`](docs/acceptance-2026-10-19-memory-assistant.md)
 - 跨设备同步设计（v1.7）：[`docs/specs/2026-10-20-data-sync-design.md`](docs/specs/2026-10-20-data-sync-design.md)
 - 文字笔记设计（v1.8）：[`docs/specs/2026-10-21-notes-design.md`](docs/specs/2026-10-21-notes-design.md)
+- OpenCode Go 代理设计：[`docs/specs/2026-10-21-opencode-go-proxy-design.md`](docs/specs/2026-10-21-opencode-go-proxy-design.md)
+- OpenCode Go 代理部署指南（Cloudflare Worker）：[`packages/opencode-proxy/README.md`](packages/opencode-proxy/README.md)
 - 文字笔记真机验收清单（v1.8）：[`docs/acceptance-2026-10-21-notes.md`](docs/acceptance-2026-10-21-notes.md)
 - 跨设备同步配置指南（Neon / JWT / SQL / CORS）：[`docs/sync-neon-setup.md`](docs/sync-neon-setup.md)
 - 跨设备同步验收清单（v1.7）：[`docs/acceptance-2026-10-20-data-sync.md`](docs/acceptance-2026-10-20-data-sync.md)
