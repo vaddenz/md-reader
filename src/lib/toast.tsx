@@ -8,11 +8,24 @@ import '../styles/toast.css';
 
 export type ToastKind = 'info' | 'error';
 
+export interface ToastAction {
+  label: string;
+  onAction: () => void;
+}
+
+export interface ToastOptions {
+  kind?: ToastKind;
+  durationMs?: number;
+  /** 可选操作按钮（如「撤销」）；点击后先关闭本条，再执行回调。 */
+  action?: ToastAction;
+}
+
 export interface ToastItem {
   id: number;
   text: string;
   kind: ToastKind;
   durationMs: number;
+  action?: ToastAction;
 }
 
 /** 自动消失时长（ms）。 */
@@ -28,12 +41,13 @@ const listeners = new Set<Listener>();
 let nextId = 1;
 
 /** 显示一条 toast；返回条目 id（供测试/程序化关闭）。 */
-export function showToast(text: string, opts: { kind?: ToastKind; durationMs?: number } = {}): number {
+export function showToast(text: string, opts: ToastOptions = {}): number {
   const item: ToastItem = {
     id: nextId++,
     text,
     kind: opts.kind ?? 'info',
     durationMs: opts.durationMs ?? DEFAULT_DURATION_MS,
+    ...(opts.action ? { action: opts.action } : {}),
   };
   for (const listener of [...listeners]) listener(item);
   return item.id;
@@ -84,15 +98,28 @@ export function ToastHost() {
   return (
     <div className="toast-host" role="status" aria-live="polite">
       {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={`toast toast-${item.kind}`}
-          title="点击关闭"
-          onClick={() => dismiss(item.id)}
-        >
-          {item.text}
-        </button>
+        <div key={item.id} className={`toast-wrap toast-${item.kind}${item.action ? ' toast-wrap-action' : ''}`}>
+          <button
+            type="button"
+            className={`toast toast-${item.kind}`}
+            title="点击关闭"
+            onClick={() => dismiss(item.id)}
+          >
+            {item.text}
+          </button>
+          {item.action && (
+            <button
+              type="button"
+              className="toast-action"
+              onClick={() => {
+                dismiss(item.id);
+                item.action!.onAction();
+              }}
+            >
+              {item.action.label}
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );

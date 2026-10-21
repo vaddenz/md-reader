@@ -390,9 +390,10 @@ export default function MemoryPage() {
             {progress.map((p) => (
               <li key={p.path}>
                 <span className="memory-bank-name">{p.name}</span>
-                <span className="memory-bank-meta">
-                  已练 {p.practiced}/{p.total} · 已掌握 {p.mastered}{p.excluded ? ` · 排除坏题 ${p.excluded}` : ''}
-                </span>
+                <span className="memory-bank-meta">已练 {p.practiced}/{p.total} · 已掌握 {p.mastered}</span>
+                {p.excluded > 0 && (
+                  <span className="memory-bank-sub">题库 {p.total + p.excluded} 题，{p.excluded} 道坏题已排除</span>
+                )}
               </li>
             ))}
           </ul>
@@ -412,7 +413,7 @@ export default function MemoryPage() {
                       <b>{bankName(b.bankPath)} · {b.id}</b>
                       {q ? ` · ${q.question.replace(/\s+/g, ' ').slice(0, 60)}` : ''}
                     </span>
-                    <button type="button" className="memory-textlink" onClick={() => void onUnmark(b.qid)}>恢复</button>
+                    <button type="button" className="memory-restore" onClick={() => void onUnmark(b.qid)}>恢复</button>
                   </li>
                 );
               })}

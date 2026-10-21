@@ -41,7 +41,7 @@
   padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
 }
 .memory-train .memory-header { flex: none; }
-.memory-train-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.memory-train-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: 80px; }
 .memory-zone-question { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .memory-zone-answer { flex: none; padding-top: 12px; }
 .memory-zone-answer .memory-input,
@@ -94,17 +94,29 @@
 .memory-field input { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-ctl); font: inherit; }
 .memory-field select { min-height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--card); color: var(--ink); font: inherit; }
 .memory-progress { list-style: none; margin: 4px 0 0; padding: 0; }
-.memory-progress li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.memory-progress li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 8px; padding: 6px 0; border-top: 1px solid var(--line); }
 .memory-progress li:first-child { border-top: 0; }
-.memory-progress .memory-bank-meta { white-space: normal; text-align: right; }
-.memory-bad-manage summary { cursor: pointer; }
+.memory-progress .memory-bank-name { min-width: 0; overflow-wrap: anywhere; }
+.memory-progress .memory-bank-meta { white-space: nowrap; text-align: right; }
+.memory-bank-sub { grid-column: 1 / -1; color: var(--ink2); font-size: 12px; line-height: 1.5; }
+.memory-bad-manage summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; }
+.memory-bad-manage summary::before {
+  content: '▸'; margin-right: 8px; color: var(--ink2);
+  transition: transform 0.15s ease;
+}
+.memory-bad-manage[open] summary::before { transform: rotate(90deg); }
 .memory-bad-manage summary::marker { color: var(--ink2); }
 .memory-bad-list { list-style: none; margin: 4px 0 0; padding: 0; }
 .memory-bad-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 .memory-bad-list li:first-child { border-top: 0; }
 .memory-bad-text { min-width: 0; overflow-wrap: anywhere; color: var(--ink2); font-size: 13px; line-height: 1.55; }
 .memory-bad-text b { color: var(--ink); font-weight: 500; }
-.memory-bad-list .memory-textlink { flex: none; }
+.memory-restore {
+  flex: none; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--card); color: var(--ink);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
 .memory-footnote { margin: 16px 0 0; color: var(--ink2); font-size: 12.5px; line-height: 1.6; }
 
 .memory-md { font-size: 15px; line-height: 1.7; }

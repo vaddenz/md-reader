@@ -55,6 +55,19 @@ describe('toast', () => {
     expect(toasts(c)).toHaveLength(0);
   });
 
+  it('操作按钮触发回调并关闭本条', () => {
+    const c = mountHost();
+    let called = 0;
+    act(() => {
+      showToast('已标记', { action: { label: '撤销', onAction: () => { called += 1; } } });
+    });
+    const action = c.querySelector<HTMLButtonElement>('.toast-action')!;
+    expect(action.textContent).toBe('撤销');
+    act(() => { action.click(); });
+    expect(called).toBe(1);
+    expect(toasts(c)).toHaveLength(0);
+  });
+
   it('到时自动消失', async () => {
     const c = mountHost();
     act(() => { showToast('短暂', { durationMs: 30 }); });

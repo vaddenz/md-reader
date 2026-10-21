@@ -9,7 +9,7 @@ import {
   type LlmConfig, type MemorySession,
 } from '../data/memory';
 import { getParsedBank } from '../data/qbankIndex';
-import { loadBadQuestionMap, markBadQuestion } from '../data/badQuestions';
+import { loadBadQuestionMap, markBadQuestion, unmarkBadQuestion } from '../data/badQuestions';
 import { extractHintKeywords } from '../lib/hints';
 import type { BankQuestion } from '../lib/qbank';
 import { VERDICT_LABELS, nextState, verdictFromChoice, type SrsState, type Verdict } from '../lib/srs';
@@ -308,15 +308,28 @@ export default function MemoryTrainPage() {
     await advance();
   }, [advance]);
 
+  const undoMarked = useCallback(async (qid: string) => {
+    try {
+      await unmarkBadQuestion(qid);
+      showToast('已恢复该题', { durationMs: 2500 });
+    } catch {
+      showToast('撤销失败，请重试', { kind: 'error' });
+    }
+  }, []);
+
   const onMarkBad = useCallback(async () => {
     if (!session || currentIndex === null || !current || markingBad) return;
+    const marked = current;
     markBadRequestedRef.current = true;
     abortRef.current?.abort();
     setMarkingBad(true);
     try {
-      await markBadQuestion({ qid: current.question.qid, bankPath: current.bankPath, id: current.question.id });
-      showToast('已标记为坏题，之后不再出现');
-      await advance(current.question.qid);
+      await markBadQuestion({ qid: marked.question.qid, bankPath: marked.bankPath, id: marked.question.id });
+      showToast('已标记为坏题，之后不再出现', {
+        durationMs: 5000,
+        action: { label: '撤销', onAction: () => void undoMarked(marked.question.qid) },
+      });
+      await advance(marked.question.qid);
     } catch {
       markBadRequestedRef.current = false;
       setPhase((phaseNow) => (phaseNow === 'scoring' ? 'answering' : phaseNow));
@@ -324,7 +337,7 @@ export default function MemoryTrainPage() {
     } finally {
       setMarkingBad(false);
     }
-  }, [advance, current, currentIndex, markingBad, session]);
+  }, [advance, current, currentIndex, markingBad, session, undoMarked]);
 
   /** 结束训练：清空会话并回到概览（结果视图的次级按钮）。 */
   const onEnd = useCallback(async () => {
@@ -382,6 +395,8 @@ export default function MemoryTrainPage() {
     return null;
   }, [current, views]);
 
+  const trainClass = 'memory memory-train';
+
   // —— 渲染段（第 2/2 段继续）——
 
   if (phase === 'loading') {
@@ -392,7 +407,7 @@ export default function MemoryTrainPage() {
     const scores = session?.scores ?? [];
     const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
     return (
-      <main className="memory memory-train">
+      <main className={trainClass}>
         <section className="memory-card memory-train-card" aria-labelledby="memory-finished-title">
           <div className="memory-zone-question">
             <h2 id="memory-finished-title" className="memory-card-title">本次训练完成</h2>
@@ -436,7 +451,7 @@ export default function MemoryTrainPage() {
 
   if (phase === 'result') {
     return (
-      <main className="memory memory-train">
+      <main className={trainClass}>
         <header className="memory-header">
           <button type="button" className="memory-back" onClick={() => navigate(toRouterPath(MEMORY))}>← 返回概览</button>
         </header>
@@ -501,7 +516,7 @@ export default function MemoryTrainPage() {
   }
 
   return (
-    <main className="memory memory-train">
+    <main className={trainClass}>
       <header className="memory-header">
         <button type="button" className="memory-back" onClick={() => navigate(toRouterPath(MEMORY))}>← 暂时离开</button>
         <span className="memory-meta memory-bank-meta">第 {(currentIndex ?? 0) + 1} / {session?.items.length ?? 0} 题</span>
