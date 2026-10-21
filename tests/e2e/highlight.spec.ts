@@ -78,7 +78,7 @@ test('右键菜单：选中文字出现菜单，复制与高亮黄可用', async
   await selectAndContextMenu(page, 'MVCC 并发控制');
   const menu = page.locator('.selection-menu');
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '笔记', '高亮·黄', '高亮·红']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '笔记', '从这里朗读', '高亮·黄', '高亮·红']);
 
   await menu.getByRole('menuitem', { name: '复制' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__copied)).toBe('MVCC 并发控制');
