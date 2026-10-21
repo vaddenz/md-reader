@@ -1,0 +1,10 @@
+name = "md-reader-opencode"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 只允许 GitHub Pages 站点与本地开发端口调用；其余来源 403。
+ALLOWED_ORIGINS = "https://vaddenz.github.io,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+# 需要换上游时再打开：
+# UPSTREAM = "https://opencode.ai/inference/go/openai"
+# USER_AGENT = "opencode/latest/2.1.1/cli"

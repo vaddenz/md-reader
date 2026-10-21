@@ -100,6 +100,17 @@ describe('sanitizeLlmConfig / 读写', () => {
     await saveLlmConfig(cfg);
     expect(await getLlmConfig()).toEqual(cfg);
   });
+
+  it('思考强度随配置保存；非法值丢弃', async () => {
+    expect(sanitizeLlmConfig({ baseUrl: 'https://x', apiKey: 'k', model: 'm', reasoningEffort: 'max' }))
+      .toEqual({ baseUrl: 'https://x', apiKey: 'k', model: 'm', reasoningEffort: 'max' });
+    expect(sanitizeLlmConfig({ baseUrl: 'https://x', apiKey: 'k', model: 'm', reasoningEffort: 'ultra' }))
+      .toEqual({ baseUrl: 'https://x', apiKey: 'k', model: 'm' });
+
+    const cfg = { baseUrl: 'https://x', apiKey: 'k', model: 'm', reasoningEffort: 'high' as const };
+    await saveLlmConfig(cfg);
+    expect(await getLlmConfig()).toEqual(cfg);
+  });
 });
 
 describe('进度与记录', () => {
