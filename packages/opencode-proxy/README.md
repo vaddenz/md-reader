@@ -19,13 +19,24 @@ npx wrangler deploy
 
 部署成功后会打印形如 `https://md-reader-opencode.<your-subdomain>.workers.dev` 的地址。
 
+### 已部署实例（2026-10-21）
+
+| 项 | 值 |
+| --- | --- |
+| Worker | `md-reader-opencode` |
+| Base URL | `https://md-reader-opencode.md-reader-opencode-proxy.workers.dev/opencode/v1` |
+| 账号 | Vadden.z@gmail.com's Account（`fcedfc73…`） |
+| 允许来源 | `https://vaddenz.github.io`、`localhost/127.0.0.1` 的 5173 与 4173 |
+
+`ALLOWED_ORIGINS` 已写进 `wrangler.toml`；改动后 `npx wrangler deploy` 即生效。
+
 ## 在应用里填写
 
 设置 › 记忆助手 › 模型设置：
 
 | 字段 | 值 |
 | --- | --- |
-| Base URL | `https://md-reader-opencode.<your-subdomain>.workers.dev/opencode/v1` |
+| Base URL | `https://md-reader-opencode.md-reader-opencode-proxy.workers.dev/opencode/v1` |
 | API Key | OpenCode Console 里新建的 `oc_sk_...`（**新建**，旧 Key 过期后重新登录也不会续期） |
 | 模型名 | `deepseek-v4.1-flash` |
 
@@ -75,5 +86,6 @@ curl -i -X POST "https://<worker>/opencode/v1/chat/completions" \
 ## 注意
 
 - 这是给个人自用的代理，存在 `workers.dev` 上即可；不要把它变成公开的中转站，务必收紧 `ALLOWED_ORIGINS`。
+- 若终端 `curl` 连接超时、但 Chrome 能打开：本机对 `workers.dev` 的 DNS 可能被污染（Chrome 走 Secure DNS/DoH 会绕过）。以浏览器结果为准，或给 Worker 绑自定义域。
 - OpenCode Go 的额度按模型分别计算，DeepSeek V4.1 Flash 的月度上限见 <https://opencode.ai/docs/console/go/>。
 - 官方要求客户端自行标识 UA（如 `my-agent/1.0`）；本代理默认伪装成 OpenCode CLI 是应本项目需求，如果被上游策略调整影响，改 `USER_AGENT` 即可。
