@@ -679,7 +679,12 @@ export default function DocPage() {
           else if (tts.state === 'ended') tts.start(0);
           else tts.start();
         } : undefined}
-        ttsActive={tts.state === 'playing' || tts.state === 'paused'}
+        ttsLabel={
+          tts.state === 'playing' ? '暂停朗读'
+            : tts.state === 'paused' ? '继续朗读'
+              : tts.state === 'ended' ? '重新朗读'
+                : '朗读'
+        }
         orientation={orientation}
         onToggleOrientation={toggleLandscape}
         onFlipOrientation={flip}

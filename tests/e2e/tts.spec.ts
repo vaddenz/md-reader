@@ -63,7 +63,8 @@ test('朗读：系统 TTS 入口、控制条与语速设置', async ({ page }) =
   await page.getByRole('link', { name: 'a', exact: true }).click();
   await expect(page.getByRole('heading', { name: '文档 A' })).toBeVisible();
 
-  await page.getByRole('button', { name: '朗读' }).click();
+  await page.getByRole('button', { name: '更多' }).click();
+  await page.locator('.doc-more').getByRole('button', { name: '朗读' }).click();
   const bar = page.locator('.tts-bar');
   await expect(bar).toBeVisible();
   await expect(bar).toContainText('第 1/');

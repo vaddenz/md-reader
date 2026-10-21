@@ -32,21 +32,6 @@
   border: 0;
 }
 
-/* 顶栏朗读按钮 */
-.doc-tts-btn {
-  position: relative;
-}
-.doc-tts-dot {
-  position: absolute;
-  right: 9px;
-  top: 9px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--acc);
-  box-shadow: 0 0 0 2px var(--shell);
-}
-
 /* 底部播放条 */
 :root {
   --tts-bar-h: 60px;
