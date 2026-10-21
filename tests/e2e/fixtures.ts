@@ -370,6 +370,35 @@ export async function readKv(page: Page, key: string): Promise<unknown> {
   );
 }
 
+/** 在页面内选中包含 text 的段落片段并派发 contextmenu（正文异步渲染，先等目标文本出现）。 */
+export async function selectAndContextMenu(page: Page, text: string): Promise<void> {
+  await expect.poll(() =>
+    page.evaluate((t) => (document.querySelector('.doc-content')?.textContent ?? '').includes(t), text),
+  ).toBe(true);
+  await page.evaluate((t) => {
+    const container = document.querySelector('.doc-content')!;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode() as Text | null;
+    while (node) {
+      const i = node.data.indexOf(t);
+      if (i !== -1) {
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, i + t.length);
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+        (node.parentElement ?? container).dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 240 }),
+        );
+        return;
+      }
+      node = walker.nextNode() as Text | null;
+    }
+    throw new Error(`未找到文本：${t}`);
+  }, text);
+}
+
 /** 读取任意 object store 的全部记录（无 key）或单条（有 key）；失败返回 null。 */
 export async function readStore(page: Page, store: string, key?: string): Promise<unknown> {
   return page.evaluate(

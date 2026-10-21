@@ -15,15 +15,15 @@ function ids(ctx: MenuContext): string[] {
 }
 
 describe('menuActionsFor（spec §6.2 菜单项判定）', () => {
-  it('有选区（普通文本）：复制 ｜ 高亮·黄 ｜ 高亮·红', () => {
+  it('有选区（普通文本）：复制 ｜ 笔记 ｜ 高亮·黄 ｜ 高亮·红', () => {
     const actions = menuActionsFor({ ...base, hasSelection: true });
-    expect(actions.map((a) => a.id)).toEqual(['copy', 'hl:yellow', 'hl:red']);
-    expect(actions.map((a) => a.label)).toEqual(['复制', '高亮·黄', '高亮·红']);
+    expect(actions.map((a) => a.id)).toEqual(['copy', 'note', 'hl:yellow', 'hl:red']);
+    expect(actions.map((a) => a.label)).toEqual(['复制', '笔记', '高亮·黄', '高亮·红']);
   });
 
   it('有选区且与已渲染高亮相交：追加「清除高亮」', () => {
     expect(ids({ ...base, hasSelection: true, selectionIntersectsHighlight: true }))
-      .toEqual(['copy', 'hl:yellow', 'hl:red', 'clear']);
+      .toEqual(['copy', 'note', 'hl:yellow', 'hl:red', 'clear']);
   });
 
   it('有选区（与排除区相交，如代码块）：只提供复制', () => {

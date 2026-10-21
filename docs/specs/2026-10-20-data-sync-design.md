@@ -401,6 +401,8 @@ interface OutboxEntry {
 
 ### 7.7 笔记（预留，不实现）
 
+> 2026-10-21 更新：已按本节扩展点实现（`reading.notes`），见 [`2026-10-21-notes-design.md`](2026-10-21-notes-design.md)。以下为当时的预留设计，保留作历史记录。
+
 本期不创建 notes 适配器。未来新增时：
 
 1. 在 `src/data/` 定义笔记存储与 sanitize；

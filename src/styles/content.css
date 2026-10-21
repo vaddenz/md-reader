@@ -82,6 +82,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
 }
 .doc-more-icon { flex: none; }
 .doc-more-aa { flex: none; width: 18px; text-align: center; font-size: 14px; font-weight: 700; }

@@ -1,5 +1,6 @@
 import { progressCollection } from './progress';
 import { highlightsCollection } from './highlights';
+import { notesCollection } from './notes';
 import { favoritesCollection } from './favorites';
 import { memorySrsCollection } from './memorySrs';
 import { memoryAttemptsCollection } from './memoryAttempts';
@@ -9,6 +10,7 @@ import type { SyncCollection } from '../types';
 export const SYNC_COLLECTIONS: readonly SyncCollection[] = [
   progressCollection,
   highlightsCollection,
+  notesCollection,
   favoritesCollection,
   memorySrsCollection,
   memoryAttemptsCollection,

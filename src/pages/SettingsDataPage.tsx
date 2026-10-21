@@ -44,7 +44,7 @@ export default function SettingsDataPage() {
 
   async function onClearAll() {
     if (clearing) return;
-    if (!window.confirm('确定清除全部数据吗？将删除本机所有仓库的缓存、收藏、阅读进度、记忆训练数据、Token 与跨设备同步配置，且不可恢复。Neon 上已同步的数据不会被删除。')) return;
+    if (!window.confirm('确定清除全部数据吗？将删除本机所有仓库的缓存、收藏、阅读进度、高亮、笔记、记忆训练数据、Token 与跨设备同步配置，且不可恢复。Neon 上已同步的数据不会被删除。')) return;
     setClearing(true);
     setClearError(null);
     try {

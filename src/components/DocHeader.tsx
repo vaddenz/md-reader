@@ -14,6 +14,10 @@ interface DocHeaderProps {
   onToggleFavorite?: () => void;
   /** 打开阅读内外观面板；未提供时不渲染外观按钮。 */
   onOpenAppearance?: () => void;
+  /** 打开当前文档的笔记列表；未提供时不渲染笔记项。 */
+  onOpenNotes?: () => void;
+  /** 当前文档笔记数（仅用于菜单文案提示，不参与加载状态）。 */
+  noteCount?: number;
   /** 当前显示方向；未提供 onToggleOrientation 时不渲染方向按钮。 */
   orientation?: 'portrait' | 'landscape' | 'landscape-flipped';
   /** 横屏/竖屏切换；未提供时不渲染横屏按钮。 */
@@ -34,6 +38,8 @@ export default function DocHeader({
   favorite,
   onToggleFavorite,
   onOpenAppearance,
+  onOpenNotes,
+  noteCount,
   orientation,
   onToggleOrientation,
   onFlipOrientation,
@@ -211,6 +217,15 @@ export default function DocHeader({
               </svg>
               搜索
             </button>
+            {onOpenNotes && (
+              <button type="button" className="doc-more-item" onClick={() => act(onOpenNotes)}>
+                <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" d="M5 4.5h14v15l-4.2-3H5z" />
+                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M9 9h6M9 12.5h4" />
+                </svg>
+                笔记{noteCount ? `（${noteCount}）` : ''}
+              </button>
+            )}
             {onToggleFavorite && (
               <button
                 type="button"

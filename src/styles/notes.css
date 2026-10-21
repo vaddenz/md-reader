@@ -1,0 +1,244 @@
+/* ========== 笔记：正文锚点符号 + 编辑面板 + 文档笔记列表 ========== */
+
+/* 锚定文字末尾的小徽标：强调蓝实心圆 + 白色便签图标；
+   插在文字流里但不参与正文 haystack / 复制（button 在跳过清单内）。 */
+.doc-content .note-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0 1px 0 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--card);
+  box-shadow: 0 0 0 2px var(--card);
+  vertical-align: text-top;
+  line-height: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.doc-content .note-mark svg { display: block; }
+@media (hover: hover) {
+  .doc-content .note-mark:hover { background: var(--acc-text); }
+}
+.doc-content .note-mark:active { transform: scale(0.92); }
+.doc-content .note-mark:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* 编辑面板：底部 sheet，与外观面板同族但更高，textarea 占主要空间。 */
+.note-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(23, 24, 26, 0.32);
+}
+.note-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 46rem;
+  max-height: 82vh;
+  padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--card);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px rgba(23, 24, 26, 0.24);
+  outline: none;
+}
+.note-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding-left: 2px;
+}
+.note-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.note-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: none;
+  color: var(--ink2);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .note-close:not(:disabled):hover { background: var(--shell); }
+}
+
+/* 被锚定原文：最多 3 行，提示笔记归属。 */
+.note-quote {
+  flex: none;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--acc);
+  border-radius: 4px;
+  background: var(--shell);
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.note-input {
+  flex: 1 1 auto;
+  min-height: 140px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+  resize: vertical;
+}
+.note-input::placeholder { color: var(--ink2); opacity: 0.7; }
+.note-input:disabled { opacity: 0.7; }
+
+.note-error {
+  flex: none;
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.note-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+}
+.note-btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--shell);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.note-btn:disabled { color: #8b949e; cursor: default; }
+@media (hover: hover) {
+  .note-btn:not(:disabled):not(.note-btn-primary):hover { background: var(--line); }
+}
+.note-btn-primary {
+  background: var(--acc-fill);
+  color: var(--card);
+  font-weight: 600;
+}
+@media (hover: hover) {
+  .note-btn-primary:not(:disabled):hover { background: #1932aa; }
+}
+.note-btn-primary:disabled { background: var(--line); color: #8b949e; }
+.note-btn-danger {
+  margin-right: auto;
+  background: none;
+  color: var(--danger);
+}
+@media (hover: hover) {
+  .note-btn-danger:not(:disabled):hover { background: rgba(192, 57, 43, 0.07); }
+}
+
+/* 文档笔记列表（Drawer 内容） */
+.notes-empty {
+  margin: 0;
+  padding: 28px 12px;
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: center;
+}
+.notes-list {
+  margin: 0;
+  padding: 4px 0 8px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.note-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.note-item:active { background: var(--shell); }
+.note-item-quote {
+  padding-left: 8px;
+  border-left: 2px solid var(--line);
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.note-item-body {
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.note-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink2);
+  font-size: 12px;
+}
+.note-orphan {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: rgba(192, 57, 43, 0.08);
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .note-overlay { animation: note-fade-in 0.16s ease-out; }
+  .note-sheet { animation: note-slide-up 0.2s ease-out; }
+}
+@keyframes note-fade-in {
+  from { opacity: 0; }
+}
+@keyframes note-slide-up {
+  from { transform: translateY(100%); }
+}

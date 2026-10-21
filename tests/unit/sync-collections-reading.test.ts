@@ -3,11 +3,13 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAllData } from '../../src/data/db';
 import { getDocHighlights, addHighlight, removeHighlights } from '../../src/data/highlights';
+import { addNote, getDocNotes, removeNotes, type NoteRecord } from '../../src/data/notes';
 import { getFavorites, getProgress, saveProgress, toggleFavorite } from '../../src/data/prefs';
 import { openRepoDb } from '../../src/sync/repoDb';
 import { progressCollection } from '../../src/sync/collections/progress';
 import { favoritesCollection } from '../../src/sync/collections/favorites';
 import { highlightsCollection } from '../../src/sync/collections/highlights';
+import { notesCollection } from '../../src/sync/collections/notes';
 import { clearTombstone, readTombstones, setTombstone, tombstoneAt } from '../../src/sync/tombstones';
 
 beforeEach(async () => { await clearAllData(); });
@@ -191,6 +193,81 @@ describe('highlights collection', () => {
     });
     await highlightsCollection.clearBefore!(repo, 5);
     expect(await repo.kvGet('highlights')).toEqual({ 'b.md': [hl('fresh', '新', 6)] });
+    repo.close();
+  });
+});
+
+describe('notes collection', () => {
+  const note = (id: string, exact: string, updatedAt = 1000, body = '内容'): NoteRecord => ({
+    id, exact, prefix: '', suffix: '', body, createdAt: 1000, updatedAt,
+  });
+
+  it('list 带 path；远端 tombstone 删除记录并写本地墓碑', async () => {
+    const repo = await openRepoDb('mdreader');
+    const rec = await addNote('a.md', { exact: '甲', prefix: '', suffix: '' }, '内容', 1000);
+    const [local] = await notesCollection.listLocal(repo);
+    expect(local.payload).toMatchObject({ path: 'a.md', record: { id: rec.id, body: '内容' } });
+    expect(local.updatedAt).toBe(rec.updatedAt);
+
+    const applied = await notesCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.notes', recordId: rec.id, payload: null,
+      updatedAt: rec.updatedAt + 10, deleted: true, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(applied).toBe(true);
+    expect(await getDocNotes('a.md')).toEqual([]);
+    expect(await tombstoneAt(repo, 'reading.notes', rec.id)).toBe(rec.updatedAt + 10);
+    repo.close();
+  });
+
+  it('本地删除写墓碑；陈旧远端 upsert 不复活，更新的 upsert 复活并清墓碑', async () => {
+    const repo = await openRepoDb('mdreader');
+    const rec = await addNote('a.md', { exact: '甲', prefix: '', suffix: '' }, '旧', 1000);
+    await removeNotes('a.md', [rec.id]);
+    const deletedAt = (await tombstoneAt(repo, 'reading.notes', rec.id))!;
+    expect(deletedAt).toBeGreaterThan(rec.updatedAt);
+
+    const stale = await notesCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.notes', recordId: rec.id,
+      payload: { path: 'a.md', record: note(rec.id, '甲', rec.updatedAt) },
+      updatedAt: rec.updatedAt, deleted: false, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(stale).toBe(false);
+    expect(await getDocNotes('a.md')).toEqual([]);
+
+    const fresh = await notesCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.notes', recordId: rec.id,
+      payload: { path: 'a.md', record: note(rec.id, '甲', deletedAt + 1, '新') },
+      updatedAt: deletedAt + 1, deleted: false, deviceId: 'd', serverUpdatedAt: 2,
+    });
+    expect(fresh).toBe(true);
+    expect((await getDocNotes('a.md')).map((r) => r.body)).toEqual(['新']);
+    expect(await tombstoneAt(repo, 'reading.notes', rec.id)).toBeUndefined();
+    repo.close();
+  });
+
+  it('远端更新可把笔记移动到新路径；旧路径不再保留', async () => {
+    const repo = await openRepoDb('mdreader');
+    const rec = await addNote('a.md', { exact: '甲', prefix: '', suffix: '' }, '旧', 1000);
+
+    const moved = await notesCollection.applyRemote(repo, {
+      scope: 's', collection: 'reading.notes', recordId: rec.id,
+      payload: { path: 'b.md', record: note(rec.id, '甲', rec.updatedAt + 1, '新') },
+      updatedAt: rec.updatedAt + 1, deleted: false, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(moved).toBe(true);
+    expect(await getDocNotes('a.md')).toEqual([]);
+    expect((await getDocNotes('b.md')).map((r) => r.body)).toEqual(['新']);
+    repo.close();
+  });
+
+  it('clearBefore 删除 <= 边界，保留更新的笔记', async () => {
+    const repo = await openRepoDb('mdreader');
+    await repo.kvSet('notes', {
+      'a.md': [note('old', '旧', 5)],
+      'b.md': [note('fresh', '新', 6)],
+    });
+    await notesCollection.clearBefore!(repo, 5);
+    expect(await repo.kvGet('notes')).toEqual({ 'b.md': [note('fresh', '新', 6)] });
     repo.close();
   });
 });

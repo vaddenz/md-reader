@@ -6,6 +6,8 @@ import AppearanceSheet from '../components/AppearanceSheet';
 import BackToSource from '../components/BackToSource';
 import DocHeader from '../components/DocHeader';
 import FloatingTocButton from '../components/FloatingTocButton';
+import NoteEditor from '../components/NoteEditor';
+import NotesDrawer from '../components/NotesDrawer';
 import PrevNext from '../components/PrevNext';
 import RelatedDocs from '../components/RelatedDocs';
 import SelectionMenu from '../components/SelectionMenu';
@@ -15,6 +17,7 @@ import { appearanceStyle, DEFAULT_APPEARANCE, getAppearance, type ReaderAppearan
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
 import { addHighlight, getDocHighlights, removeHighlights, type HighlightRecord } from '../data/highlights';
+import { addNote, getDocNotes, removeNotes, updateNote, type NoteRecord } from '../data/notes';
 import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { activeRepo } from '../data/repos';
 import { downloadDocText } from '../data/sync';
@@ -26,6 +29,7 @@ import { highlightInContainer } from '../markdown/highlight';
 import { applyHighlights, buildHaystack, contentRange, rangeIntersectsExcluded, removeMarks, selectionToAnchor, visibleText, wrapRange } from '../markdown/highlights';
 import { hydrateImages } from '../markdown/images';
 import { hydrateMermaid } from '../markdown/mermaid';
+import { applyNotes } from '../markdown/notes';
 import { renderDoc } from '../markdown/render';
 import { useOrientation } from '../state/OrientationContext';
 import { useSync } from '../state/SyncContext';
@@ -51,6 +55,11 @@ interface MenuState {
 
 const COPY_LABEL = '复制';
 const COPY_RESET_MS = 1500;
+const EMPTY_NOTES: NoteRecord[] = [];
+
+type NoteEditorState =
+  | { kind: 'create'; anchor: { exact: string; prefix: string; suffix: string } }
+  | { kind: 'edit'; note: NoteRecord };
 
 /** 路由参数通常已被 react-router 解码；仍含 % 时兜底再解一次，非法编码原样使用。 */
 function safeDecode(raw: string): string {
@@ -102,8 +111,15 @@ export default function DocPage() {
   const [appearance, setAppearance] = useState<ReaderAppearance>(DEFAULT_APPEARANCE);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  // 同步应用后自增，触发高亮重锚（正文 DOM 不变，只增删 mark）。
+  // 同步应用后自增，触发高亮/笔记重锚（正文 DOM 不变，只增删 mark）。
   const [syncTick, setSyncTick] = useState(0);
+  const [notesDoc, setNotesDoc] = useState<{ path: string; list: NoteRecord[] }>({ path: '', list: [] });
+  const [notePositions, setNotePositions] = useState<{
+    path: string;
+    positions: Map<string, { start: number; end: number }>;
+  } | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteEditor, setNoteEditor] = useState<NoteEditorState | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
   // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
@@ -169,6 +185,11 @@ export default function DocPage() {
   );
   const ready = rendered !== null;
   const html = rendered?.html ?? '';
+  // 文档切换的加载间隙不把上一篇的笔记套到新正文上。
+  const notes = useMemo(
+    () => (notesDoc.path === path ? notesDoc.list : EMPTY_NOTES),
+    [notesDoc, path],
+  );
 
   // 目录抽屉只列 h1–h4（brief 约定）；无标题时入口仍显示，抽屉内呈现空态（2026-10-20 用户裁定）。
   const tocHeadings = useMemo(
@@ -186,6 +207,8 @@ export default function DocPage() {
     setTocOpen(false);
     setTreeOpen(false);
     setMenu(null);
+    setNotesOpen(false);
+    setNoteEditor(null);
     selectAllRangeRef.current = null;
     appliedRef.current = new Map();
   }, [path]);
@@ -270,6 +293,24 @@ export default function DocPage() {
     );
     return () => { cancelled = true; };
   }, [html, path, syncTick]);
+
+  // 笔记：正文注入/同步后读取；与高亮共用 TextQuote 锚定口径。
+  useEffect(() => {
+    let cancelled = false;
+    void getDocNotes(path).then(
+      (list) => { if (!cancelled) setNotesDoc({ path, list }); },
+      () => { if (!cancelled) setNotesDoc({ path, list: [] }); },
+    );
+    return () => { cancelled = true; };
+  }, [path, syncTick]);
+
+  // 笔记符号：记录变化（新增/编辑/同步）后先移除旧符号再重锚；未命中的孤儿保留记录但不渲染。
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container || !html) return;
+    const positions = applyNotes(container, notes);
+    setNotePositions({ path, positions });
+  }, [html, path, notes]);
 
   // 持续记录当前历史条目的滚动位置（rAF 节流）。仅在正文就绪时记录：
   // 切换文档的加载间隙页面会变矮，浏览器把 scrollY 钳制到新高度，
@@ -376,6 +417,14 @@ export default function DocPage() {
 
   const onContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const el = e.target as Element;
+    const noteMark = el.closest<HTMLElement>('button.note-mark');
+    if (noteMark) {
+      e.preventDefault(); // 笔记符号可能落在链接内：阻止链接导航
+      const id = noteMark.getAttribute('data-note-id');
+      const note = notes.find((n) => n.id === id);
+      if (note) setNoteEditor({ kind: 'edit', note });
+      return;
+    }
     const dead = el.closest('a[data-dead]');
     if (dead) {
       e.preventDefault(); // 目标不存在的链接停留原处，仅提示（spec §6.1-2）
@@ -407,7 +456,7 @@ export default function DocPage() {
     }
     const btn = el.closest<HTMLElement>('button.code-copy');
     if (btn) void copyCode(btn);
-  }, [copyCode, location.pathname, location.search, locationKey, navigate]);
+  }, [copyCode, location.pathname, location.search, locationKey, navigate, notes]);
 
   // 右键/长按（spec §6）：正文内始终压制原生菜单，按选区/目标算出菜单项与选区锚点。
   const onContentContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -457,6 +506,12 @@ export default function DocPage() {
         () => showToast('已复制'),
         () => showToast('复制失败', { kind: 'error' }),
       );
+      return;
+    }
+    if (id === 'note') {
+      if (!current.sel) return;
+      setNoteEditor({ kind: 'create', anchor: current.sel.anchor });
+      sel?.removeAllRanges();
       return;
     }
     if (id === 'select-all') {
@@ -540,6 +595,51 @@ export default function DocPage() {
   // ⋯ 菜单导航（搜索/设置）：离开阅读页前记住滚动，与互链/抽屉跳转同口径。
   const remember = useCallback(() => rememberScroll(locationKey, window.scrollY), [locationKey]);
 
+  const reloadNotes = useCallback(async () => {
+    const list = await getDocNotes(path).catch(() => null);
+    if (list) setNotesDoc({ path, list });
+  }, [path]);
+
+  const saveNoteEditor = useCallback(async (body: string) => {
+    if (!noteEditor) return;
+    if (noteEditor.kind === 'create') {
+      await addNote(path, noteEditor.anchor, body);
+      showToast('笔记已保存');
+    } else {
+      const rec = await updateNote(path, noteEditor.note.id, body);
+      if (!rec) {
+        showToast('这条笔记已不存在', { kind: 'error' });
+        setNoteEditor(null);
+        await reloadNotes();
+        return;
+      }
+      showToast('笔记已更新');
+    }
+    await reloadNotes();
+    setNoteEditor(null);
+  }, [noteEditor, path, reloadNotes]);
+
+  const deleteNoteEditor = useCallback(async () => {
+    if (!noteEditor || noteEditor.kind !== 'edit') return;
+    await removeNotes(path, [noteEditor.note.id]);
+    await reloadNotes();
+    setNoteEditor(null);
+    showToast('笔记已删除');
+  }, [noteEditor, path, reloadNotes]);
+
+  // 列表跳转：先关抽屉再打开编辑面板，尽量把锚点符号滚到视口中央（孤儿笔记无符号，直接编辑）。
+  const openNoteFromList = useCallback((note: NoteRecord) => {
+    setNotesOpen(false);
+    setNoteEditor({ kind: 'edit', note });
+    window.requestAnimationFrame(() => {
+      const container = contentRef.current;
+      if (!container) return;
+      const mark = [...container.querySelectorAll<HTMLElement>('button.note-mark')]
+        .find((btn) => btn.dataset.noteId === note.id);
+      mark?.scrollIntoView({ block: 'center' });
+    });
+  }, []);
+
   const title = cur.kind === 'ready' ? cur.title : '';
 
   return (
@@ -550,6 +650,8 @@ export default function DocPage() {
         favorite={favorite === true}
         onToggleFavorite={favorite === null ? undefined : toggleFav}
         onOpenAppearance={() => setAppearanceOpen(true)}
+        onOpenNotes={() => setNotesOpen(true)}
+        noteCount={notes.length}
         orientation={orientation}
         onToggleOrientation={toggleLandscape}
         onFlipOrientation={flip}
@@ -606,6 +708,25 @@ export default function DocPage() {
       )}
       {treeOpen && (
         <TreeDrawer metas={metas} currentPath={path} onSelect={openDocFromTree} onClose={closeTree} />
+      )}
+      {notesOpen && (
+        <NotesDrawer
+          notes={notes}
+          positions={notePositions && notePositions.path === path ? notePositions.positions : null}
+          onSelect={openNoteFromList}
+          onClose={() => setNotesOpen(false)}
+        />
+      )}
+      {noteEditor && (
+        <NoteEditor
+          key={noteEditor.kind === 'edit' ? noteEditor.note.id : 'create'}
+          mode={noteEditor.kind}
+          anchor={noteEditor.kind === 'create' ? noteEditor.anchor.exact : noteEditor.note.exact}
+          initialBody={noteEditor.kind === 'edit' ? noteEditor.note.body : ''}
+          onSave={saveNoteEditor}
+          onDelete={noteEditor.kind === 'edit' ? deleteNoteEditor : undefined}
+          onClose={() => setNoteEditor(null)}
+        />
       )}
       {menu && (
         <SelectionMenu

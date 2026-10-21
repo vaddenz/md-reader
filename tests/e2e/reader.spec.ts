@@ -100,7 +100,7 @@ test('⋯ 菜单：搜索/设置导航（底栏已移除）', async ({ page }) =
   await expect(page.locator('.doc-bottombar')).toHaveCount(0);
 
   await page.getByRole('button', { name: '更多' }).click();
-  await expect(page.locator('.doc-more-item svg')).toHaveCount(5); // 竖屏：搜索/收藏/文件/横屏/设置 + 外观「Aa」文字徽
+  await expect(page.locator('.doc-more-item svg')).toHaveCount(6); // 竖屏：搜索/笔记/收藏/文件/横屏/设置 + 外观「Aa」文字徽
   await expect(page.locator('.doc-more-aa')).toHaveText('Aa');
   await page.getByRole('button', { name: '搜索' }).click();
   await expect(page).toHaveURL(/#\/search/);

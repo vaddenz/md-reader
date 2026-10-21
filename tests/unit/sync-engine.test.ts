@@ -115,9 +115,9 @@ describe('sync engine', () => {
     expect(pushed.flat().some((record) => record.recordId === 'scope-reseed.md')).toBe(true);
   });
 
-  it('注册全部六个集合，且 resetAt=0 不过滤 updatedAt=0', async () => {
+  it('注册全部七个集合，且 resetAt=0 不过滤 updatedAt=0', async () => {
     expect(SYNC_COLLECTIONS.map((collection) => collection.name)).toEqual([
-      'reading.progress', 'reading.highlights', 'reading.favorites',
+      'reading.progress', 'reading.highlights', 'reading.notes', 'reading.favorites',
       'memory.srs', 'memory.attempts', 'memory.selection',
     ]);
     await kvSet('syncReset', { 'reading.favorites': 0 });

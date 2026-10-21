@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { configureAndSync, readFileRecord, readKv, writeKv } from './fixtures';
+import { configureAndSync, readFileRecord, readKv, selectAndContextMenu, writeKv } from './fixtures';
 
 const QUOTE = 'MVCC 并发控制与版本可见性';
 
@@ -65,36 +65,6 @@ test('高亮文字被改写：孤儿保留记录、不渲染；改回后恢复',
   await expect(page.locator('mark.hl-yellow')).toHaveCount(1); // 改回原文自动恢复
 });
 
-/** 在页面内选中包含 text 的段落片段并派发 contextmenu。 */
-async function selectAndContextMenu(page: import('@playwright/test').Page, text: string) {
-  // 正文为异步渲染（IDB 读取 → render）：先等目标文本出现，避免选中时机早于渲染的竞态。
-  await expect.poll(() =>
-    page.evaluate((t) => (document.querySelector('.doc-content')?.textContent ?? '').includes(t), text),
-  ).toBe(true);
-  await page.evaluate((t) => {
-    const container = document.querySelector('.doc-content')!;
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode() as Text | null;
-    while (node) {
-      const i = node.data.indexOf(t);
-      if (i !== -1) {
-        const range = document.createRange();
-        range.setStart(node, i);
-        range.setEnd(node, i + t.length);
-        const sel = window.getSelection()!;
-        sel.removeAllRanges();
-        sel.addRange(range);
-        (node.parentElement ?? container).dispatchEvent(
-          new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 240 }),
-        );
-        return;
-      }
-      node = walker.nextNode() as Text | null;
-    }
-    throw new Error(`未找到文本：${t}`);
-  }, text);
-}
-
 test('右键菜单：选中文字出现菜单，复制与高亮黄可用', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -108,7 +78,7 @@ test('右键菜单：选中文字出现菜单，复制与高亮黄可用', async
   await selectAndContextMenu(page, 'MVCC 并发控制');
   const menu = page.locator('.selection-menu');
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '高亮·黄', '高亮·红']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '笔记', '高亮·黄', '高亮·红']);
 
   await menu.getByRole('menuitem', { name: '复制' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__copied)).toBe('MVCC 并发控制');

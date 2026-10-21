@@ -2,6 +2,7 @@
 export const COLLECTIONS = {
   progress: 'reading.progress',
   highlights: 'reading.highlights',
+  notes: 'reading.notes',
   favorites: 'reading.favorites',
   memorySrs: 'memory.srs',
   memoryAttempts: 'memory.attempts',

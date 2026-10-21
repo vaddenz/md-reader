@@ -208,6 +208,8 @@ export function applyHighlights(container: HTMLElement, records: HighlightRecord
 
 export function rangeIntersectsExcluded(container: HTMLElement, range: Range): boolean {
   for (const el of container.querySelectorAll(SKIP_SELECTOR)) {
+    // 笔记符号是正文内的行内按钮：选区跨过它不应视为命中排除区（haystack/复制本就不含它）。
+    if (el.closest('.note-mark')) continue;
     if (range.intersectsNode(el)) return true;
   }
   return false;

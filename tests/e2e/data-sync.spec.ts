@@ -128,7 +128,7 @@ test('跨设备同步：手动同步推送本地进度记录体', async ({ page 
   expect(progress?.payload).toEqual({ ratio: 0.42, updatedAt: NOW });
 });
 
-test('跨设备同步：清空本机进度与高亮后从远端恢复', async ({ page }) => {
+test('跨设备同步：清空本机进度、高亮与笔记后从远端恢复', async ({ page }) => {
   await installGitHubMock(page, { token: 'ghp_e2e_fake_token_1234' });
   await seedSyncConfig(page);
 
@@ -180,11 +180,23 @@ test('跨设备同步：清空本机进度与高亮后从远端恢复', async ({
       createdAt: NOW,
     }],
   });
+  await writeKv(page, 'notes', {
+    '同步/恢复.md': [{
+      id: 'note-restore-1',
+      exact: '跨设备笔记',
+      prefix: '',
+      suffix: '',
+      body: '从远端恢复的笔记内容',
+      createdAt: NOW,
+      updatedAt: NOW,
+    }],
+  });
 
   const syncButton = page.getByRole('button', { name: '立即同步' });
   await syncButton.click();
   await expect.poll(() => [...rows.values()].filter((row) => row.collection === 'reading.progress').length).toBeGreaterThan(0);
   await expect.poll(() => [...rows.values()].filter((row) => row.collection === 'reading.highlights').length).toBeGreaterThan(0);
+  await expect.poll(() => [...rows.values()].filter((row) => row.collection === 'reading.notes').length).toBeGreaterThan(0);
   // 等推送完成、outbox 删空后再清空本地数据，避免残留条目在第二次同步时被重新推送。
   await expect.poll(async () => {
     const entries = await readStore(page, 'sync_outbox') as unknown[] | null;
@@ -194,6 +206,7 @@ test('跨设备同步：清空本机进度与高亮后从远端恢复', async ({
   // 清空本机数据（保留同步配置与已 seed 标记），再同步一次。
   await deleteKv(page, 'progress');
   await deleteKv(page, 'highlights');
+  await deleteKv(page, 'notes');
   await syncButton.click();
 
   await expect.poll(async () => {
@@ -204,6 +217,10 @@ test('跨设备同步：清空本机进度与高亮后从远端恢复', async ({
     const map = await readKv(page, 'highlights') as Record<string, { id: string }[]> | undefined;
     return map?.['同步/恢复.md']?.[0]?.id;
   }).toBe('hl-restore-1');
+  await expect.poll(async () => {
+    const map = await readKv(page, 'notes') as Record<string, { id: string; body?: string }[]> | undefined;
+    return map?.['同步/恢复.md']?.[0]?.body;
+  }).toBe('从远端恢复的笔记内容');
 });
 
 test('跨设备同步：鉴权失败与表不存在显示对应中文错误', async ({ page }) => {
