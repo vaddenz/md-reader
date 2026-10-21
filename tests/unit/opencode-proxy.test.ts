@@ -108,6 +108,28 @@ describe('Worker 转发', () => {
     expect((await call(PATH, { method: 'PUT', origin: ORIGIN, body: '{}' })).status).toBe(405);
   });
 
+  it('透传 SSE：响应体原样流给浏览器，内容类型不变', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"reasoning_content":"想"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"{\\"score\\":80}"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    })));
+    const res = await call(PATH, { method: 'POST', origin: ORIGIN, body: '{}' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('text/event-stream');
+    const text = await res.text();
+    expect(text).toContain('"reasoning_content":"想"');
+    expect(text).toContain('data: [DONE]');
+  });
+
   it('上游不可达返回 502', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('boom'); }));
     const res = await call(PATH, { method: 'POST', origin: ORIGIN, body: '{}' });

@@ -58,6 +58,14 @@ CLIENT = "cli"
 - `UPSTREAM`：默认 Go 的 OpenAI 兼容入口。换 Provider 时只改这里，前端不用动。
 - `USER_AGENT` / `CLIENT`：上游看到的客户端标识。
 
+## 流式与思考
+
+Worker 不解析请求体、不缓冲响应体：
+
+- `stream: true` 产生的 `text/event-stream` 会逐块透传给浏览器（实测 600 ms 间隔的事件到达间隔仍约 600 ms）；
+- `reasoning_effort`（OpenCode / OpenAI 兼容）或 `chat_template_kwargs`（直连 DeepSeek）随请求体原样转发；
+- 应用把 `delta.reasoning_content`（思考）与 `delta.content`（正式回答）分开渲染，思考内容不参与评分 JSON 解析。
+
 ## 本地开发
 
 ```bash

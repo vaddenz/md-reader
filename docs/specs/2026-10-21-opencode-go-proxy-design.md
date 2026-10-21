@@ -58,7 +58,15 @@ MemoryTrainPage → scoreAnswer()（自动加 x-opencode-session）
 - CORS：默认 `*`；可用 `ALLOWED_ORIGINS` 收紧到 Pages 与本地开发地址。
 - 上游基址、UA、来源均可用 `wrangler.toml` 的 `[vars]` 覆盖。
 
-## 5. 错误映射
+## 5. 流式输出与思考模式
+
+- 请求固定带 `stream: true`；响应按 SSE 解析：以空行切分事件，逐事件累加 `delta.reasoning_content`（思考）与 `delta.content`（正式回答）。
+- 服务端忽略 `stream`、直接返回一次性 JSON 时自动回退到 `message.content` / `message.reasoning_content`，不报错。
+- 思考强度（`reasoningEffort`：low / high / max）随配置保存：OpenCode 与通用 OpenAI 兼容接口发 `reasoning_effort`；直连 `api.deepseek.com` 发 `chat_template_kwargs: { thinking: true, reasoning_effort }`，与 OpenCode 自身对 DeepSeek V4 的处理一致。
+- 思考内容只用于展示（评分中实时显示、结果页可折叠回看），不参与 JSON 解析；评分仍只取正式回答。
+- Worker 不缓冲响应体，SSE 逐块透传；应用侧不做整包等待。
+
+## 6. 错误映射
 
 | 状态 | 应用提示 | 常见原因 |
 | --- | --- | --- |
@@ -67,7 +75,8 @@ MemoryTrainPage → scoreAnswer()（自动加 x-opencode-session）
 | 403 `origin_not_allowed` | Key 无效或无权限 | 代理收紧了 `ALLOWED_ORIGINS`，当前站点不在白名单 |
 | 502 `upstream_unreachable` | 网络不可用 | Worker 未部署 / 上游不可达 |
 
-## 6. 验证
+## 7. 验证
 
-- 单测：`tests/unit/llm.test.ts`（目标识别、会话头稳定性）、`tests/unit/opencode-proxy.test.ts`（转发、CORS、兜底、错误码）。
+- 单测：`tests/unit/llm.test.ts`（目标识别、会话头稳定性、SSE/非流式解析、思考强度参数）、`tests/unit/opencode-proxy.test.ts`（转发、CORS、兜底、SSE 透传、错误码）、`tests/unit/llm-config-form.test.tsx`（思考强度读写）。
 - 实测：`wrangler dev` 下预检返回 204；用无效 Key 请求返回 `Invalid credential` 而非 `MissingSessionID`，说明会话头与 UA 已被上游接受。
+- 流式实测：本地 mock 上游每 600 ms 推一个 SSE 事件，经 Worker 后到达间隔仍约 600 ms（27.58 → 28.18 → 28.78 → 29.08），证明代理未缓冲。

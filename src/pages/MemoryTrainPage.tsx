@@ -47,6 +47,8 @@ export default function MemoryTrainPage() {
   const [revealed, setRevealed] = useState(false);
   const [hintLevel, setHintLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  /** 模型流式返回的思考内容（与正式回答分开显示）。 */
+  const [thinking, setThinking] = useState('');
   const [sessionVerdicts, setSessionVerdicts] = useState<Record<Verdict, number> | null>(null);
   const questionStartedAt = useRef(Date.now());
   const abortRef = useRef<AbortController | null>(null);
@@ -123,6 +125,7 @@ export default function MemoryTrainPage() {
     setRevealed(false);
     setHintLevel(0);
     setError(null);
+    setThinking('');
     revealRequestedRef.current = false;
     questionStartedAt.current = Date.now();
   }, []);
@@ -188,6 +191,7 @@ export default function MemoryTrainPage() {
 
     if (isLlmConfigured(llm) && navigator.onLine) {
       setPhase('scoring');
+      setThinking('');
       const ac = new AbortController();
       abortRef.current = ac;
       try {
@@ -198,7 +202,7 @@ export default function MemoryTrainPage() {
           ...(q.prompt ? { prompt: q.prompt } : {}),
           answer: q.answer ?? '',
           userAnswer: text,
-        }, { signal: ac.signal });
+        }, { signal: ac.signal, onDelta: (d) => { if (d.reasoning) setThinking((prev) => prev + d.reasoning); } });
         await persist({ verdict: res.verdict, mode: 'ai', score: res.score, hit: res.hit, missed: res.missed, comment: res.comment });
         setResult({ ...res, mode: 'ai' });
       } catch (err) {
@@ -425,6 +429,13 @@ export default function MemoryTrainPage() {
               </div>
             )}
 
+            {thinking && (
+              <details className="memory-thinking">
+                <summary>查看思考过程</summary>
+                <div className="memory-thinking-body">{thinking}</div>
+              </details>
+            )}
+
             {q.answer && (
               <MarkdownBlock className="memory-answer" text={q.answer} path={current.bankPath} knownPaths={knownPaths} />
             )}
@@ -504,6 +515,17 @@ export default function MemoryTrainPage() {
               </button>
             </div>
           </div>
+          {phase === 'scoring' && (
+            <div className="memory-stream" aria-live="polite">
+              <p className="memory-note">{thinking ? '模型思考中…' : '正在请求模型…'}</p>
+              {thinking && (
+                <details className="memory-thinking" open>
+                  <summary>思考过程</summary>
+                  <div className="memory-thinking-body">{thinking}</div>
+                </details>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </main>

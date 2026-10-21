@@ -10,7 +10,16 @@ import { commitWithNotify, enqueueChange } from '../sync/outbox';
 import { clearTombstoneTx } from '../sync/tombstones';
 import { COLLECTIONS, RESET_RECORD_ID } from '../sync/collections/names';
 
-export interface LlmConfig { baseUrl: string; apiKey: string; model: string }
+/** 推理强度：与 OpenCode / OpenAI 兼容接口的 `reasoning_effort` 对齐。 */
+export type LlmReasoningEffort = 'low' | 'high' | 'max';
+
+export interface LlmConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  /** 可选：不填则由服务端决定（多数模型默认开启思考）。 */
+  reasoningEffort?: LlmReasoningEffort;
+}
 
 export interface MemoryFilters {
   kinds: string[];
@@ -191,13 +200,18 @@ export function saveSelection(sel: MemorySelection): Promise<void> {
   });
 }
 
+const REASONING_EFFORTS: LlmReasoningEffort[] = ['low', 'high', 'max'];
+
 export function sanitizeLlmConfig(raw: unknown): LlmConfig | undefined {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const r = raw as Record<string, unknown>;
   const baseUrl = typeof r.baseUrl === 'string' ? r.baseUrl.trim() : '';
   const apiKey = typeof r.apiKey === 'string' ? r.apiKey.trim() : '';
   const model = typeof r.model === 'string' ? r.model.trim() : '';
-  return baseUrl && apiKey && model ? { baseUrl, apiKey, model } : undefined;
+  if (!baseUrl || !apiKey || !model) return undefined;
+  const effort = r.reasoningEffort;
+  const reasoningEffort = REASONING_EFFORTS.find((v) => v === effort);
+  return reasoningEffort ? { baseUrl, apiKey, model, reasoningEffort } : { baseUrl, apiKey, model };
 }
 
 export async function getLlmConfig(): Promise<LlmConfig | undefined> {
@@ -218,7 +232,12 @@ export async function getLlmConfig(): Promise<LlmConfig | undefined> {
 }
 
 export function saveLlmConfig(cfg: LlmConfig): Promise<void> {
-  const clean = { baseUrl: cfg.baseUrl.trim(), apiKey: cfg.apiKey.trim(), model: cfg.model.trim() };
+  const clean: LlmConfig = {
+    baseUrl: cfg.baseUrl.trim(),
+    apiKey: cfg.apiKey.trim(),
+    model: cfg.model.trim(),
+    ...(cfg.reasoningEffort ? { reasoningEffort: cfg.reasoningEffort } : {}),
+  };
   writeGlobalJson(GLOBAL_LLM_KEY, clean);
   return serialize(() => kvSet(LLM_KEY, clean));
 }

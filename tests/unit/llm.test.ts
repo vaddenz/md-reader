@@ -25,6 +25,7 @@ function hangingBody(signal?: AbortSignal): Response {
   return {
     ok: true,
     status: 200,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
     json: () => new Promise((_, reject) => {
       const fail = () => reject(new DOMException('Aborted', 'AbortError'));
       if (signal?.aborted) return fail();
@@ -168,8 +169,7 @@ describe('testConnection', () => {
   });
 });
 
-describe('OpenCode 会话头', () => {
-  it('识别直连与 Worker 代理地址，其它地址不受影响', () => {
+describe('OpenCode 会话头', () => {  it('识别直连与 Worker 代理地址，其它地址不受影响', () => {
     expect(isOpenCodeTarget('https://opencode.ai/inference/go/openai/v1')).toBe(true);
     expect(isOpenCodeTarget('https://api.opencode.ai/zen/go/v1')).toBe(true);
     expect(isOpenCodeTarget('https://md-reader-opencode.pw.workers.dev/opencode/v1')).toBe(true);
@@ -204,5 +204,65 @@ describe('OpenCode 会话头', () => {
     await scoreAnswer(CFG, INPUT, { fetchImpl });
     const [call] = fetchImpl.mock.calls as unknown as [string, RequestInit][];
     expect(new Headers(call[1].headers).get('x-opencode-session')).toBeNull();
+  });
+});
+
+function sseResponse(events: string[]): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const event of events) controller.enqueue(encoder.encode(event));
+      controller.close();
+    },
+  });
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+describe('流式输出与思考内容', () => {
+  it('SSE：思考与正文分开回调，正文跨块拼接后可解析', async () => {
+    const [head, tail] = [OK.slice(0, 20), OK.slice(20)];
+    const fetchImpl = vi.fn(async () => sseResponse([
+      `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: '先审题' } }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: '再对照要点' } }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: head } }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: tail } }] })}\n\n`,
+      'data: [DONE]\n\n',
+    ]));
+
+    const deltas: { content?: string; reasoning?: string }[] = [];
+    const result = await scoreAnswer(CFG, INPUT, { fetchImpl, onDelta: (d) => deltas.push(d) });
+
+    expect(result).toMatchObject({ score: 82, hit: ['要点 A'], missed: ['要点 B'] });
+    expect(deltas.filter((d) => d.reasoning).map((d) => d.reasoning).join('')).toBe('先审题再对照要点');
+    expect(deltas.filter((d) => d.content).map((d) => d.content).join('')).toBe(OK);
+  });
+
+  it('服务端忽略 stream 时仍按 JSON 解析，并读取 message.reasoning_content', async () => {
+    const fetchImpl = vi.fn(async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: OK, reasoning_content: '简短思考' } }] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    const deltas: { content?: string; reasoning?: string }[] = [];
+    const result = await scoreAnswer(CFG, INPUT, { fetchImpl, onDelta: (d) => deltas.push(d) });
+
+    expect(result.score).toBe(82);
+    expect(deltas).toEqual([{ reasoning: '简短思考' }, { content: OK }]);
+  });
+
+  it('思考强度：OpenCode 用 reasoning_effort，直连 DeepSeek 用 chat_template_kwargs', async () => {
+    const opencode = vi.fn(async () => chat(OK));
+    await scoreAnswer({ ...CFG, baseUrl: 'https://w.dev/opencode/v1', reasoningEffort: 'max' }, INPUT, { fetchImpl: opencode });
+    const [opencodeCall] = opencode.mock.calls as unknown as [string, RequestInit][];
+    const body = JSON.parse(String(opencodeCall[1].body));
+    expect(body.reasoning_effort).toBe('max');
+    expect(body.stream).toBe(true);
+    expect(body.chat_template_kwargs).toBeUndefined();
+
+    const deepseek = vi.fn(async () => chat(OK));
+    await scoreAnswer({ ...CFG, baseUrl: 'https://api.deepseek.com/v1', reasoningEffort: 'high' }, INPUT, { fetchImpl: deepseek });
+    const [deepseekCall] = deepseek.mock.calls as unknown as [string, RequestInit][];
+    const dsBody = JSON.parse(String(deepseekCall[1].body));
+    expect(dsBody.reasoning_effort).toBeUndefined();
+    expect(dsBody.chat_template_kwargs).toEqual({ thinking: true, reasoning_effort: 'high' });
   });
 });
