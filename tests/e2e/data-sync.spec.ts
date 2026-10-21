@@ -21,7 +21,7 @@ function makeJwt(payload: Record<string, unknown>): string {
   return `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64(payload)}.sig`;
 }
 
-const JWT = makeJwt({ sub: 'md-reader', exp: Math.floor(Date.now() / 1000) + 86400 * 365 });
+const JWT = makeJwt({ sub: 'md-reader', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 * 365 });
 
 /** 预置同步配置（默认仅手动），避免每个用例重复填表。 */
 async function seedSyncConfig(page: Page): Promise<void> {
@@ -77,7 +77,7 @@ test('跨设备同步：默认仅手动，测试连接与手动同步', async ({
 
   await page.goto('./#/settings/sync');
   await page.getByLabel('接口地址').fill(ENDPOINT);
-  await page.getByLabel('JWT').fill(makeJwt({ sub: 'md-reader', exp: Math.floor(Date.now() / 1000) + 86400 }));
+  await page.getByLabel('JWT').fill(makeJwt({ sub: 'md-reader', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 }));
 
   await page.getByRole('button', { name: '测试连接' }).click();
   await expect(page.getByText(/连接成功/)).toBeVisible();

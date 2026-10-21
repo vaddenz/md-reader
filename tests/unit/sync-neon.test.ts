@@ -17,7 +17,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe('neon backend', () => {
   it('test：解码 sub、读表、写探测、删除探测', async () => {
     const calls: string[] = [];
-    const token = jwt({ sub: 'md-reader', exp: Math.floor(Date.now() / 1000) + 90 * 86400 });
+    const token = jwt({ sub: 'md-reader', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 90 * 86400 });
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       calls.push(`${init?.method ?? 'GET'} ${url}`);
       return new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -31,7 +31,7 @@ describe('neon backend', () => {
   });
 
   it('test：JWT 30 天内到期返回 warning 但继续', async () => {
-    const token = jwt({ sub: 'md-reader', exp: Math.floor(Date.now() / 1000) + 86400 });
+    const token = jwt({ sub: 'md-reader', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 });
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })));
     const backend = neonDefinition.create({ endpoint: values.endpoint, token });
     const result = await backend.test();
@@ -42,7 +42,10 @@ describe('neon backend', () => {
     const noSub = neonDefinition.create({ endpoint: values.endpoint, token: jwt({ exp: 9999999999 }) });
     await expect(noSub.test()).rejects.toMatchObject({ kind: 'config' });
 
-    const token = jwt({ sub: 'md-reader', exp: Math.floor(Date.now() / 1000) + 86400 });
+    const noRole = neonDefinition.create({ endpoint: values.endpoint, token: jwt({ sub: 'md-reader', exp: 9999999999 }) });
+    await expect(noRole.test()).rejects.toMatchObject({ kind: 'config' });
+
+    const token = jwt({ sub: 'md-reader', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 86400 });
     vi.stubGlobal('fetch', vi.fn(async () => new Response('no', { status: 401 })));
     const backend = neonDefinition.create({ endpoint: values.endpoint, token });
     await expect(backend.test()).rejects.toMatchObject({ kind: 'auth' });
@@ -105,7 +108,7 @@ describe('neon backend', () => {
   it('错误映射：过期 JWT => auth，网络失败 => network，非法 JSON => parse', async () => {
     const expired = neonDefinition.create({
       endpoint: values.endpoint,
-      token: jwt({ sub: 'md-reader', exp: Math.floor(Date.now() / 1000) - 1 }),
+      token: jwt({ sub: 'md-reader', role: 'authenticated', exp: Math.floor(Date.now() / 1000) - 1 }),
     });
     await expect(expired.test()).rejects.toMatchObject({ kind: 'auth' });
 

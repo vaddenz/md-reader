@@ -7,6 +7,7 @@ function usage() {
   console.error(`用法: node scripts/sync-jwt.mjs [options]
 
   --sub <id>         JWT sub，默认 md-reader
+  --role <role>      JWT role，默认 authenticated
   --days <n>         有效期天数，默认 3650
   --aud <value>      可选 aud
   --out-dir <dir>    私钥目录，默认 .sync-jwt
@@ -48,6 +49,12 @@ if (typeof rawSub !== 'string' || rawSub.trim() === '') {
 }
 const sub = rawSub;
 
+const rawRole = args.role === undefined ? 'authenticated' : args.role;
+if (typeof rawRole !== 'string' || rawRole.trim() === '') {
+  fail('--role 需要非空字符串');
+}
+const role = rawRole.trim();
+
 const rawDays = args.days === undefined ? '3650' : args.days;
 if (typeof rawDays !== 'string' || !/^[1-9]\d*$/.test(rawDays) || !Number.isSafeInteger(Number(rawDays))) {
   fail('--days 需要正整数');
@@ -84,6 +91,7 @@ const now = Math.floor(Date.now() / 1000);
 const header = { alg: 'RS256', typ: 'JWT', kid };
 const payload = {
   sub,
+  role,
   iat: now,
   exp: now + Math.max(1, days) * 86400,
   iss: 'md-reader',
@@ -93,6 +101,6 @@ const input = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload
 const signature = sign('RSA-SHA256', Buffer.from(input), privatePem).toString('base64url');
 
 console.error(`JWKS: ${jwksPath}`);
-console.error(`sub: ${sub} · 有效 ${days} 天`);
+console.error(`sub: ${sub} · role: ${role} · 有效 ${days} 天`);
 console.error('把下面的 JWT 粘贴到 md-reader 的「设置 › 跨设备同步」：');
 console.log(`${input}.${signature}`);

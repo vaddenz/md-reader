@@ -177,7 +177,7 @@ export interface SyncCollection {
 
 `sync_upsert(p_records jsonb)` 在 Postgres 内做条件更新：
 
-- 插入时 `user_id = auth.user_id()`；
+- 插入时 `user_id = current_setting('request.jwt.claims', true)::jsonb->>'sub'`（Data API 会把 JWT claims 放进 `request.jwt.claims`；这样 RPC 不依赖 `authenticated` 对 `auth` schema 的 USAGE 权限）；
 - 冲突时只有当
   `(excluded.updated_at, excluded.device_id)`
   **严格大于**
@@ -537,7 +537,7 @@ window.dispatchEvent(new CustomEvent('mdreader:sync-applied', {
 ### 9.2 请求
 
 - `test()`：
-  1. 客户端解析 JWT payload（不验签），确认 `sub` 非空；`exp` 已过期 → `auth` 错误并阻止测试；`exp` 在 30 天内 → 测试继续但返回到期警告。JWT 不是三段式或无法解析 → `config` 错误。
+  1. 客户端解析 JWT payload（不验签），确认 `sub` 非空且 `role` 为 `authenticated`（Data API 默认用 `.role` 选择数据库角色；缺少 role 会导致写入 403）；`exp` 已过期 → `auth` 错误并阻止测试；`exp` 在 30 天内 → 测试继续但返回到期警告。JWT 不是三段式或无法解析 → `config` 错误。
   2. `GET {endpoint}/sync_records?select=scope&limit=1`（读权限 + 表存在）。
   3. `POST {endpoint}/rpc/sync_upsert`，写入一条 `collection='__probe__'`、`record_id='probe'`、`payload=null`、`updated_at=0`、`deleted=true`、`device_id='__probe__'` 的探测记录（写权限 + RLS `with check`）。
   4. `DELETE {endpoint}/sync_records?scope=eq.__probe__&collection=eq.__probe__&record_id=eq.probe` 清理探测记录；删除失败不影响连接判定，残留行不会被集合适配器处理。
@@ -610,9 +610,9 @@ Neon Data API 需要 JWKS 验证 JWT。两种路径：
 2. **个人长期 JWT（本期保留的可选工具）**：附带 `scripts/sync-jwt.mjs`（是否长期维护后续再定）：
    - 生成 RSA 密钥对；私钥写到 `.sync-jwt/private.pem`（gitignore，0600）；
    - 公钥 JWKS 写到 `public/sync-jwks.json`（公钥可公开，随 GitHub Pages 部署）；
-   - 签发 `sub` 可配置（默认 `md-reader`）、有效期默认 10 年的 RS256 JWT，打印到终端；
+   - 签发 `sub` 可配置（默认 `md-reader`）、`role` 默认 `authenticated`、有效期默认 10 年的 RS256 JWT，打印到终端；
    - 用户在 Neon 配置 JWKS URL `https://vaddenz.github.io/md-reader/sync-jwks.json`，把 JWT 粘贴到应用。
-   - 支持 `--sub`、`--days`、`--aud`、`--jwks`、`--out-dir` 参数；重复运行复用私钥，只重新签发。
+   - 支持 `--sub`、`--role`、`--days`、`--aud`、`--jwks`、`--out-dir` 参数；重复运行复用私钥，只重新签发。
    - 不把私钥、JWT 写进仓库或日志；脚本只在本机运行。
 3. 若用户不方便部署 JWKS，也可接现有 provider；应用侧不感知差异。
 
@@ -877,8 +877,11 @@ begin
   insert into public.sync_records (
     user_id, scope, collection, record_id, payload, updated_at, deleted, device_id
   )
+  -- Data API 会把 JWT claims 放在 request.jwt.claims；直接取 sub 可避免
+  -- authenticated 角色对 auth schema 的 USAGE 依赖。
   select
-    auth.user_id(), r.scope, r.collection, r.record_id, r.payload,
+    current_setting('request.jwt.claims', true)::jsonb->>'sub',
+    r.scope, r.collection, r.record_id, r.payload,
     r.updated_at, r.deleted, r.device_id
   from jsonb_to_recordset(coalesce(p_records, '[]'::jsonb)) as r(
     scope text,

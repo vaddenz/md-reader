@@ -79,6 +79,9 @@ export class NeonBackend implements SyncBackend {
     const payload = decodeJwtPayload(this.token);
     if (!payload) throw new SyncError('config', 'JWT 格式不正确');
     if (typeof payload.sub !== 'string' || !payload.sub.trim()) throw new SyncError('config', 'JWT 缺少 sub');
+    if (payload.role !== 'authenticated') {
+      throw new SyncError('config', 'JWT 缺少 role=authenticated（Data API 需要它选择数据库角色）');
+    }
     let warning: string | undefined;
     if (typeof payload.exp === 'number') {
       const left = payload.exp * 1000 - Date.now();

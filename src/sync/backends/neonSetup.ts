@@ -47,8 +47,11 @@ begin
   insert into public.sync_records (
     user_id, scope, collection, record_id, payload, updated_at, deleted, device_id
   )
+  -- Data API 会把 JWT claims 放在 request.jwt.claims；直接取 sub 可避免
+  -- authenticated 角色对 auth schema 的 USAGE 依赖。
   select
-    auth.user_id(), r.scope, r.collection, r.record_id, r.payload,
+    current_setting('request.jwt.claims', true)::jsonb->>'sub',
+    r.scope, r.collection, r.record_id, r.payload,
     r.updated_at, r.deleted, r.device_id
   from jsonb_to_recordset(coalesce(p_records, '[]'::jsonb)) as r(
     scope text,

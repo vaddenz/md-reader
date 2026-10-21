@@ -34,10 +34,11 @@ Neon Data API 用 JWT 鉴权，并用 JWKS 中的公钥验签。两条路径任�
 ### 方式 A：已有 JWT 提供方（Auth0 / Clerk / Keycloak / Firebase 等）
 
 1. 在提供方处创建一个用户 / 客户端，取得长期 JWT；`sub` 是该用户的唯一标识。
-2. 在 Neon Console → **Postgres database → Data API → Settings → Authentication → Add provider**，填入提供方的 **JWKS URL**；若提供方要求 audience，再填入对应的 **JWT Audience**。
-3. 把 JWT 粘贴到 md-reader 的「设置 › 跨设备同步」。
+2. JWT 必须包含 `role` claim，值通常是 `authenticated`（Data API 用 `.role` 选择数据库角色）；缺少它时写入会返回 `403 permission denied`。
+3. 在 Neon Console → **Postgres database → Data API → Settings → Authentication → Add provider**，填入提供方的 **JWKS URL**；若提供方要求 audience，再填入对应的 **JWT Audience**。
+4. 把 JWT 粘贴到 md-reader 的「设置 › 跨设备同步」。
 
-应用只解析 JWT 的 `sub` 与 `exp`（不验签），不关心签发方。
+应用只解析 JWT 的 `sub`、`role` 与 `exp`（不验签），不关心签发方。
 
 ### 方式 B：仓库附带的本地脚本（个人长期 JWT）
 
@@ -58,13 +59,14 @@ node scripts/sync-jwt.mjs --help   # 退出码 0
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
 | `--sub <id>` | `md-reader` | JWT 的 `sub`，也是 Neon 中的用户标识；必须为非空字符串 |
+| `--role <role>` | `authenticated` | JWT 的 `role`；Data API 用它选择数据库角色，必须与 Data API 的 `jwt_role_claim_key`（默认 `.role`）匹配 |
 | `--days <n>` | `3650` | 有效期天数（10 年）；必须为正整数 |
 | `--aud <value>` | 无 | 可选 `aud`；若 Neon 侧校验 audience，填一致的值 |
 | `--out-dir <dir>` | `.sync-jwt` | 私钥目录 |
 | `--jwks <file>` | `public/sync-jwks.json` | 公钥 JWKS 输出路径 |
 | `--help` | — | 显示用法并退出 |
 
-`--sub` / `--days` 非法（含裸参数、`abc`、`0`、负数、小数）时，脚本打印错误与用法到 stderr，以退出码 1 结束，并在创建任何目录或密钥之前退出。
+`--sub` / `--role` / `--days` 非法（含裸参数、`abc`、`0`、负数、小数）时，脚本打印错误与用法到 stderr，以退出码 1 结束，并在创建任何目录或密钥之前退出。
 
 产物与边界：
 
@@ -131,8 +133,11 @@ begin
   insert into public.sync_records (
     user_id, scope, collection, record_id, payload, updated_at, deleted, device_id
   )
+  -- Data API 会把 JWT claims 放在 request.jwt.claims；直接取 sub 可避免
+  -- authenticated 角色对 auth schema 的 USAGE 依赖。
   select
-    auth.user_id(), r.scope, r.collection, r.record_id, r.payload,
+    current_setting('request.jwt.claims', true)::jsonb->>'sub',
+    r.scope, r.collection, r.record_id, r.payload,
     r.updated_at, r.deleted, r.device_id
   from jsonb_to_recordset(coalesce(p_records, '[]'::jsonb)) as r(
     scope text,
@@ -164,7 +169,7 @@ grant execute on function public.sync_upsert(jsonb) to authenticated;
 
 要点：
 
-- `user_id` 由 `auth.user_id()`（JWT 的 `sub`）填充；RLS 只允许本人读写。
+- `user_id` 由 `request.jwt.claims` 里的 `sub` 填充（`sync_upsert` 显式取值）；RLS 使用 `auth.user_id()` 校验，二者都来自同一枚 JWT，只允许本人读写。
 - `sync_upsert` 是条件写：只有 `(updated_at, device_id)` 严格更大的记录才覆盖远端，避免旧数据覆盖新数据。
 - 不向 `anon` 授权；匿名请求不能读写。
 - 不需要为每种数据类型建表；新增数据类型只改客户端。
@@ -206,7 +211,7 @@ http://localhost:5173
 | 现象 | 可能原因 | 处理 |
 | --- | --- | --- |
 | `401` / 「JWT 无效、已过期或没有权限」 | JWT 过期、拼写错误、签名与 JWKS 不匹配、`kid` 不在 JWKS、`sub` 为空、Neon 配置的 JWT Audience 与 token 的 `aud` 不一致 | 重新粘贴完整 JWT；用 `node scripts/sync-jwt.mjs` 重签；核对 Neon 的 JWKS 与 JWT Audience 设置；确认 JWKS 已部署且内容是最新公钥 |
-| `403` | RLS 未允许当前 `sub`，或没有 `authenticated` 权限 | 重新执行第 3 节完整 SQL；确认 JWT 的 `sub` 与 RLS 使用的 `auth.user_id()` 一致；确认已执行 `grant` 语句 |
+| `403` | JWT 缺少 `role` / role 不是 `authenticated`，或 RLS 未允许当前 `sub` | 重新执行第 3 节完整 SQL；确认 JWT 含 `role: "authenticated"`（`node scripts/sync-jwt.mjs` 默认会加）；确认 `sub` 与 RLS 使用的 `auth.user_id()` 一致；确认已执行 `grant` 语句 |
 | `404` / 「同步表不存在，请先执行初始化 SQL」 | 表或 RPC 不存在、API URL 少了 `/rest/v1`、连到了错误的分支/数据库 | 执行第 3 节 SQL；核对 API URL 的数据库名与分支 |
 | 浏览器报 CORS / 「网络不可用，或 Neon CORS 未允许当前站点」 | 来源未加入 CORS、协议或端口不一致、Neon 项目休眠/冷启动超时 | 在 Data API → Settings 添加当前页面来源（含 `https://` / `http://localhost:5173`）；确认网络；冷启动稍后重试 |
 | 「JWT 将在 X 天后到期」 | JWT 临近过期（30 天内） | 不阻断同步；尽快用脚本重签并更新应用中的 JWT |
@@ -225,7 +230,7 @@ http://localhost:5173
 检查 JWT 的 `sub` / `exp`（不验签，仅本地查看）：
 
 ```bash
-node -e "const t=process.argv[1];const p=JSON.parse(Buffer.from(t.split('.')[1],'base64url'));console.log({sub:p.sub,exp:new Date(p.exp*1000).toISOString()})" '<粘贴 JWT>'
+node -e "const t=process.argv[1];const p=JSON.parse(Buffer.from(t.split('.')[1],'base64url'));console.log({sub:p.sub,role:p.role,aud:p.aud,exp:new Date(p.exp*1000).toISOString()})" '<粘贴 JWT>'
 ```
 
 直接请求表（应返回 `[]` 或记录；把 URL 与 JWT 换成自己的）：

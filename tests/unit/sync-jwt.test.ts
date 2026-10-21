@@ -26,6 +26,7 @@ describe('sync-jwt script', () => {
     expect(token.split('.')).toHaveLength(3);
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
     expect(payload.sub).toBe('test-user');
+    expect(payload.role).toBe('authenticated');
     const jwks = JSON.parse(readFileSync(join(dir, 'jwks.json'), 'utf8'));
     expect(jwks.keys[0]).toMatchObject({ alg: 'RS256', use: 'sig' });
     expect(jwks.keys[0].kid).toBeTruthy();
