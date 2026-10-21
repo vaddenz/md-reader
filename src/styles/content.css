@@ -53,6 +53,8 @@
 .doc-header-actions {
   position: relative;
   flex: none;
+  display: flex;
+  align-items: center;
 }
 
 /* ⋯ 弹层（spec §3.2）：文件 / 横屏 / 旋转（内部仍是普通 button，保留可访问名契约） */
@@ -61,6 +63,10 @@
   right: 4px;
   top: calc(100% + 6px);
   min-width: 132px;
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--card);
   border-radius: 12px;
   box-shadow: var(--shadow-card);

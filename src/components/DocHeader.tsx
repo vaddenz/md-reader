@@ -18,6 +18,10 @@ interface DocHeaderProps {
   onOpenNotes?: () => void;
   /** 当前文档笔记数（仅用于菜单文案提示，不参与加载状态）。 */
   noteCount?: number;
+  /** 启动/暂停朗读；未提供时不渲染朗读菜单项。 */
+  onOpenTts?: () => void;
+  /** 朗读菜单项文案（朗读 / 暂停朗读 / 继续朗读 / 重新朗读）。 */
+  ttsLabel?: string;
   /** 当前显示方向；未提供 onToggleOrientation 时不渲染方向按钮。 */
   orientation?: 'portrait' | 'landscape' | 'landscape-flipped';
   /** 横屏/竖屏切换；未提供时不渲染横屏按钮。 */
@@ -40,6 +44,8 @@ export default function DocHeader({
   onOpenAppearance,
   onOpenNotes,
   noteCount,
+  onOpenTts,
+  ttsLabel,
   orientation,
   onToggleOrientation,
   onFlipOrientation,
@@ -217,6 +223,15 @@ export default function DocHeader({
               </svg>
               搜索
             </button>
+            {onOpenTts && (
+              <button type="button" className="doc-more-item" onClick={() => act(onOpenTts)}>
+                <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path d="M4 10v4h4l5 4V6l-5 4H4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="M16 9.5a3.6 3.6 0 0 1 0 5M18.6 7a7 7 0 0 1 0 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                {ttsLabel ?? '朗读'}
+              </button>
+            )}
             {onOpenNotes && (
               <button type="button" className="doc-more-item" onClick={() => act(onOpenNotes)}>
                 <svg className="doc-more-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">

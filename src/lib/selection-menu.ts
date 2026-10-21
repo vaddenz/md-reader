@@ -27,7 +27,11 @@ export function rangesEqual(a: Range | null, b: Range | null): boolean {
 export function menuActionsFor(ctx: MenuContext): MenuAction[] {
   if (ctx.hasSelection) {
     if (ctx.selectionInExcluded) return [{ id: 'copy', label: '复制' }];
-    const actions: MenuAction[] = [{ id: 'copy', label: '复制' }, { id: 'note', label: '笔记' }];
+    const actions: MenuAction[] = [
+      { id: 'copy', label: '复制' },
+      { id: 'note', label: '笔记' },
+      { id: 'read-aloud', label: '从这里朗读' },
+    ];
     for (const c of HIGHLIGHT_COLORS) actions.push({ id: `hl:${c.id}`, label: c.label });
     if (ctx.selectionIntersectsHighlight) actions.push({ id: 'clear', label: '清除高亮' });
     return actions;

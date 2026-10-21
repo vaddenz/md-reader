@@ -13,6 +13,8 @@ import RelatedDocs from '../components/RelatedDocs';
 import SelectionMenu from '../components/SelectionMenu';
 import TocDrawer from '../components/TocDrawer';
 import TreeDrawer from '../components/TreeDrawer';
+import TtsBar from '../components/TtsBar';
+import TtsSheet from '../components/TtsSheet';
 import { appearanceStyle, DEFAULT_APPEARANCE, getAppearance, type ReaderAppearance } from '../data/appearance';
 import { getFile, kvGet, kvSet, listFilesMeta, touchFile, type FileMeta, type TreeEntry } from '../data/db';
 import { GitHubClient, GitHubError } from '../data/github';
@@ -22,6 +24,7 @@ import { getFavorites, getProgress, toggleFavorite } from '../data/prefs';
 import { activeRepo } from '../data/repos';
 import { downloadDocText } from '../data/sync';
 import { useReadingProgress } from '../hooks/useReadingProgress';
+import { useTts } from '../tts/useTts';
 import { AUTH_EXPIRED_TEXT, QUOTA_TEXT, isQuotaError } from '../lib/errors';
 import { menuActionsFor, type MenuContext } from '../lib/selection-menu';
 import { showToast } from '../lib/toast';
@@ -120,6 +123,7 @@ export default function DocPage() {
   } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteEditor, setNoteEditor] = useState<NoteEditorState | null>(null);
+  const [ttsOpen, setTtsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const copyTimers = useRef(new Map<HTMLElement, number>());
   // 已渲染高亮：记录 id → haystack 区间（右键菜单判定相交/清除时使用，T10 消费）。
@@ -379,6 +383,13 @@ export default function DocPage() {
   // 阅读进度记录：滚动比例节流写入（含 visibilitychange 与卸载补写）。
   useReadingProgress(path, { enabled: ready, container: contentRef });
 
+  // 文档朗读：系统 TTS + 句级高亮 + 断点。只朗读正文，不读代码/图表。
+  const tts = useTts({ path, containerRef: contentRef, ready });
+
+  useEffect(() => {
+    setTtsOpen(false);
+  }, [path]);
+
   // 多标签登记（spec §3.2）：载入完成后确保当前文档在标签中并聚焦。
   useEffect(() => {
     if (!tabsLoaded) return;
@@ -499,6 +510,12 @@ export default function DocPage() {
     if (!current || !container) return;
     const sel = window.getSelection();
 
+    if (id === 'read-aloud') {
+      if (current.range) tts.startFromSelection(current.range);
+      sel?.removeAllRanges();
+      return;
+    }
+
     if (id === 'copy') {
       // 全选选区（Range 含中间排除区）改用可见文本，避免带入「复制」按钮等界面文本。
       const text = sameSelectionRange(sel, selectAllRangeRef.current, container) ? visibleText(container) : (sel?.toString() ?? '');
@@ -570,7 +587,7 @@ export default function DocPage() {
       window.getSelection()?.removeAllRanges();
       return;
     }
-  }, [menu, path]);
+  }, [menu, path, tts]);
 
   // 原生复制（Cmd/Ctrl+C）兜底：全选选区含中间排除区（Range 是连续区间），
   // 复制时改写为可见文本，避免代码块内「复制」按钮等界面文本混入剪贴板。
@@ -641,6 +658,7 @@ export default function DocPage() {
   }, []);
 
   const title = cur.kind === 'ready' ? cur.title : '';
+  const ttsBarVisible = tts.state !== 'idle' && tts.state !== 'unsupported';
 
   return (
     <>
@@ -652,6 +670,21 @@ export default function DocPage() {
         onOpenAppearance={() => setAppearanceOpen(true)}
         onOpenNotes={() => setNotesOpen(true)}
         noteCount={notes.length}
+        onOpenTts={ready ? () => {
+          if (!tts.supported) {
+            showToast('当前浏览器不支持朗读', { kind: 'error' });
+            return;
+          }
+          if (tts.state === 'playing' || tts.state === 'paused') tts.toggle();
+          else if (tts.state === 'ended') tts.start(0);
+          else tts.start();
+        } : undefined}
+        ttsLabel={
+          tts.state === 'playing' ? '暂停朗读'
+            : tts.state === 'paused' ? '继续朗读'
+              : tts.state === 'ended' ? '重新朗读'
+                : '朗读'
+        }
         orientation={orientation}
         onToggleOrientation={toggleLandscape}
         onFlipOrientation={flip}
@@ -698,6 +731,59 @@ export default function DocPage() {
       )}
       {ready && <RelatedDocs path={path} />}
       {ready && <PrevNext path={path} metas={metas} />}
+      {ttsBarVisible && (
+        <TtsBar
+          state={tts.state}
+          current={tts.current}
+          total={tts.total}
+          rate={tts.rate}
+          remainingSeconds={tts.remainingSeconds}
+          following={tts.following}
+          sleepMinutes={tts.sleepMinutes}
+          error={tts.error}
+          onToggle={() => {
+            if (tts.state === 'ended') tts.start(0);
+            else tts.toggle();
+          }}
+          onPrev={tts.prev}
+          onNext={tts.next}
+          onOpen={() => setTtsOpen(true)}
+          onClose={() => {
+            tts.stop();
+            setTtsOpen(false);
+          }}
+          onResumeFollow={tts.resumeFollow}
+        />
+      )}
+      {ttsBarVisible && <div className="tts-bottom-space" aria-hidden="true" />}
+      {ttsOpen && (
+        <TtsSheet
+          state={tts.state}
+          prefs={tts.prefs}
+          voiceOptions={tts.voiceOptions}
+          hasAnyVoice={tts.voices.length > 0}
+          selectedVoice={tts.selectedVoice}
+          loadingVoices={tts.loadingVoices}
+          sleepMinutes={tts.sleepMinutes}
+          error={tts.error}
+          onClose={() => setTtsOpen(false)}
+          onSetRate={tts.setRate}
+          onSetVoiceKey={tts.setVoiceKey}
+          onSetPrefs={tts.setPrefs}
+          onSetSleepMinutes={tts.setSleepMinutes}
+          onRestart={() => tts.start(0)}
+          onStop={() => {
+            tts.stop();
+            setTtsOpen(false);
+          }}
+          onRefreshVoices={tts.refreshVoices}
+          onOpenToc={() => {
+            tts.pause();
+            setTtsOpen(false);
+            openToc();
+          }}
+        />
+      )}
       {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}
       {appearanceOpen && (
         <AppearanceSheet
