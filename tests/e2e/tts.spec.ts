@@ -71,7 +71,7 @@ test('朗读：系统 TTS 入口、控制条与语速设置', async ({ page }) =
 
   const highlighted = await page.evaluate(() => {
     const registry = (CSS as unknown as { highlights?: { has?: (name: string) => boolean } }).highlights;
-    if (registry?.has) return registry.has('tts-current');
+    if (registry?.has) return registry.has('tts-current') || registry.has('tts-current-heading');
     return document.querySelectorAll('.tts-current-block').length > 0;
   });
   expect(highlighted).toBe(true);

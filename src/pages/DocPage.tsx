@@ -772,6 +772,10 @@ export default function DocPage() {
             setTtsOpen(false);
           }}
           onRefreshVoices={tts.refreshVoices}
+          onOpenToc={() => {
+            setTtsOpen(false);
+            openToc();
+          }}
         />
       )}
       {tocOpen && <TocDrawer headings={tocHeadings} onClose={closeToc} />}

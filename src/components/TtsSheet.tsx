@@ -19,6 +19,7 @@ interface TtsSheetProps {
   onRestart: () => void;
   onStop: () => void;
   onRefreshVoices: () => void;
+  onOpenToc: () => void;
 }
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
@@ -41,11 +42,12 @@ export default function TtsSheet({
   onRestart,
   onStop,
   onRefreshVoices,
+  onOpenToc,
 }: TtsSheetProps) {
   const failed = state === 'error' || state === 'no-voice' || state === 'blocked';
 
   return (
-    <Drawer title="朗读" onClose={onClose}>
+    <Drawer title="朗读" onClose={onClose} className="tts-sheet-drawer">
       <div className="tts-sheet">
         {failed && <p className="tts-sheet-error">{state === 'blocked' ? '浏览器拦截了朗读，点按播放键重试。' : error || '朗读暂不可用。'}</p>}
 
@@ -103,15 +105,14 @@ export default function TtsSheet({
                 aria-pressed={prefs.rate === r}
                 onClick={() => onSetRate(r)}
               >
-                {r}x
+                {r === 1 ? '1.0x' : `${r}x`}
               </button>
             ))}
           </div>
         </section>
 
         <section className="tts-sheet-section">
-          <h3>睡眠定时</h3>
-          <div className="tts-rate-row" role="group" aria-label="睡眠定时">
+          <h3>睡眠定时</h3>          <div className="tts-rate-row" role="group" aria-label="睡眠定时">
             {(['off', 15, 30, 45, 60] as const).map((m) => (
               <button
                 key={m}
@@ -143,6 +144,7 @@ export default function TtsSheet({
         </section>
 
         <div className="tts-sheet-actions">
+          <button type="button" className="tts-sheet-btn" onClick={onOpenToc}>目录</button>
           <button type="button" className="tts-sheet-btn" onClick={onRestart}>从头朗读</button>
           <button type="button" className="tts-sheet-btn tts-sheet-btn-danger" onClick={onStop}>停止朗读</button>
         </div>

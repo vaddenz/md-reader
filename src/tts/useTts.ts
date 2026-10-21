@@ -63,7 +63,10 @@ function applyHighlight(chunk: Chunk): void {
 
   try {
     if (registry && HighlightCtor && chunk.ranges.length > 0) {
-      registry.set('tts-current', new HighlightCtor(...chunk.ranges));
+      const name = chunk.kind === 'heading' ? 'tts-current-heading' : 'tts-current';
+      registry.delete('tts-current');
+      registry.delete('tts-current-heading');
+      registry.set(name, new HighlightCtor(...chunk.ranges));
       return;
     }
   } catch {
@@ -78,6 +81,7 @@ function clearHighlightDom(): void {
   try {
     const registry = (CSS as unknown as { highlights?: { delete: (name: string) => void } }).highlights;
     registry?.delete('tts-current');
+    registry?.delete('tts-current-heading');
   } catch {
     // 忽略高亮清理失败
   }

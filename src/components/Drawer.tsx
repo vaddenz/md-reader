@@ -6,6 +6,8 @@ interface DrawerProps {
   title: string;
   /** 关闭抽屉（遮罩点击 / 关闭按钮 / Esc / 内部跳转后调用）。 */
   onClose: () => void;
+  /** 附加到抽屉面板的类名（如朗读设置需要更高的面板）。 */
+  className?: string;
   children: ReactNode;
 }
 
@@ -13,7 +15,7 @@ interface DrawerProps {
  * 底部弹出的通用抽屉外壳（T16 起 TOC 与文件树共用）：
  * 遮罩/关闭按钮/Esc 关闭；打开期间锁定背景滚动、聚焦面板，关闭时把焦点还给触发元素。
  */
-export default function Drawer({ title, onClose, children }: DrawerProps) {
+export default function Drawer({ title, onClose, className, children }: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function Drawer({ title, onClose, children }: DrawerProps) {
     <div className="drawer-overlay" onClick={onClose}>
       <div
         ref={panelRef}
-        className="drawer-panel"
+        className={className ? `drawer-panel ${className}` : 'drawer-panel'}
         role="dialog"
         aria-modal="true"
         aria-label={title}

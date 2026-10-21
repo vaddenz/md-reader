@@ -1,12 +1,18 @@
 /* 朗读：当前句高亮、底部播放条、设置面板。 */
 
 ::highlight(tts-current) {
-  background-color: rgba(31, 63, 212, .14);
-  background-color: color-mix(in srgb, var(--acc) 14%, transparent);
+  background: rgba(31, 63, 212, .04);
+  background: color-mix(in srgb, var(--acc) 4%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--acc);
-  text-decoration-thickness: 1px;
+  text-decoration-thickness: 2px;
   text-underline-offset: 3px;
+}
+
+/* 标题不用下划线，避免看起来像链接；用极浅底色表示当前句 */
+::highlight(tts-current-heading) {
+  background: rgba(31, 63, 212, .07);
+  background: color-mix(in srgb, var(--acc) 7%, transparent);
 }
 
 .tts-current-block {
@@ -138,9 +144,14 @@
   height: calc(var(--tts-bar-h) + env(safe-area-inset-bottom));
 }
 
-/* 播放期间把悬浮目录按钮上移，避免和播放条重叠；拖动时保持原位 */
-body.tts-bar-visible .doc-toc-fab:not(.doc-toc-fab-dragging) {
-  transform: translateY(calc(-1 * var(--tts-bar-h)));
+/* 播放期间隐藏悬浮目录按钮（目录入口移入朗读设置），避免遮挡正文 */
+body.tts-bar-visible .doc-toc-fab {
+  display: none;
+}
+
+/* 朗读设置项较多：用更高的抽屉，底部操作无需滚动才能看到 */
+.drawer-panel.tts-sheet-drawer {
+  max-height: 86vh;
 }
 
 /* 设置面板 */
