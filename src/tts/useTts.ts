@@ -93,7 +93,8 @@ function scrollChunkIntoView(chunk: Chunk): void {
   const rect = chunkRect(chunk);
   if (rect.top >= 80 && rect.bottom <= window.innerHeight - 120) return;
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  chunk.block.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  const top = Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.35);
+  window.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
 }
 
 function firstVisibleIndex(chunks: Chunk[]): number {

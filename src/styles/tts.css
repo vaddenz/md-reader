@@ -138,12 +138,9 @@
   height: calc(var(--tts-bar-h) + env(safe-area-inset-bottom));
 }
 
-/* 播放期间把悬浮目录按钮上移，避免和播放条重叠；拖动时同步偏移 */
-body.tts-bar-visible .doc-toc-fab {
+/* 播放期间把悬浮目录按钮上移，避免和播放条重叠；拖动时保持原位 */
+body.tts-bar-visible .doc-toc-fab:not(.doc-toc-fab-dragging) {
   transform: translateY(calc(-1 * var(--tts-bar-h)));
-}
-body.tts-bar-visible .doc-toc-fab-dragging {
-  transform: scale(1.06) translateY(calc(-1 * var(--tts-bar-h)));
 }
 
 /* 设置面板 */
