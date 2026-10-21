@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { LlmError, isLlmConfigured, testConnection } from '../../data/llm';
-import type { LlmConfig } from '../../data/memory';
+import type { LlmConfig, LlmReasoningEffort } from '../../data/memory';
 import { showToast } from '../../lib/toast';
 
 const EMPTY: LlmConfig = { baseUrl: '', apiKey: '', model: '' };
+
+const EFFORT_OPTIONS: { value: LlmReasoningEffort | ''; label: string }[] = [
+  { value: '', label: '默认（由模型决定）' },
+  { value: 'low', label: 'low · 轻量' },
+  { value: 'high', label: 'high · 标准' },
+  { value: 'max', label: 'max · 最深' },
+];
 
 function errorText(err: unknown): string {
   if (err instanceof LlmError) return err.message;
@@ -45,6 +52,8 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
     }
   };
 
+  const opencodeDirect = /^https?:\/\/([^/]+\.)?opencode\.ai(\/|$)/i.test(draft.baseUrl.trim());
+
   return (
     <div className="memory-llm-form">
       <label className="memory-field">
@@ -62,6 +71,15 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
         <input value={draft.model} placeholder="如 deepseek-chat" autoComplete="off"
           onChange={(e) => edit({ model: e.target.value })} />
       </label>
+      <label className="memory-field">
+        <span>思考强度</span>
+        <select
+          value={draft.reasoningEffort ?? ''}
+          onChange={(e) => edit({ reasoningEffort: (e.target.value || undefined) as LlmReasoningEffort | undefined })}
+        >
+          {EFFORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </label>
       <div className="memory-actions" style={{ marginTop: 10 }}>
         <div className="memory-actions-row">
           <button type="button" className="memory-primary" disabled={busy} onClick={onSave}>保存</button>
@@ -74,6 +92,20 @@ export default function LlmConfigForm(props: { cfg: LlmConfig | undefined; onCha
         问答评分时会把题干、参考答案与你的作答发送到你填写的地址；Key 仅保存在本机。
         直连需服务端允许浏览器跨域（CORS），Ollama 需配置 <code>OLLAMA_ORIGINS</code>。
       </p>
+      <p className="memory-note">
+        推理模型（如 DeepSeek V4.1 Flash）可用「思考强度」选择 low / high / max；
+        模型返回的思考内容会单独显示在「思考过程」，不会混入评分结果。
+      </p>
+      <p className="memory-note">
+        用 OpenCode Go 时填 Worker 代理地址（<code>https://&lt;worker&gt;/opencode/v1</code>）：
+        浏览器无法直连 <code>opencode.ai</code>，也不能设置 User-Agent，这两项由代理补上；
+        会话头 <code>x-opencode-session</code> 由应用自动附带。
+      </p>
+      {opencodeDirect && (
+        <p className="memory-note" role="alert">
+          检测到直连 <code>opencode.ai</code>：浏览器会被 CORS 拦截，请改用本仓库的 Worker 代理地址。
+        </p>
+      )}
     </div>
   );
 }
