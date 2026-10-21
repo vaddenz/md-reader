@@ -18,6 +18,10 @@ interface DocHeaderProps {
   onOpenNotes?: () => void;
   /** 当前文档笔记数（仅用于菜单文案提示，不参与加载状态）。 */
   noteCount?: number;
+  /** 启动/暂停朗读；未提供时不渲染朗读按钮。 */
+  onOpenTts?: () => void;
+  /** 朗读会话是否活跃（用于按钮圆点）。 */
+  ttsActive?: boolean;
   /** 当前显示方向；未提供 onToggleOrientation 时不渲染方向按钮。 */
   orientation?: 'portrait' | 'landscape' | 'landscape-flipped';
   /** 横屏/竖屏切换；未提供时不渲染横屏按钮。 */
@@ -40,6 +44,8 @@ export default function DocHeader({
   onOpenAppearance,
   onOpenNotes,
   noteCount,
+  onOpenTts,
+  ttsActive,
   orientation,
   onToggleOrientation,
   onFlipOrientation,
@@ -192,6 +198,26 @@ export default function DocHeader({
         </div>
       )}
       <div className="doc-header-actions">
+        {onOpenTts && (
+          <button
+            type="button"
+            className="doc-header-btn doc-tts-btn"
+            aria-label={ttsActive ? '朗读控制' : '朗读'}
+            aria-pressed={ttsActive === true}
+            title="朗读"
+            onClick={() => {
+              setMore(false);
+              setTabsOpen(false);
+              onOpenTts();
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path d="M4 10v4h4l5 4V6l-5 4H4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M16 9.5a3.6 3.6 0 0 1 0 5M18.6 7a7 7 0 0 1 0 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            {ttsActive && <span className="doc-tts-dot" aria-hidden="true" />}
+          </button>
+        )}
         <button
           type="button"
           className="doc-header-btn"

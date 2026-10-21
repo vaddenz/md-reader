@@ -1,0 +1,264 @@
+/* 朗读：当前句高亮、底部播放条、设置面板。 */
+
+::highlight(tts-current) {
+  background-color: rgba(31, 63, 212, .14);
+  background-color: color-mix(in srgb, var(--acc) 14%, transparent);
+  text-decoration: underline;
+  text-decoration-color: var(--acc);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.tts-current-block {
+  box-shadow: inset 2px 0 0 var(--acc);
+  border-radius: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 顶栏朗读按钮 */
+.doc-tts-btn {
+  position: relative;
+}
+.doc-tts-dot {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 0 2px var(--shell);
+}
+
+/* 底部播放条 */
+:root {
+  --tts-bar-h: 60px;
+}
+.tts-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 18px rgba(40, 44, 52, .08);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tts-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 10px;
+}
+.tts-play {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--acc-fill);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.tts-play:active { background: #1932aa; background: color-mix(in srgb, var(--acc-fill) 85%, #000); }
+.tts-play:disabled { opacity: .45; }
+.tts-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tts-status-main {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tts-status-sub {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tts-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.tts-icon-btn {
+  width: 32px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.tts-icon-btn:active { background: var(--shell); }
+.tts-icon-btn:disabled { opacity: .35; }
+.tts-locate { color: var(--acc-text); }
+.tts-progress {
+  height: 2px;
+  background: var(--line);
+}
+.tts-progress i {
+  display: block;
+  height: 100%;
+  background: var(--acc);
+  transition: width .25s ease;
+}
+.tts-bottom-space {
+  height: calc(var(--tts-bar-h) + env(safe-area-inset-bottom));
+}
+
+/* 播放期间把悬浮目录按钮上移，避免和播放条重叠；拖动时同步偏移 */
+body.tts-bar-visible .doc-toc-fab {
+  transform: translateY(calc(-1 * var(--tts-bar-h)));
+}
+body.tts-bar-visible .doc-toc-fab-dragging {
+  transform: scale(1.06) translateY(calc(-1 * var(--tts-bar-h)));
+}
+
+/* 设置面板 */
+.tts-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 6px;
+}
+.tts-sheet-section h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.tts-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tts-sheet-head h3 { margin-bottom: 8px; }
+.tts-sheet-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tts-sheet-select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.tts-sheet-note {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.tts-sheet-error {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--r-ctl);
+  background: var(--page);
+  background: color-mix(in srgb, var(--danger) 9%, var(--page));
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.tts-sheet-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.tts-sheet-check input { width: 18px; height: 18px; accent-color: var(--acc); }
+.tts-rate-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tts-chip {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tts-chip-on {
+  border-color: var(--acc);
+  background: var(--card);
+  background: color-mix(in srgb, var(--acc) 10%, var(--card));
+  color: var(--acc-text);
+}
+.tts-sheet-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
+}
+.tts-sheet-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tts-sheet-btn:active { background: var(--shell); }
+.tts-sheet-btn-danger { color: var(--danger); }
+
+@media (max-width: 420px) {
+  .tts-icon-btn { width: 30px; }
+  .tts-bar-inner { gap: 7px; padding: 6px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tts-progress i { transition: none; }
+}

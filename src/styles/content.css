@@ -53,6 +53,8 @@
 .doc-header-actions {
   position: relative;
   flex: none;
+  display: flex;
+  align-items: center;
 }
 
 /* ⋯ 弹层（spec §3.2）：文件 / 横屏 / 旋转（内部仍是普通 button，保留可访问名契约） */
