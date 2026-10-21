@@ -97,7 +97,17 @@ export class NeonBackend implements SyncBackend {
     await this.request('/rpc/sync_upsert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_records: [probe] }),
+      body: JSON.stringify({
+        p_records: [{
+          scope: probe.scope,
+          collection: probe.collection,
+          record_id: probe.recordId,
+          payload: probe.payload,
+          updated_at: probe.updatedAt,
+          deleted: probe.deleted,
+          device_id: probe.deviceId,
+        }],
+      }),
     }, signal);
     try {
       await this.request('/sync_records?scope=eq.__probe__&collection=eq.__probe__&record_id=eq.probe', {
