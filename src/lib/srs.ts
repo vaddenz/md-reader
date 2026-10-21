@@ -130,6 +130,8 @@ export interface BuildQueueInput {
   candidates: QueueCandidate[];
   srsByQid: Map<string, SrsState>;
   filters: QueueFilters;
+  /** 已标记坏题（按 qid），不进入候选池，也不占用新题额度。 */
+  excludedQids?: ReadonlySet<string>;
   /** 0 = 不限。 */
   sessionSize: number;
   newPerDay: number;
@@ -174,6 +176,7 @@ export function buildQueue(input: BuildQueueInput): QueueEntry[] {
   const pool: QueueCandidate[] = [];
   const poolSeen = new Set<string>();
   for (const c of input.candidates) {
+    if (input.excludedQids?.has(c.qid)) continue;
     if (!matches(c, input.filters)) continue;
     if (poolSeen.has(c.qid)) continue;
     poolSeen.add(c.qid);

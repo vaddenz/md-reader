@@ -3,10 +3,12 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAllData } from '../../src/data/db';
 import { appendAttempt, loadSrsMap, putSrs, saveSelection, getSelection } from '../../src/data/memory';
+import { loadBadQuestionMap, markBadQuestion, unmarkBadQuestion } from '../../src/data/badQuestions';
 import { openRepoDb } from '../../src/sync/repoDb';
 import { memorySrsCollection } from '../../src/sync/collections/memorySrs';
 import { memoryAttemptsCollection } from '../../src/sync/collections/memoryAttempts';
 import { memorySelectionCollection } from '../../src/sync/collections/memorySelection';
+import { badQuestionsCollection } from '../../src/sync/collections/badQuestions';
 import { setTombstone, tombstoneAt } from '../../src/sync/tombstones';
 import type { SrsState } from '../../src/lib/srs';
 
@@ -148,6 +150,67 @@ describe('attempts tombstone', () => {
     expect(applied).toBe(true);
     expect((await repo.getAll('mem_attempts')).length).toBe(0);
     expect(await tombstoneAt(repo, 'memory.attempts', key)).toBe(NOW + 7);
+    repo.close();
+  });
+});
+
+describe('badQuestions', () => {
+  const payload = (markedAt: number, bankPath = 'b') => ({
+    qid: 'q1', bankPath, id: 'Q1', markedAt,
+  });
+
+  it('远端新增 / 更新 / tombstone 删除', async () => {
+    const repo = await openRepoDb('mdreader');
+    await markBadQuestion({ qid: 'q1', bankPath: 'b', id: 'Q1' });
+    const base = (await loadBadQuestionMap()).get('q1')!.markedAt;
+
+    const updated = await badQuestionsCollection.applyRemote(repo, {
+      scope: 's', collection: 'memory.badQuestions', recordId: 'q1', payload: payload(base + 10, 'remote'),
+      updatedAt: base + 10, deleted: false, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(updated).toBe(true);
+    expect((await loadBadQuestionMap()).get('q1')?.bankPath).toBe('remote');
+
+    const deleted = await badQuestionsCollection.applyRemote(repo, {
+      scope: 's', collection: 'memory.badQuestions', recordId: 'q1', payload: null,
+      updatedAt: base + 11, deleted: true, deviceId: 'd', serverUpdatedAt: 2,
+    });
+    expect(deleted).toBe(true);
+    expect((await loadBadQuestionMap()).size).toBe(0);
+    expect(await tombstoneAt(repo, 'memory.badQuestions', 'q1')).toBe(base + 11);
+    repo.close();
+  });
+
+  it('撤销后的陈旧远端不复活；更新的远端可恢复', async () => {
+    const repo = await openRepoDb('mdreader');
+    await markBadQuestion({ qid: 'q1', bankPath: 'b', id: 'Q1' });
+    await unmarkBadQuestion('q1');
+    const deletedAt = await tombstoneAt(repo, 'memory.badQuestions', 'q1');
+    expect(deletedAt).toBeTypeOf('number');
+
+    const stale = await badQuestionsCollection.applyRemote(repo, {
+      scope: 's', collection: 'memory.badQuestions', recordId: 'q1', payload: payload((deletedAt ?? 0) - 1),
+      updatedAt: (deletedAt ?? 0) - 1, deleted: false, deviceId: 'd', serverUpdatedAt: 1,
+    });
+    expect(stale).toBe(false);
+    expect((await loadBadQuestionMap()).size).toBe(0);
+
+    const freshAt = (deletedAt ?? 0) + 1;
+    const fresh = await badQuestionsCollection.applyRemote(repo, {
+      scope: 's', collection: 'memory.badQuestions', recordId: 'q1', payload: payload(freshAt),
+      updatedAt: freshAt, deleted: false, deviceId: 'd', serverUpdatedAt: 2,
+    });
+    expect(fresh).toBe(true);
+    expect((await loadBadQuestionMap()).size).toBe(1);
+    expect(await tombstoneAt(repo, 'memory.badQuestions', 'q1')).toBeUndefined();
+    repo.close();
+  });
+
+  it('clearBefore 清理旧标记', async () => {
+    const repo = await openRepoDb('mdreader');
+    const record = await markBadQuestion({ qid: 'q1', bankPath: 'b', id: 'Q1' });
+    await badQuestionsCollection.clearBefore!(repo, record.markedAt);
+    expect((await loadBadQuestionMap()).size).toBe(0);
     repo.close();
   });
 });

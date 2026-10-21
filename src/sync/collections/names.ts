@@ -7,6 +7,7 @@ export const COLLECTIONS = {
   memorySrs: 'memory.srs',
   memoryAttempts: 'memory.attempts',
   memorySelection: 'memory.selection',
+  memoryBadQuestions: 'memory.badQuestions',
 } as const;
 
 export type CollectionName = typeof COLLECTIONS[keyof typeof COLLECTIONS];

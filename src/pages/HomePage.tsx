@@ -4,6 +4,7 @@ import FileTree from '../components/FileTree';
 import SyncBadge from '../components/SyncBadge';
 import { DbBlockedError, listFilesMeta, type FileMeta } from '../data/db';
 import { loadSrsMap } from '../data/memory';
+import { loadBadQuestionMap } from '../data/badQuestions';
 import { getFavorites, getProgress, recentDocs, type RecentDoc } from '../data/prefs';
 import { useSync } from '../state/SyncContext';
 import '../styles/home.css';
@@ -68,14 +69,14 @@ export default function HomePage() {
     return () => window.removeEventListener('mdreader:sync-applied', onApplied);
   }, []);
 
-  // 记忆助手入口的「今日待复习」提示（仅本机统计，失败静默）
+  // 记忆助手入口的「今日待复习」提示（仅本机统计，坏题不计；失败静默）
   useEffect(() => {
     let cancelled = false;
-    void loadSrsMap().then(
-      (map) => {
+    void Promise.all([loadSrsMap(), loadBadQuestionMap()]).then(
+      ([map, bad]) => {
         if (cancelled) return;
         const now = Date.now();
-        setDueCount([...map.values()].filter((s) => s.dueAt <= now).length);
+        setDueCount([...map.values()].filter((s) => !bad.has(s.qid) && s.dueAt <= now).length);
       },
       () => {},
     );

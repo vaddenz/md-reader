@@ -185,7 +185,7 @@ export default function SettingsSyncPage() {
         <h2 id="settings-sync-scope-title">同步范围</h2>
         <ul className="settings-about-list">
           <li>阅读进度、文本高亮、笔记、收藏</li>
-          <li>记忆 SRS 调度、训练记录、题库偏好</li>
+          <li>记忆 SRS 调度、训练记录、题库偏好、坏题标记</li>
         </ul>
         <p className="settings-note">不同步：正文、GitHub Token、AI Key / 模型配置、当前训练会话、打开的标签页、阅读外观。</p>
       </section>

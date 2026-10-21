@@ -15,31 +15,57 @@
   pointer-events: none;
 }
 
-.toast {
+.toast-wrap {
   pointer-events: auto;
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  min-height: 44px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32);
+  overflow: hidden;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   max-width: 100%;
-  min-height: 44px; /* 触摸目标尺寸与全站一致 */
+  min-height: 44px;
   padding: 11px 18px;
   border: 0;
-  border-radius: var(--r-pill);
-  background: var(--ink);
+  background: none;
   color: #ffffff;
   font: inherit;
   font-size: 14px;
   line-height: 1.5;
   text-align: center;
   overflow-wrap: anywhere;
-  box-shadow: 0 8px 20px rgba(23, 24, 26, 0.32);
   cursor: pointer;
-  animation: toast-in 0.18s ease-out;
 }
 .toast:active { opacity: 0.85; }
+.toast-wrap-action .toast { padding-right: 10px; }
+
+.toast-action {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  background: none;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast-action:active { background: rgba(255, 255, 255, 0.12); }
 
 /* 错误态：--danger 底白字（5.4:1） */
-.toast-error {
+.toast-wrap.toast-error {
   background: var(--danger);
 }
 
@@ -49,5 +75,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast { animation: none; }
+  .toast-wrap { animation: none; }
 }

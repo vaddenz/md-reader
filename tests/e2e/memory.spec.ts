@@ -396,6 +396,59 @@ test('记录页：统计与明细、清除训练数据', async ({ page }) => {
   await expect(page.getByText('还没有训练记录。')).toBeVisible();
 });
 
+test('标记坏题：跳过当前题、不写记录、toast 撤销与概览恢复', async ({ page }) => {
+  await configureAndSync(page);
+  await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
+  await page.goto('./#/memory');
+  await page.locator('.memory-bank').filter({ hasText: '示例题库' }).getByRole('checkbox').check();
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('5 题');
+  await page.getByRole('button', { name: '开始训练' }).click();
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+
+  await page.getByRole('button', { name: '标记坏题' }).click();
+  await expect(page.locator('.toast').filter({ hasText: '已标记为坏题' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '撤销' })).toBeVisible();
+  await expect(page.locator('.memory-question')).toContainText('什么是微任务？');
+
+  // toast 不得压住底部操作行
+  await expect.poll(async () => page.evaluate(() => {
+    const toast = document.querySelector('.toast')?.getBoundingClientRect();
+    const actions = document.querySelector('.memory-textactions')?.getBoundingClientRect();
+    if (!toast || !actions) return null;
+    return !(toast.right < actions.left || toast.left > actions.right || toast.bottom < actions.top || toast.top > actions.bottom);
+  })).toBe(false);
+
+  // 坏题不写进度，也不写训练记录
+  expect(await readStore(page, 'mem_attempts')).toEqual([]);
+  expect(await readStore(page, 'mem_srs')).toEqual([]);
+  const bad = await readKv(page, 'memBadQuestions') as Record<string, { bankPath: string; id: string }>;
+  expect(Object.values(bad)).toMatchObject([{ bankPath: BANK_PATH, id: 'Q1.1' }]);
+
+  // toast 内撤销：立即恢复标记
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.locator('.toast').filter({ hasText: '已恢复该题' })).toBeVisible();
+  expect(await readKv(page, 'memBadQuestions')).toEqual({});
+
+  // 再标记当前题（Q1.2），用于验证概览管理入口
+  await page.getByRole('button', { name: '标记坏题' }).click();
+  await expect(page.locator('.toast').filter({ hasText: '已标记为坏题' })).toBeVisible();
+  await page.locator('.toast').filter({ hasText: '已标记为坏题' }).click();
+
+  // 概览：题库行显示坏题数，展开后可恢复
+  await page.goto('./#/memory');
+  await expect(page.locator('.memory-bank').filter({ hasText: '示例题库' })).toContainText('1 道坏题');
+  await expect(page.getByText('已标记坏题 · 1 道')).toBeVisible();
+  await page.getByText('已标记坏题 · 1 道').click();
+  await page.getByRole('button', { name: '恢复', exact: true }).click();
+  await expect(page.locator('.toast').filter({ hasText: '已恢复该题' })).toBeVisible();
+  await expect(page.getByText('已标记坏题 · 1 道')).toHaveCount(0);
+  expect(await readKv(page, 'memBadQuestions')).toEqual({});
+
+  // 恢复后重新进入抽题范围
+  await page.getByRole('button', { name: '开始训练' }).click();
+  await expect(page.locator('.memory-question')).toContainText('什么是事件循环？');
+});
+
 test('记录页：导出 JSON 可下载，导入同一文件幂等且统计不变', async ({ page }) => {
   await configureAndSync(page);
   await writeKv(page, 'memSelection', QA_ONLY_SELECTION);
