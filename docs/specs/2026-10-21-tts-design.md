@@ -1,9 +1,9 @@
 # 文档朗读（TTS）设计（v1.9）
 
-> 日期：2026-10-21 · 状态：Phase 1 已合并（v1.10.0）；真机初测基本通过，音色待 Phase 2
+> 日期：2026-10-21 · 状态：Phase 1 已合并（v1.10.0）；Phase 2 已实现（待真机验收，目标 v1.11.0）
 > 关联：[浏览器 TTS 调研](../research/2026-10-21-browser-tts.md)、[产品定义](../../PRODUCT.md)、[设计系统](../../DESIGN.md)
-> 范围：阅读页前台朗读。系统 TTS 为默认引擎；Phase 2 增加可选的本地 Matcha zh-en 语音包。
-> 目标版本：v1.9.0（Phase 1）/ v1.10.0（Phase 2，按真机 bake-off 决定是否进入）。
+> 范围：阅读页前台朗读。系统 TTS 为默认引擎；Phase 2 增加可选的本地 Matcha zh-en 离线语音包。
+> 目标版本：v1.9.0（Phase 1）/ v1.11.0（Phase 2；Phase 1 已占用 v1.10.0）。
 
 ## 1. 目标与非目标
 
@@ -88,17 +88,22 @@
 
 ```
 src/tts/
-  types.ts          // TtsPrefs / TtsPosition / Chunk / PlayerState
-  segment.ts        // DOM → Chunk[]（清洗、分句、范围映射）
-  voices.ts         // 语音加载、归一化、筛选、默认选择
-  player.ts         // 状态机、队列、代际 token、错误处理
-  engine-system.ts  // speechSynthesis 实现
-  engine-local.ts   // Phase 2：sherpa-onnx WASM + Web Audio
-  useTts.ts         // React 绑定
-  ModelStore.ts     // Phase 2：OPFS 下载/校验/删除
+  types.ts            // TtsPrefs / TtsPosition / Chunk / PlayerState / SpeechSource
+  segment.ts          // DOM → Chunk[]（清洗、分句、范围映射）
+  voices.ts           // 语音加载、归一化、筛选、默认选择
+  player.ts           // 状态机、队列、代际 token、错误处理；引擎无关
+  system-source.ts    // speechSynthesis 实现
+  local-source.ts     // Phase 2：Worker + Web Audio，句内精确暂停
+  model-store.ts      // Phase 2：OPFS 下载/校验/解压/删除
+  model-manifest.ts   // Phase 2：Matcha zh-en 文件清单（ModelScope CDN URL + SHA-256）
+  tar.ts / opfs.ts    // Phase 2：tar.gz 解析、OPFS 读写
+  prefs.ts / useTts.ts
+public/tts/
+  tts-worker.js       // sherpa-onnx WASM + 从 OPFS 挂载模型
+  runtime/            // sherpa-onnx 预构建 WASM（Apache-2.0，已提交）
 components/
-  TtsBar.tsx        // 底部播放条
-  TtsSheet.tsx      // 展开面板（音色/语速/离线包/睡眠定时）
+  TtsBar.tsx          // 底部播放条
+  TtsSheet.tsx        // 展开面板（引擎/离线包/音色/语速/睡眠定时）
 ```
 
 - `DocPage` 只负责把 `contentRef`、`path`、`ready` 传给 `useTts`，并渲染 `<TtsBar>`；不把播放逻辑塞进 2000 行的页面组件。
@@ -366,24 +371,30 @@ document.addEventListener('visibilitychange', () => {
 
 ## 9. 本地引擎（Phase 2）
 
-### 9.1 模型
+### 9.1 模型：Matcha zh-en（唯一发布）
 
-首选 **Matcha zh-en**：
+Phase 2 bake-off 后只保留 **Matcha zh-en**：
 
 | 文件 | 大小 | 说明 |
 |---|---|---|
-| `model-steps-3.onnx` | 72MB | 声学模型 |
-| `vocos-16khz-univ.onnx` | 51MB | vocoder |
-| `lexicon.txt`、`tokens.txt`、`espeak-ng-data` | 约 10MB | 文本前端 |
-| WASM runtime | 约 10–20MB | 懒加载，首次使用后缓存 |
+| `model-steps-3.onnx` | 75.7MB | 声学模型 |
+| `vocos-16khz-univ.onnx` | 53.9MB | vocoder |
+| `lexicon.txt` / `tokens.txt` / `*.fst` | 约 1.6MB | 文本前端 |
+| `espeak-ng-data.tar.gz` | 9.0MB | 英文 espeak 数据，下载后解压 |
+| WASM runtime | 13.5MB + JS | 随 app 发布（`public/tts/runtime`），懒加载并缓存 |
 
-- 采样率 16kHz；单说话人；中英混读。
-- 备选 Piper `zh_CN-huayan-medium`（63MB，22.05k，中文-only）。
-- 不默认发布 MeloTTS / Kokoro：RTF 和体积不适合手机连续朗读；如做实验包，必须单独评审。
+- 采样率 16kHz；单说话人；中英混读；RTF 在 Mac 上约 0.14。
+- 被评估并淘汰的模型（2026-10-22 结论）：
+  - **Matcha zh-baker 22k**：中文更自然，但直接跳过英文，中英混排不可用；
+  - **MeloTTS zh-en 44k**：中文尚可，英文差，RTF≈1.5，手机更慢；
+  - **VITS zh-ll**：仅中文，RTF≈1.07；
+  - **Kokoro v1.1 int8/fp32**：官方 int8 在 Android 上无法合成，fp32 音质不优于 Matcha 且 RTF≈1.9。
+- 模型文件来自 ModelScope CDN（`bujidc/matcha-icefall-zh-en`），浏览器直接 `fetch` 下载，不经过应用服务器。
 
 ### 9.2 运行时
 
-- `sherpa-onnx` WASM，跑在 Web Worker；主线程只做 UI/音频调度。
+- `sherpa-onnx` WASM 预构建（Apache-2.0）提交在 `public/tts/runtime`；`scripts/tts-runtime-setup.mjs` 可重新生成（会去掉内置 `.data` 模型包）。
+- 跑在 Web Worker（`public/tts/tts-worker.js`）；主线程只做 UI/音频调度。
 - **单线程**：GitHub Pages 无 COOP/COEP，`SharedArrayBuffer` 不可用；`numThreads = 1`。
 - 若未来换托管（Cloudflare Pages/Netlify）并能设置 COOP/COEP，再评估多线程。
 - 不默认使用 `coi-serviceworker`：`COEP: require-corp` 可能阻断跨域图片/字体；如要尝试，单独评审并做全站回归。
@@ -392,46 +403,28 @@ document.addEventListener('visibilitychange', () => {
 
 - 用户手势内创建 `AudioContext`；`resume()` 后开始。
 - 一句一个 `AudioBuffer`；`AudioBufferSourceNode` 调度播放。
-- 预取 2 句；当前句播放时合成下一句；队列空时补。
-- 句间静音 120–180ms；块边界 250ms。
+- 预取下一句：当前句播放时 `LocalSource.prefetch()` 让 Worker 合成下一句并缓存。
 - 暂停：`AudioContext.suspend()`；恢复：`resume()`；位置由音频时钟保留，句内精确。
 - 停止：`source.stop()`、清空队列、`ctx.resume()` 以保持后续可用。
-- 语速：传 `length_scale = 1 / rate` 重新合成；不用 `playbackRate`（会变调）。
-- 进度：`buffer.duration` + 已播放 offset；可显示剩余分钟。
-- 内存：只保留当前 + 下一句的 buffer；播完释放。
+- 语速：传 `speed = rate` 重新合成；不用 `playbackRate`（会变调）。
+- 内存：缓存当前 + 下一句的 buffer；`stop()` 时清空。
 
 ### 9.4 模型下载
 
-- manifest（随 app 发布或同源静态 JSON）：
-
-```ts
-interface ModelManifest {
-  id: string;              // 'matcha-zh-en'
-  version: string;         // '1'
-  files: { path: string; size: number; sha256: string }[];
-  sampleRate: number;
-  languages: string[];
-  license: string;
-}
-```
-
-- 下载到 OPFS：`/tts/<id>/<version>/...`；用 `fetch` + `ReadableStream` 显示进度；支持取消。
+- `src/tts/model-manifest.ts` 内置清单：文件路径、大小、SHA-256、ModelScope URL；`espeak-ng-data.tar.gz` 标记 `archive`。
+- 下载到 OPFS：`tts/matcha-zh-en/v1/...`；用 `fetch` + `ReadableStream` 显示进度；`AbortController` 支持取消。
 - 下载前：
-  - `navigator.storage.estimate()`，剩余空间 < 2× 模型大小则拒绝并提示；
-  - `navigator.storage.persist()`；
-  - 非 Wi-Fi 时提示体积（`navigator.connection?.type` 可用则用，不可用不阻塞）。
-- 下载后逐文件 SHA-256 校验；失败删除并重试。
-- 设置页显示：包大小、版本、最后使用时间、删除按钮；删除后 `engine` 回退 `system`。
-- **不要**把模型放进 Workbox 预缓存；`globIgnores` 排除 `models/**`，运行时按需缓存。
+  - `navigator.storage.estimate()`，剩余空间 < 1.5× 模型大小则拒绝并提示；
+  - `navigator.storage.persist()`。
+- 下载后逐文件 SHA-256 校验；`tar.gz` 用 `DecompressionStream('gzip')` + `parseTar` 解压到 OPFS；失败删除整个目录并重试。
+- TtsSheet「引擎 › 离线语音包」显示：包大小、版本、下载/删除按钮；删除后 `engine` 回退 `system`。
+- **不要**把模型放进 Workbox 预缓存；WASM runtime 用 `runtimeCaching` CacheFirst 缓存。
 
 ### 9.5 分发
 
-- Matcha 的 72MB / 51MB 单文件均 <100MB，可放同源 GitHub Pages 的 `public/models/`；放独立 repo 也可以，只要最终同源 `vaddenz.github.io`。
-- 模型文件不进主仓 Git 历史更干净？两个选项：
-  - A：`public/models/`，部署简单，仓库增大 ~135MB；
-  - B：独立 `md-reader-models` 仓 + Pages，主仓干净，但多一个部署步骤。
-  - 默认选 A，等仓库体积成为问题时再拆。
-- 备选镜像 Hugging Face；国内网络可能不稳，不作为默认。
+- 模型文件不进主仓；运行时从 ModelScope CDN 按需下载到 OPFS。
+- WASM runtime 进主仓 `public/tts/runtime`（约 13.6MB），Service Worker 运行时缓存，首次使用后离线可用。
+- 模型下载后完全离线；飞行模式下本地引擎仍可合成。
 
 ### 9.6 CSP
 
@@ -527,7 +520,11 @@ script-src 'self' 'wasm-unsafe-eval';
   - 代际 token 丢弃过期事件；
   - `not-allowed` → blocked；`voice-unavailable` → fallback；连续失败 → error；
   - 结束、空文档、单句文档。
-- `tests/unit/tts-prefs.test.ts`：默认值、sanitize、rate 钳制、voiceKey 解析。
+- `tests/unit/tts-prefs.test.ts`：默认值、sanitize、rate 钳制、voiceKey 解析、engine 枚举。
+- `tests/unit/tts-model-manifest.test.ts`：清单路径唯一、SHA-256 格式、归档标记、总量范围。
+- `tests/unit/tts-model-store.test.ts`：下载写入、SHA 校验失败清理、元数据非法值、删除。
+- `tests/unit/tts-tar.test.ts`：tar 解析、目录项忽略。
+- `tests/unit/tts-player.test.ts`：系统/本地两种 pause 语义、顺序播放、错误分支。
 - `tests/unit/selection-menu.test.ts`：新增 `read-aloud` 项及排除区不出现。
 
 ### 12.2 e2e
@@ -591,11 +588,11 @@ script-src 'self' 'wasm-unsafe-eval';
 - 空态/错误/可见性处理；
 - 单测 + e2e + 真机验收。
 
-### Phase 2：本地引擎（v1.10，条件进入，约 4–6 天）
+### Phase 2：本地引擎（v1.11，已实现，待真机验收）
 
-- 先做 spike：Matcha + sherpa-onnx WASM + Worker + Web Audio，`?tts=local` 开关；
-- 跑 bake-off；达标再做模型下载/OPFS/设置 UI/CSP 变更；
-- 不达标就停止，不合并到主线。
+- Spike：Matcha + sherpa-onnx WASM + Worker + Web Audio，隐藏探针页；bake-off 通过后进入正式实现。
+- 正式实现：`SpeechSource` 双引擎、OPFS 下载/校验/解压/删除、TtsSheet 离线包卡片、失败回退系统 TTS、CSP/WASM 运行时缓存、单测 + e2e。
+- 结论：只发布 Matcha zh-en；Kokoro/MeloTTS/VITS/zh-baker 均因音质、语言或 RTF 被淘汰。
 
 ### Phase 3：打磨（可选）
 
@@ -646,3 +643,19 @@ script-src 'self' 'wasm-unsafe-eval';
 - 内容：DOM 文本节点按最近块级祖先 + 连续区间分组；跳过代码/表格/mermaid；camelCase/snake_case 拆词。
 - 高亮：CSS Custom Highlight（`tts-current`），Range 失效时退回块级 `.tts-current-block`。
 - 验收：`npm run typecheck`、`npm test`（56 文件 / 446 测试）、`npx playwright test tests/e2e/tts.spec.ts`、`npm run build` 均通过；真机清单见 §12.3。
+
+## 17. Phase 2 实现记录（2026-10-22）
+
+- 分支：`tts-phase2`。
+- 结构：
+  - 引擎接口：`SpeechSource`（`src/tts/types.ts`）；`SystemSource` 与 `LocalSource` 双实现；`TtsPlayer` 不再依赖 `speechSynthesis`。
+  - 本地引擎：`public/tts/tts-worker.js` 在 Worker 内跑 sherpa-onnx WASM，从 OPFS 把模型文件挂到 MEMFS，再 `createOfflineTts`。
+  - 模型存储：`src/tts/{model-manifest,model-store,opfs,tar}.ts`；清单 8 个文件，共约 140MB，全部从 ModelScope CDN 下载；`espeak-ng-data.tar.gz` 用 `DecompressionStream` + `parseTar` 解压。
+  - 运行时：`public/tts/runtime/{sherpa-onnx-tts.js,sherpa-onnx-wasm-main-tts.js,sherpa-onnx-wasm-main-tts.wasm}`（13.6MB，Apache-2.0）；`scripts/tts-runtime-setup.mjs` 负责重新生成。
+  - UI：TtsSheet 增加「引擎 / 离线语音包」区块；TtsBar 显示「系统语音 / 离线包」。
+- 决策：模型只保留 Matcha zh-en；模型文件走 ModelScope CDN，不进主仓；WASM runtime 进主仓并按需缓存。
+- 验证：
+  - 单元测试：475 通过（含 model-store / tar / manifest / player 双引擎）。
+  - e2e：96 通过（新增 `tests/e2e/tts-local.spec.ts` 离线包入口；`TTS_LOCAL_MANUAL=1` 的手动用例真实下载 ModelScope 模型并切本地引擎）。
+  - 手动 e2e：ModelScope 下载约 140MB → OPFS → Worker 挂载 → 本地播放、暂停/继续、下一句均通过（桌面 Chromium，18.4s）。
+  - 真机验收清单见 §12.4；Edge Android 结果待补。

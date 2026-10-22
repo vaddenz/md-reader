@@ -1,11 +1,4 @@
-import type { SpeakResult } from './types';
-
-export interface SpeakOptions {
-  rate: number;
-  /** null 时用系统默认语音（`lang='zh-CN'`）。 */
-  voice: SpeechSynthesisVoice | null;
-  onStart?: () => void;
-}
+import type { SpeakOptions, SpeakResult, SpeechSource } from './types';
 
 export function clampRate(rate: number): number {
   if (!Number.isFinite(rate)) return 1;
@@ -13,7 +6,9 @@ export function clampRate(rate: number): number {
 }
 
 /** 对 `window.speechSynthesis` 的薄封装：一次一句、可取消、保留 utterance 引用。 */
-export class SystemSource {
+export class SystemSource implements SpeechSource {
+  readonly kind = 'system' as const;
+  readonly supportsMidSentencePause = false;
   private readonly synth: SpeechSynthesis;
   private readonly pending = new Map<SpeechSynthesisUtterance, (r: SpeakResult) => void>();
 
@@ -89,6 +84,14 @@ export class SystemSource {
 
   get paused(): boolean {
     return this.synth.paused;
+  }
+
+  setRate(_rate: number): void {
+    // 语速在 speak() 时传入，这里不需要保存。
+  }
+
+  dispose(): void {
+    this.stop();
   }
 
   /** 取消当前与队列；所有 pending Promise 以 canceled 结束，避免 async 循环悬挂。 */

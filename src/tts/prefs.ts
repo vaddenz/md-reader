@@ -9,6 +9,7 @@ export function sanitizeTtsPrefs(raw: unknown): TtsPrefs {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT_TTS_PREFS };
   const v = raw as Partial<TtsPrefs>;
   return {
+    engine: v.engine === 'local' ? 'local' : 'system',
     rate: typeof v.rate === 'number' && Number.isFinite(v.rate) ? clampRate(v.rate) : DEFAULT_TTS_PREFS.rate,
     voiceKey: typeof v.voiceKey === 'string' && v.voiceKey ? v.voiceKey : null,
     skipCode: typeof v.skipCode === 'boolean' ? v.skipCode : DEFAULT_TTS_PREFS.skipCode,

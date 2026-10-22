@@ -1,14 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { showToast } from '../lib/toast';
 import { buildChunks, estimateSeconds } from './segment';
 import { TtsPlayer } from './player';
-import { clampRate, speechSupported } from './system-source';
+import { SystemSource, clampRate, speechSupported } from './system-source';
+import { LocalSource } from './local-source';
 import { loadTtsPosition, loadTtsPrefs, saveTtsPosition, saveTtsPrefs, sanitizeTtsPrefs } from './prefs';
 import { listVoices, loadVoices, pickDefaultVoice, voiceKey } from './voices';
+import { MATCHA_ZH_EN_MANIFEST } from './model-manifest';
+import {
+  deleteModel as deleteStoredModel,
+  downloadModel as downloadStoredModel,
+  isModelReady,
+  loadModelInfo,
+  type ModelInfo,
+  type ModelPhase,
+  type ModelProgress,
+} from './model-store';
+import { opfsSupported } from './opfs';
 import {
   DEFAULT_TTS_PREFS,
   type Chunk,
   type PlayerSnapshot,
   type PlayerState,
+  type SpeechSource,
+  type TtsEngine,
   type TtsPrefs,
 } from './types';
 
@@ -25,6 +40,7 @@ export interface UseTtsResult {
   total: number;
   error: string;
   prefs: TtsPrefs;
+  engine: TtsEngine;
   rate: number;
   voices: SpeechSynthesisVoice[];
   voiceOptions: SpeechSynthesisVoice[];
@@ -34,6 +50,11 @@ export interface UseTtsResult {
   following: boolean;
   sleepMinutes: number | 'off';
   remainingSeconds: number;
+  modelSupported: boolean;
+  modelReady: boolean;
+  modelInfo: ModelInfo | null;
+  modelStatus: ModelPhase;
+  modelProgress: ModelProgress;
   start: (from?: number) => void;
   startFromSelection: (range: Range) => void;
   startFromViewport: () => void;
@@ -46,6 +67,10 @@ export interface UseTtsResult {
   setRate: (rate: number) => void;
   setVoiceKey: (key: string | null) => void;
   setPrefs: (patch: Partial<TtsPrefs>) => void;
+  setEngine: (engine: TtsEngine) => void;
+  downloadModel: () => void;
+  cancelDownload: () => void;
+  deleteModel: () => void;
   setSleepMinutes: (minutes: number | 'off') => void;
   refreshVoices: () => void;
   resumeFollow: () => void;
@@ -129,11 +154,12 @@ function persist(path: string, index: number): void {
   void saveTtsPosition(path, index).catch(() => {});
 }
 
-/** 阅读页朗读控制器：系统 TTS + 句级高亮 + 自动跟随 + 断点。 */
+/** 阅读页朗读控制器：系统 TTS 或本地 Matcha，句级高亮 + 自动跟随 + 断点。 */
 export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResult {
-  const supported = speechSupported();
+  const systemSupported = speechSupported();
+  const modelSupported = opfsSupported();
   const [snapshot, setSnapshot] = useState<PlayerSnapshot>(() => ({
-    state: supported ? 'idle' : 'unsupported',
+    state: systemSupported ? 'idle' : 'unsupported',
     index: 0,
     total: 0,
   }));
@@ -153,6 +179,10 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
   const [following, setFollowing] = useState(true);
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState === 'visible');
   const [sleepMinutes, setSleepMinutesState] = useState<number | 'off'>('off');
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
+  const [modelReady, setModelReady] = useState(false);
+  const [modelStatus, setModelStatus] = useState<ModelPhase>('idle');
+  const [modelProgress, setModelProgress] = useState<ModelProgress>({ phase: 'idle', file: '', loaded: 0, total: 0 });
 
   const playerRef = useRef<TtsPlayer | null>(null);
   const chunksRef = useRef<Chunk[]>([]);
@@ -161,12 +191,53 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const followRef = useRef(true);
   const followTimerRef = useRef(0);
+  const downloadAbortRef = useRef<AbortController | null>(null);
   pathRef.current = path;
 
-  // 播放器只创建一次；动态数据通过 ref 传入。
+  const supported = systemSupported || modelReady;
+
+  // 本地模型状态：启动时检查 OPFS 元数据。
+  useEffect(() => {
+    if (!modelSupported) return;
+    let cancelled = false;
+    setModelStatus('checking');
+    void (async () => {
+      const info = await loadModelInfo();
+      const ready = await isModelReady();
+      if (cancelled) return;
+      setModelInfo(info);
+      setModelReady(ready);
+      setModelStatus(ready ? 'ready' : 'idle');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelSupported]);
+
+  const handleFatal = useCallback((message: string) => {
+    showToast(message);
+    setPrefsState((prev) => {
+      if (prev.engine !== 'local') return prev;
+      const next: TtsPrefs = { ...prev, engine: 'system' };
+      prefsRef.current = next;
+      void saveTtsPrefs(next).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // 播放器：引擎或模型状态变化时重建；保留当前句位置。
   useEffect(() => {
     if (!supported) return;
+    const previous = snapshotRef.current;
+    const createSource = (): SpeechSource | null => {
+      if (prefsRef.current.engine === 'local' && modelReady && modelSupported) return new LocalSource();
+      if (systemSupported) return new SystemSource(window.speechSynthesis);
+      return null;
+    };
+    const source = createSource();
+    if (!source) return;
     const player = new TtsPlayer({
+      source,
       onChange: handleSnapshot,
       onCurrent: (index, chunk) => {
         applyHighlight(chunk);
@@ -180,14 +251,21 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
         resumeRef.current = next;
         setHasResume(next > 0);
       },
+      onFatal: handleFatal,
     });
     playerRef.current = player;
+    if ((previous.state === 'playing' || previous.state === 'paused') && chunksRef.current.length > 0) {
+      player.setChunks(chunksRef.current);
+      player.setRate(clampRate(prefsRef.current.rate));
+      player.setVoice(voiceRef.current);
+      player.playFrom(previous.index);
+    }
     return () => {
-      player.stop();
+      player.dispose();
       playerRef.current = null;
       clearHighlightDom();
     };
-  }, [supported, handleSnapshot]);
+  }, [supported, systemSupported, modelReady, modelSupported, prefs.engine, handleSnapshot, handleFatal]);
 
   // 偏好
   useEffect(() => {
@@ -202,27 +280,26 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
     };
   }, []);
 
-  // 语音列表
+  // 语音列表（仅系统引擎需要）
   const refreshVoices = useCallback(() => {
-    if (!supported) return;
+    if (!systemSupported) return;
     setLoadingVoices(true);
     void loadVoices(window.speechSynthesis, 4000).then((list) => {
       setVoices(list);
       setLoadingVoices(false);
     });
-  }, [supported]);
+  }, [systemSupported]);
 
   useEffect(() => {
     refreshVoices();
   }, [refreshVoices]);
 
-  // 语音包在页面打开后才安装/切换时，也能收到更新。
   useEffect(() => {
-    if (!supported) return;
+    if (!systemSupported) return;
     const onChange = () => setVoices(window.speechSynthesis.getVoices());
     window.speechSynthesis.addEventListener('voiceschanged', onChange);
     return () => window.speechSynthesis.removeEventListener('voiceschanged', onChange);
-  }, [supported]);
+  }, [systemSupported]);
 
   const voiceOptions = useMemo(() => listVoices(voices, prefs.localOnly), [voices, prefs.localOnly]);
   const selectedVoice = useMemo(() => {
@@ -384,12 +461,15 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
       player.setChunks(list);
       player.setRate(clampRate(prefsRef.current.rate));
       player.setVoice(voiceRef.current);
+      void player.prepare().catch((err) => {
+        handleFatal(err instanceof Error ? err.message : '本地语音初始化失败，已切回系统语音');
+      });
       player.playFrom(index);
       resumeRef.current = index;
       setHasResume(index > 0);
       persist(pathRef.current, index);
     },
-    [supported, ensureChunks, handleSnapshot],
+    [supported, ensureChunks, handleFatal, handleSnapshot],
   );
 
   const startFromSelection = useCallback(
@@ -460,19 +540,102 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
     [voiceOptions],
   );
 
-  const setPrefs = useCallback((patch: Partial<TtsPrefs>) => {
-    setPrefsState((prev) => {
-      const next = sanitizeTtsPrefs({ ...prev, ...patch });
-      prefsRef.current = next;
-      void saveTtsPrefs(next).catch(() => {});
-      return next;
-    });
-    if (patch.skipCode !== undefined || patch.readTable !== undefined) {
-      chunksRef.current = [];
-      playerRef.current?.stop();
-      clearHighlightDom();
+  const setEngine = useCallback(
+    (engine: TtsEngine) => {
+      if (engine === 'local' && !modelReady) {
+        showToast('请先下载离线语音包');
+        return;
+      }
+      setPrefsState((prev) => {
+        if (prev.engine === engine) return prev;
+        const next: TtsPrefs = { ...prev, engine };
+        prefsRef.current = next;
+        void saveTtsPrefs(next).catch(() => {});
+        return next;
+      });
+    },
+    [modelReady],
+  );
+
+  const downloadModel = useCallback(() => {
+    if (!modelSupported) {
+      showToast('当前浏览器不支持离线语音包');
+      return;
     }
+    if (['checking', 'downloading', 'verifying', 'extracting'].includes(modelStatus)) return;
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
+    setModelStatus('checking');
+    void (async () => {
+      try {
+        const info = await downloadStoredModel(MATCHA_ZH_EN_MANIFEST, {
+          signal: controller.signal,
+          onProgress: (progress) => {
+            setModelProgress(progress);
+            setModelStatus(progress.phase);
+          },
+        });
+        setModelInfo(info);
+        setModelReady(true);
+        setModelStatus('ready');
+        showToast('离线语音包已下载');
+      } catch (err) {
+        if (controller.signal.aborted) {
+          setModelStatus(modelReady ? 'ready' : 'idle');
+          return;
+        }
+        setModelStatus('error');
+        showToast(err instanceof Error ? err.message : '离线语音包下载失败');
+      } finally {
+        downloadAbortRef.current = null;
+      }
+    })();
+  }, [modelReady, modelStatus, modelSupported]);
+
+  const cancelDownload = useCallback(() => {
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
+    setModelStatus(modelReady ? 'ready' : 'idle');
+  }, [modelReady]);
+
+  const deleteModel = useCallback(() => {
+    void (async () => {
+      await deleteStoredModel();
+      setModelInfo(null);
+      setModelReady(false);
+      setModelStatus('idle');
+      if (prefsRef.current.engine === 'local') {
+        setPrefsState((prev) => {
+          const next: TtsPrefs = { ...prev, engine: 'system' };
+          prefsRef.current = next;
+          void saveTtsPrefs(next).catch(() => {});
+          return next;
+        });
+      }
+      showToast('离线语音包已删除');
+    })();
   }, []);
+
+  const setPrefs = useCallback(
+    (patch: Partial<TtsPrefs>) => {
+      if (patch.engine !== undefined && patch.engine !== prefsRef.current.engine) {
+        setEngine(patch.engine);
+        return;
+      }
+      setPrefsState((prev) => {
+        const next = sanitizeTtsPrefs({ ...prev, ...patch });
+        prefsRef.current = next;
+        void saveTtsPrefs(next).catch(() => {});
+        return next;
+      });
+      if (patch.skipCode !== undefined || patch.readTable !== undefined) {
+        chunksRef.current = [];
+        playerRef.current?.stop();
+        clearHighlightDom();
+      }
+    },
+    [setEngine],
+  );
 
   const setSleepMinutes = useCallback((minutes: number | 'off') => {
     setSleepMinutesState(minutes);
@@ -491,6 +654,7 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
     total: snapshot.total,
     error: snapshot.error ?? '',
     prefs,
+    engine: prefs.engine,
     rate: prefs.rate,
     voices,
     voiceOptions,
@@ -500,6 +664,11 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
     following,
     sleepMinutes,
     remainingSeconds,
+    modelSupported,
+    modelReady,
+    modelInfo,
+    modelStatus,
+    modelProgress,
     start,
     startFromSelection,
     startFromViewport,
@@ -512,6 +681,10 @@ export function useTts({ path, containerRef, ready }: UseTtsOptions): UseTtsResu
     setRate,
     setVoiceKey,
     setPrefs,
+    setEngine,
+    downloadModel,
+    cancelDownload,
+    deleteModel,
     setSleepMinutes,
     refreshVoices,
     resumeFollow,

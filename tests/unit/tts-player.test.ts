@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { TtsPlayer } from '../../src/tts/player';
-import type { SystemSource, SpeakOptions } from '../../src/tts/system-source';
-import type { Chunk, PlayerSnapshot, SpeakResult } from '../../src/tts/types';
+import type { Chunk, PlayerSnapshot, SpeakOptions, SpeakResult, SpeechSource, TtsEngine } from '../../src/tts/types';
 
-class FakeSource {
+class FakeSource implements SpeechSource {
+  readonly kind: TtsEngine = 'system';
+  readonly supportsMidSentencePause: boolean = false;
   speaking = false;
   paused = false;
   calls: string[] = [];
   private resolvers: Array<(r: SpeakResult) => void> = [];
+
+  setRate(): void {}
 
   speak(text: string, opts: SpeakOptions): Promise<SpeakResult> {
     this.calls.push(text);
@@ -64,7 +67,7 @@ function makePlayer(count = 3) {
   const currents: number[] = [];
   const positions: number[] = [];
   const player = new TtsPlayer({
-    source: source as unknown as SystemSource,
+    source,
     onChange: (s) => states.push(s),
     onCurrent: (i) => currents.push(i),
     onPosition: (n) => positions.push(n),
@@ -73,7 +76,26 @@ function makePlayer(count = 3) {
   return { player, source, states, currents, positions };
 }
 
+class FakeLocalSource extends FakeSource {
+  override readonly kind: TtsEngine = 'local';
+  override readonly supportsMidSentencePause = true;
+}
+
 describe('TtsPlayer', () => {
+  it('本地引擎的 pause/resume 直接调用底层 AudioContext', () => {
+    const source = new FakeLocalSource();
+    const player = new TtsPlayer({ source });
+    player.setChunks([chunk('c0'), chunk('c1')]);
+    player.playFrom(0);
+    player.pause();
+    expect(player.snapshot.state).toBe('paused');
+    expect(source.paused).toBe(true);
+    player.resume();
+    expect(player.snapshot.state).toBe('playing');
+    expect(source.paused).toBe(false);
+    player.stop();
+  });
+
   it('顺序播放并在 end 后推进', async () => {
     const { player, source, currents, positions } = makePlayer(3);
     player.playFrom(0);

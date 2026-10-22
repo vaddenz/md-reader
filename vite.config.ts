@@ -40,6 +40,15 @@ export default defineConfig({
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
+          {
+            // 本地朗读 WASM 运行时：按需加载后长期缓存；模型文件走 OPFS，不在这里。
+            urlPattern: /\/tts\/runtime\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mdreader-tts-runtime',
+              expiration: { maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
         ],
       },
     }),

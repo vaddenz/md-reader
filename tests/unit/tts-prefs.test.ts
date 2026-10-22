@@ -9,8 +9,15 @@ describe('sanitizeTtsPrefs', () => {
     expect(sanitizeTtsPrefs({ rate: NaN, skipCode: 'yes' })).toEqual(DEFAULT_TTS_PREFS);
   });
 
+  it('engine 只接受 system / local', () => {
+    expect(sanitizeTtsPrefs({ engine: 'local' }).engine).toBe('local');
+    expect(sanitizeTtsPrefs({ engine: 'other' }).engine).toBe('system');
+    expect(DEFAULT_TTS_PREFS.engine).toBe('system');
+  });
+
   it('钳制语速，保留合法布尔与 voiceKey', () => {
     const prefs = sanitizeTtsPrefs({
+      engine: 'local',
       rate: 9,
       voiceKey: 'zh-cn|婷婷',
       skipCode: false,
@@ -18,6 +25,7 @@ describe('sanitizeTtsPrefs', () => {
       keepAwake: false,
       localOnly: false,
     });
+    expect(prefs.engine).toBe('local');
     expect(prefs.rate).toBe(2);
     expect(prefs.voiceKey).toBe('zh-cn|婷婷');
     expect(prefs.skipCode).toBe(false);

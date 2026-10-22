@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import type { PlayerState } from '../tts/types';
+import type { PlayerState, TtsEngine } from '../tts/types';
 import '../styles/tts.css';
 
 interface TtsBarProps {
   state: PlayerState;
+  engine: TtsEngine;
   current: number;
   total: number;
   rate: number;
@@ -28,6 +29,7 @@ function formatRemaining(seconds: number): string {
 /** 底部朗读控制条。只在朗读会话存在时挂载；关闭即停止并保存位置。 */
 export default function TtsBar({
   state,
+  engine,
   current,
   total,
   rate,
@@ -87,7 +89,7 @@ export default function TtsBar({
         <div className="tts-status">
           <span className="tts-status-main">{status}</span>
           <span className="tts-status-sub">
-            {rate.toFixed(2).replace(/0$/, '')}x
+            {engine === 'local' ? '离线包' : '系统语音'} · {rate.toFixed(2).replace(/0$/, '')}x
             {sleepMinutes !== 'off' ? ` · ${sleepMinutes} 分钟后停` : ''}
             {!following ? ' · 未跟随' : ''}
           </span>

@@ -1,11 +1,13 @@
 import { SystemSource } from './system-source';
-import type { Chunk, PlayerSnapshot, PlayerState } from './types';
+import type { Chunk, PlayerSnapshot, PlayerState, SpeechSource, SpeakOptions } from './types';
 
 export interface PlayerOptions {
-  source?: SystemSource;
+  source?: SpeechSource;
   onChange?: (snapshot: PlayerSnapshot) => void;
   onCurrent?: (index: number, chunk: Chunk) => void;
   onPosition?: (nextIndex: number) => void;
+  /** 本地引擎初始化/合成失败等致命错误；调用方决定是否回退系统引擎。 */
+  onFatal?: (error: string) => void;
 }
 
 /**
@@ -13,10 +15,11 @@ export interface PlayerOptions {
  * 顺序播放让「锁屏读完当前句再停」天然成立，也避免预排队列在后台继续读。
  */
 export class TtsPlayer {
-  private readonly source: SystemSource;
+  private readonly source: SpeechSource;
   private readonly onChange: (snapshot: PlayerSnapshot) => void;
   private readonly onCurrent: (index: number, chunk: Chunk) => void;
   private readonly onPosition: (nextIndex: number) => void;
+  private readonly onFatal: (error: string) => void;
 
   private chunks: Chunk[] = [];
   private gen = 0;
@@ -38,6 +41,7 @@ export class TtsPlayer {
     this.onChange = opts.onChange ?? (() => {});
     this.onCurrent = opts.onCurrent ?? (() => {});
     this.onPosition = opts.onPosition ?? (() => {});
+    this.onFatal = opts.onFatal ?? (() => {});
   }
 
   get snapshot(): PlayerSnapshot {
@@ -52,6 +56,10 @@ export class TtsPlayer {
     return this.chunks.length;
   }
 
+  get engine(): SpeechSource['kind'] {
+    return this.source.kind;
+  }
+
   setChunks(chunks: Chunk[]): void {
     this.stop();
     this.chunks = chunks;
@@ -62,12 +70,14 @@ export class TtsPlayer {
   setRate(rate: number): void {
     if (rate === this.rate) return;
     this.rate = rate;
+    this.source.setRate(rate);
     if (this.state === 'playing') this.playFrom(this.index);
     else if (this.state === 'paused') this.nativePauseFailed = true;
   }
 
   setVoice(voice: SpeechSynthesisVoice | null): void {
     this.voice = voice;
+    this.source.setVoice?.(voice);
     if (this.state === 'playing') this.playFrom(this.index);
     else if (this.state === 'paused') this.nativePauseFailed = true;
   }
@@ -123,6 +133,12 @@ export class TtsPlayer {
   resume(): void {
     if (this.state !== 'paused') return;
     this.pausedByVisibility = false;
+    if (this.source.supportsMidSentencePause) {
+      this.source.resume();
+      this.state = 'playing';
+      this.emit();
+      return;
+    }
     if (!this.nativePauseFailed && this.source.speaking) {
       this.source.resume();
       this.state = 'playing';
@@ -158,6 +174,17 @@ export class TtsPlayer {
     this.stopAfterCurrent = stop;
   }
 
+  prepare(): Promise<void> {
+    return this.source.init?.() ?? Promise.resolve();
+  }
+
+  /** 释放资源；不 emit idle，避免引擎切换时把快照状态重置掉。 */
+  dispose(): void {
+    this.gen++;
+    this.source.stop();
+    this.source.dispose?.();
+  }
+
   private pauseInternal(preserveVisibility: boolean): void {
     if (this.state !== 'playing') return;
     this.pausedIndex = this.index;
@@ -166,6 +193,7 @@ export class TtsPlayer {
     this.source.pause();
     this.state = 'paused';
     this.emit();
+    if (this.source.supportsMidSentencePause) return;
     window.setTimeout(() => {
       if (this.state !== 'paused') return;
       // Edge 实测 pause 有效但 paused 属性为 false；用 speaking 判断是否被当成停止。
@@ -179,6 +207,11 @@ export class TtsPlayer {
       this.index = i;
       this.emit();
       this.onCurrent(i, this.chunks[i]);
+      const next = this.chunks[i + 1];
+      if (next) {
+        const options: SpeakOptions = { rate: this.rate, voice: this.voice };
+        this.source.prefetch?.(next.text, options);
+      }
 
       const result = await this.source.speak(this.chunks[i].text, {
         rate: this.rate,
@@ -207,8 +240,16 @@ export class TtsPlayer {
           this.fail('error', '朗读没有开始，请重试');
           return;
         }
+        if (result.error === 'local-not-ready') {
+          this.onFatal('本地语音未就绪，已切回系统语音');
+          return;
+        }
         this.consecutiveErrors++;
         if (this.consecutiveErrors >= 3) {
+          if (this.source.kind === 'local') {
+            this.onFatal('本地语音连续失败，已切回系统语音');
+            return;
+          }
           this.fail('error', `朗读失败：${result.error ?? '未知错误'}`);
           return;
         }

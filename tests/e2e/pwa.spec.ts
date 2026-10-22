@@ -70,7 +70,8 @@ test('PWA：CSP meta 存在且锁定 connect-src（spec §9）', async ({ page }
   const content = (await csp.getAttribute('content')) ?? '';
   expect(content).toContain("default-src 'self'");
   expect(content).toContain("connect-src 'self' https:");
-  expect(content).toContain("script-src 'self'");
+  expect(content).toContain("script-src 'self' 'wasm-unsafe-eval'");
+  expect(content).toContain("media-src 'self' blob:");
   expect(content).toContain("object-src 'none'");
   expect(content).toContain("base-uri 'none'");
 });

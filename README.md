@@ -23,6 +23,7 @@
 - 文字高亮：选中文字 → 黄 / 红底色，持久保存于本机（不写回仓库）；
 - 文字笔记：选中文字 → 菜单「笔记」→ 输入并保存；锚点处出现笔记符号，点击查看/编辑，⋯ 菜单可列出当前文档全部笔记；随跨设备同步一起上传；
 - 文档朗读：阅读页 `⋯` 菜单「朗读」或选中文字「从这里朗读」；系统 TTS、句级高亮与跟随滚动、暂停/继续、上一句/下一句、语速、睡眠定时、断点续读；代码/表格/mermaid 默认跳过；Edge Android 语音列表为空时仍使用系统默认语音；
+- 离线语音包（可选）：朗读设置里下载 Matcha zh-en（约 140MB，ModelScope CDN，存本机 OPFS）；下载后切到本地引擎，完全离线合成、句内精确暂停；初始化/合成失败自动回退系统语音；删除后回退系统；
 - 自定义右键菜单：阅读正文内长按 / 右键弹出（复制 / 笔记 / 从这里朗读 / 高亮 / 清除高亮 / 全选）；
 - 手动横屏：阅读页头部「横屏 / 旋转」按钮 + 设置页三态单选（全手动，不跟随传感器）；锁定需要全屏上下文，浏览器标签下会自动进入全屏后重试（仍建议以主屏幕应用 / PWA 打开）；
 - 同一 GitHub 用户名下的多仓库：设置页添加 / 切换 / 删除；每个仓库拥有独立的本机书库（缓存、收藏、进度、标签页、高亮、笔记、训练数据互不串）；
@@ -44,12 +45,12 @@
 - 记忆助手真机验收清单（v1.3）：[`docs/acceptance-2026-10-19-memory-assistant.md`](docs/acceptance-2026-10-19-memory-assistant.md)
 - 跨设备同步设计（v1.7）：[`docs/specs/2026-10-20-data-sync-design.md`](docs/specs/2026-10-20-data-sync-design.md)
 - 文字笔记设计（v1.8）：[`docs/specs/2026-10-21-notes-design.md`](docs/specs/2026-10-21-notes-design.md)
-- 文档朗读设计（v1.10）：[`docs/specs/2026-10-21-tts-design.md`](docs/specs/2026-10-21-tts-design.md)
-- 浏览器 TTS 调研（v1.10）：[`docs/research/2026-10-21-browser-tts.md`](docs/research/2026-10-21-browser-tts.md)
+- 文档朗读设计（v1.11）：[`docs/specs/2026-10-21-tts-design.md`](docs/specs/2026-10-21-tts-design.md)
+- 浏览器 TTS 调研（v1.11）：[`docs/research/2026-10-21-browser-tts.md`](docs/research/2026-10-21-browser-tts.md)
 - OpenCode Go 代理设计：[`docs/specs/2026-10-21-opencode-go-proxy-design.md`](docs/specs/2026-10-21-opencode-go-proxy-design.md)
 - OpenCode Go 代理部署指南（Cloudflare Worker）：[`packages/opencode-proxy/README.md`](packages/opencode-proxy/README.md)
 - 文字笔记真机验收清单（v1.8）：[`docs/acceptance-2026-10-21-notes.md`](docs/acceptance-2026-10-21-notes.md)
-- 文档朗读验收清单（v1.10）：[`docs/acceptance-2026-10-21-tts.md`](docs/acceptance-2026-10-21-tts.md)
+- 文档朗读验收清单（v1.11）：[`docs/acceptance-2026-10-21-tts.md`](docs/acceptance-2026-10-21-tts.md)
 - 跨设备同步配置指南（Neon / JWT / SQL / CORS）：[`docs/sync-neon-setup.md`](docs/sync-neon-setup.md)
 - 跨设备同步验收清单（v1.7）：[`docs/acceptance-2026-10-20-data-sync.md`](docs/acceptance-2026-10-20-data-sync.md)
 

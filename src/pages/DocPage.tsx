@@ -734,6 +734,7 @@ export default function DocPage() {
       {ttsBarVisible && (
         <TtsBar
           state={tts.state}
+          engine={tts.engine}
           current={tts.current}
           total={tts.total}
           rate={tts.rate}
@@ -760,16 +761,26 @@ export default function DocPage() {
         <TtsSheet
           state={tts.state}
           prefs={tts.prefs}
+          engine={tts.engine}
           voiceOptions={tts.voiceOptions}
           hasAnyVoice={tts.voices.length > 0}
           selectedVoice={tts.selectedVoice}
           loadingVoices={tts.loadingVoices}
           sleepMinutes={tts.sleepMinutes}
           error={tts.error}
+          modelSupported={tts.modelSupported}
+          modelReady={tts.modelReady}
+          modelInfo={tts.modelInfo}
+          modelStatus={tts.modelStatus}
+          modelProgress={tts.modelProgress}
           onClose={() => setTtsOpen(false)}
           onSetRate={tts.setRate}
           onSetVoiceKey={tts.setVoiceKey}
           onSetPrefs={tts.setPrefs}
+          onSetEngine={tts.setEngine}
+          onDownloadModel={tts.downloadModel}
+          onCancelDownload={tts.cancelDownload}
+          onDeleteModel={tts.deleteModel}
           onSetSleepMinutes={tts.setSleepMinutes}
           onRestart={() => tts.start(0)}
           onStop={() => {
